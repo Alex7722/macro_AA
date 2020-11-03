@@ -76,9 +76,9 @@ bibliographic_coupling <- function(dt, source, ref, normalized_weight_only=TRUE)
 
 }
 
-bibliographic_cocitation <- function(dt, source, ref, normalized_weight_only=TRUE)
+bibliographic_cocitation <- function(dt, source, ref, normalized_weight_only=TRUE, weight_threshold = 1, output_in_character = TRUE)
 {
-  #' function for edges of bibliographic coupling
+  #' function for creating the edges of bibliographic cocitation
   #' 
   #' This function creates the cosine normalized edges of the bibliographic cocitation network, from a direct
   #' citation data frame.
@@ -92,9 +92,17 @@ bibliographic_cocitation <- function(dt, source, ref, normalized_weight_only=TRU
   #' @param ref
   #'the column name of the references that are cited.
   #'
-  #' @normalized_weight_only
+  #' @param normalized_weight_only
   #' if set to FALSE, the function returns the weights normalized by the cosine measure, 
   #' but also simply the number of shared references.
+  #' 
+  #' @param weight_threshold
+  #' Correspond to the value of the non-normalized weights of edges. The function just keeps the edges 
+  #' that have a non-normalized weight superior to the `weight_threshold`.
+  #' 
+  #' @param output_in_character
+  #' If TRUE, the function ends by transforming the `from` and `to` columns in character, to make the
+  #' creation of a tidygraph object easier.
   
   # Making sure the table is a datatable
   dt <- data.table(dt)
@@ -122,28 +130,50 @@ bibliographic_cocitation <- function(dt, source, ref, normalized_weight_only=TRU
   # remove loop
   bib_cocit <- bib_cocit[Source!=Target]
   
-  #Calculating the weight
-  bib_cocit <- bib_cocit[,.N,by=list(Source,Target)] # This is the number of go references
-  # We than do manipulations to normalize this number with the cosine measure
+  # counting the number of identical links across citing articles
+  bib_cocit <- bib_cocit[,.N, .(Source,Target)]
+  # keeping edges over threshold
+  bib_cocit <- bib_cocit[N>=weight_threshold]
+  
+  # We then do manipulations to normalize this number with the cosine measure
   bib_cocit <-  merge(bib_cocit, id_nb_cit, by.x = "Target",by.y = "id_ref" )
   setnames(bib_cocit,"nb_cit", "nb_cit_Target")
   bib_cocit <-  merge(bib_cocit, id_nb_cit, by.x = "Source",by.y = "id_ref" )
   setnames(bib_cocit,"nb_cit", "nb_cit_Source")
-  bib_cocit[,weighted_edge := N/sqrt(nb_cit_Target*nb_cit_Source)] # cosine measure
+  bib_cocit[,weight := N/sqrt(nb_cit_Target*nb_cit_Source)] # cosine measure
   
   # Renaming columns
-  setnames(bib_cocit, c("Source", "Target","N"), 
-           c(paste0(source,"_Source"), paste0(source,"_Target"), "nb_shared_references"))
+  setnames(bib_cocit, c("N"), 
+           c("nb_shared_references"))
+  
+  # Transforming the Source and Target columns in character (and keeping the Source and Target in copy)
+  if(output_in_character == TRUE){
+    bib_cocit$from <- as.character(bib_cocit$Source)
+    bib_cocit$to <- as.character(bib_cocit$Target)
+    if(normalized_weight_only==TRUE){
+      return (bib_cocit[, c("from","to","weight","Source","Target")])  
+    } else { 
+      return (bib_cocit[, c("from","to","weight","nb_shared_references","Source","Target")]) 
+    }
+  }
+  else{
+    if(normalized_weight_only==TRUE){
+      return (bib_cocit[, c("Source","Target","weight")])  
+    } else { 
+      return (bib_cocit[, c("Source","Target","weight","nb_shared_references")]) 
+    }
+  }
   
   # Selecting which columns to return
-  if(normalized_weight_only==TRUE){
-    return (bib_cocit[, c(1,2,6)])  
-  } else { 
-    return (bib_cocit[, c(1,2,3,6)]) 
-  }
+ # if(normalized_weight_only==TRUE){
+#    return (bib_cocit[, c("from","to","weight","Source","Target")])  
+#  } else { 
+#    return (bib_cocit[, c("from","to","weight","nb_shared_references")]) 
+#  }
   
 }
 
+docstring(bibliographic_cocitation)
 #################### Building graphs ##################################---------
 
 tbl_main_components  <- function(edges, nodes, directed = FALSE, node_key = NULL, nb_components = 1, threshold_alert = 0.05){
