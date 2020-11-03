@@ -1,0 +1,107 @@
+---
+title: "The Making of the Corpus for Macro"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    toc_float: true
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_knit$set(root.dir = "/projects/data/macro_AA")
+library(png)
+library(grid)
+library(ggnewscale)
+library(vite)
+library(RMySQL)
+library(NetworkToolbox)
+library(broom)
+library(igraph)
+library(data.table)
+library(ggplot2)
+library(magrittr)
+library(tm)
+library(tidyr)
+library(tidytext)
+library('cluster')
+library('ggraph')
+library('tibble')
+library('tidygraph')
+library(ggrepel)
+library(readr)
+library(leiden)
+library(ggraph)
+library(ggnewscale)
+library(remotes)
+library(vite)
+library("reticulate")
+library(reticulate)
+library(leiden)
+library(tidygraph)
+library(rlang)
+library(leiden)
+library(ggforce)
+library(d3Network)
+library(scales)
+library(RColorBrewer)
+require(DescTools)
+require(stringr)
+
+```
+
+# The JEL corpus
+
+We started with all articles identified by the JEL codes from MACRO (ADD EXACT LIST) up until 2012. (Shoud we stop the corpus after 2010 ?).
+
+This gaves us 105 333 articles:
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+dt_JEL_Articles <- readRDS("Corpus_Econlit/dt_JEL_Articles.rds")
+nrow(dt_JEL_Articles)
+
+
+```
+
+With the following distribution :
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+ggplot(dt_JEL_Articles, aes(Year.V1)) + 
+  theme(axis.text=element_text(size=8)) +
+  geom_bar()
+
+
+```
+
+# Matching with Web of Science
+
+We matched our list of articles with the Web of Science data base using two techniques:  
+
+1. We matched articles that shared the same year of publication, journal name, pages number and volume number resulting  
+We matched **35 378 articles**
+  
+2. We harmonized the title of the articles on WoS and our JEL corpus by removing special symbols (! ? ;), extra white spaces, and having all title as lowercase.  
+We also removed all articles with Title containing less than three words to limit mismatching of articles with very short names.  
+We matched **40 433 articles**
+  
+3. Finally, we brought the two corpus together and only kept unique articles, for a total of **44 833 unique articles**.
+
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+JEL_matched_corpus_nodes <- readRDS("Corpus_Econlit_Matched_WoS/JEL_matched_corpus_nodes.rds")
+nrow(JEL_matched_corpus_nodes)
+
+
+```
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+ggplot(JEL_matched_corpus_nodes, aes(as.character(Annee_Bibliographique))) + 
+  theme(axis.text=element_text(size=8)) +
+  geom_bar()
+
+
+```
+
+
