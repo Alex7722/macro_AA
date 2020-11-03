@@ -6,9 +6,11 @@ if ("docstring" %in% installed.packages()==FALSE)
 }
 library(docstring)
 
+#########################################################################
+############ General functions for network analysis #####################-----
+#########################################################################
 
-############ General functions for network analysis ################-----
-
+######################## Building Nodes and Edges #######################------
 
 bibliographic_coupling <- function(dt, source, ref, normalized_weight_only=TRUE)
 {
@@ -142,33 +144,98 @@ bibliographic_cocitation <- function(dt, source, ref, normalized_weight_only=TRU
   
 }
 
+#################### Building graphs ##################################---------
 
-tbl_main_components  <- function(edges, nodes, directed = FALSE, nb_components = 1){
+tbl_main_components  <- function(edges, nodes, directed = FALSE, node_key = NULL, nb_components = 1, threshold_alert = 0.05){
   #' Main component tidygraph from edges and nodes
   #' 
-  #' A function which i) creates an igraph graph from edges and nodes, ii) transforms the igraph graph 
-  #' in a tidygraph graph and iii) keep the main components of the graph.
+  #' A function which i) creates a tidygraph graph; ii) keeps the main components of the graph; and iii) warns
+  #' the user if the first biggest component removed is too large.
   #' 
   #' @param edges
-  #' A dataframe with a list of links between nodes.
+  #' A dataframe with a list of links between nodes, under the columns "from" and "to". The two columns should
+  #' be characters.
   #' 
   #' @param nodes
-  #' A dataframe with a list of nodes. If no column titled `name` in the dataframe, the first column 
-  #' would become the `name` column. Be careful to avoid doublons in the `name` column.
+  #' A dataframe with a list of nodes. The first column will be used as the identifying column. 
+  #' Be careful to avoid doublons in the first column. The first column should be characters.
   #' 
   #' @param directed
   #' By default, the graph is computed as a non-directed graph.
   #' 
+  #' @param node_key
+  #' The name of the identifying column in the nodes dataframe.
+  #' 
   #' @param nb_components
   #' By default, the function takes the main component of the graph (nb_components = 1). However it is possible to take as 
   #' many components as you wish Component 1 is the largest one, component 2 is the second one, etc.
-graph <-  graph_from_data_frame(d=edges, vertices = nodes, directed = directed)
-graph <- as_tbl_graph(graph)
-#Keep Main Component
-graph <- graph %>% 
-  activate(nodes) %>% 
-  mutate(components_att = group_components(type = "weak")) %>% 
-  filter(components_att <= nb_components)
+  #' 
+  #' @param threshold_alert
+  #' If the biggest component after the last one selection (by default, nb_component = 1) gathers more than x% (by default, 5%) of the total number of nodes,
+  #' the function triggers a warning to inform the user that he has removed a big component of the network.
+  #' 
+  #' @details 
+  #' The function will automatically rename the first column of nodes as "Id".
+ 
+  # creating the tidygraph object
+   graph <- tbl_graph(nodes = nodes, edges = edges, directed = FALSE, node_key = node_key)
+  
+  # attributing a number to the different components (1 is the biggest components)
+  graph <- graph %>% 
+    activate(nodes) %>% 
+    mutate(components_att = group_components(type = "weak")) %>% 
+    rename_at( 1, ~"Id" ) # renamed the first column to a standard format
+  
+# looking at the biggest component just after the last one we have kept
+  threshold <- graph %>% 
+    filter(components_att== nb_components + 1) %>% 
+    rename_at( 1, ~"Id" ) 
+
+# looking at the percentage of nodes in the biggest component just after the last one we have kept
+  # trigger a warning if superior to the threshold_alert
+  if(length(V(threshold)$Id)/length(V(graph)$Id) > threshold_alert)warning(paste0("Warning: you have removed a component gathering more than ",threshold_alert,"% of the nodes"))
+
+# keeping only the number of components we want
+  graph <- graph %>% 
+    filter(components_att== nb_components) %>%
+    select(-components_att) # we remove the column as it won't be useful after that
+}
+
+components_distribution  <- function(edges, nodes, directed = FALSE, node_key = NULL){
+  #' Distribution of nodes in components
+  #' 
+  #' A function which creates the graph from nodes and edges and gives a table with the percentage of nodes in each component.
+  #' 
+  #' @param edges
+  #' A dataframe with a list of links between nodes, under the columns "from" and "to". The two columns should
+  #' be characters.
+  #' 
+  #' @param nodes
+  #' A dataframe with a list of nodes. The first column will be used as the identifying column. 
+  #' Be careful to avoid doublons in the first column. The first column should be characters.
+  #' 
+  #' @param directed
+  #' By default, the graph is computed as a non-directed graph.
+  #' 
+  #' @param node_key
+  #' The name of the identifying column in the nodes dataframe.
+  #' 
+  #' @section Future improvements
+  #' Integrate the function directly in the `tbl_main_components` function, as a second object. Imply
+  #' to find how to return two objects with a function.
+  
+  # creating the tidygraph object
+  graph <- tbl_graph(nodes = nodes, edges = edges, directed = FALSE, node_key = node_key)
+  
+  # attributing a number to the different components (1 is the biggest components)
+  Components_data <- graph %>% 
+    activate(nodes) %>% 
+    mutate(components_att = group_components(type = "weak")) %>% 
+    rename_at( 1, ~"Id" )  %>% 
+    as.data.table() 
+  
+  Components_data <- Components_data[, N_nodes_components := .N, by = "components_att"][, N_nodes_total := .N][, percentage_nodes_components := N_nodes_components/N_nodes_total*100]
+  Components_data <- unique(Components_data[order(components_att),c("components_att","N_nodes_components","percentage_nodes_components")])
 }
 
 # Running Leiden for two different resolutions and associating edges to communities
@@ -199,7 +266,7 @@ leiden_improved <- function(graph, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iter
   #' @details To make plotting easier later, a zero is put before each one-digit community number (community 5 becomes 05).
   #' @details The community attribute of nodes and edges for the first resolution is called `Com_ID`. 
   #' For the second and third resolution, it is called respectively `Com_ID_2` and `Com_ID_3`.
-  #' @detail Attributing a community number to edges enable to give edges the same color of the nodes
+  #' @details Attributing a community number to edges enable to give edges the same color of the nodes
   #' they are connecting, if the two nodes have the same color, or a different color than any node, if 
   #' the nodes belong to a different community.
   #' 
@@ -215,7 +282,8 @@ leiden_improved <- function(graph, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iter
   
   # Add the resulting partition as an attribute of nodes
   # (to make plotting easier, put a 0 before one digit community)
-  graph <- graph %>% mutate(Com_ID = str_pad(leiden, 2, pad = "0"))
+  graph <- graph %>% mutate(Com_ID = sprintf("%02d", leiden)) %>% 
+    mutate(Com_ID = as.character(Com_ID))
   
   # Add an attribute to edges, depending on the community of their nodes
   # (If communities are different between the two nodes, edges takes the total number of communities plus 1 as attribute)
@@ -233,7 +301,8 @@ leiden_improved <- function(graph, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iter
   leiden_2 <- leiden(graph, resolution_parameter = res_2, n_iterations = n_iterations)
   graph <- graph %>%
     activate(nodes) %>%
-    mutate(Com_ID_2 = str_pad(leiden_2, 2, pad = "0"))
+    mutate(Com_ID_2 = sprintf("%02d", leiden)) %>% 
+    mutate(Com_ID_2 = as.character(Com_ID))
   
   graph <- graph %>% 
     activate(edges) %>%
@@ -248,12 +317,49 @@ leiden_improved <- function(graph, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iter
     leiden_3 <- leiden(graph, resolution_parameter = res_3, n_iterations = n_iterations)
     graph <- graph %>%
       activate(nodes) %>%
-      mutate(Com_ID_3 = str_pad(leiden_3, 2, pad = "0"))
+      mutate(Com_ID_3 = sprintf("%02d", leiden)) %>% 
+      mutate(Com_ID_3 = as.character(Com_ID))
     
     graph <- graph %>% 
       activate(edges) %>%
       mutate(Com_ID_3_to = .N()$Com_ID_3[to], Com_ID_3_from = .N()$Com_ID_3[from], Com_ID_3 = ifelse(Com_ID_3_from == Com_ID_3_to, Com_ID_3_from,(max(leiden_3)+1)))
   }
+}
+
+# function for integrating the color to the communities
+
+# Running Leiden for two different resolutions and associating edges to communities
+community_colors <- function(graph, palette){
+  #' Creates color attribute depending on communities
+  #' 
+  #' @description This function takes as an input a graph, with a column for nodes and edges called `Com_ID`
+  #' and attribute to each community a color. If the two nodes connected by an edge have a different community,
+  #' the function mixes the color of the two communities.
+  #' 
+  #' @param graph A tidygraph object.
+  #' 
+  #' @param palette The palette to be used for attributing colors to communities.
+  #' 
+  #' @section Future improvements
+  #' Adding a feature to use any name for the community column, rather than uniquely "Com_ID". 
+  #' Adding a feature to give color to different resolution communities (if we have used two or three
+  #' resolution, for having a different number of communities).
+
+#Setup Colors
+color = data.table(
+  Com_ID = 1:500,
+  color = palette)
+color<-color %>%  mutate(Com_ID = sprintf("%02d", Com_ID)) %>% mutate(Com_ID = as.character(Com_ID))
+
+#Add color to nodes
+graph <- graph %>% 
+  activate(nodes) %>% 
+  left_join(color)
+#Mix color for edges of different color
+graph <- graph %>% #mix color
+  activate(edges) %>%
+  mutate(color_com_ID_to = .N()$color[to], color_com_ID_from = .N()$color[from]) %>%
+  mutate(color_edges = MixColor(color_com_ID_to, color_com_ID_from, amount1 = 0.5)) 
 }
 
 # Computing different centrality stats
