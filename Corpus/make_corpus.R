@@ -178,7 +178,7 @@ gc()
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
 # all art and all refs
-all_ref <-  dbGetQuery(ESH, paste0("SELECT OST_Expanded_SciHum.References7.ItemID_Ref, OST_Expanded_SciHum.References7.Annee, OST_Expanded_SciHum.References7.Nom, OST_Expanded_SciHum.References7.ID_Art FROM OST_Expanded_SciHum.References7 WHERE ItemID_Ref != 0;")) %>%  data.table
+all_ref <-  dbGetQuery(ESH, paste0("SELECT OST_Expanded_SciHum.References7.New_id2, OST_Expanded_SciHum.References7.Annee, OST_Expanded_SciHum.References7.Nom, OST_Expanded_SciHum.References7.ID_Art FROM OST_Expanded_SciHum.References7 WHERE New_id2 != 0;")) %>%  data.table
 all_aut <-  dbGetQuery(ESH, paste0("SELECT OST_Expanded_SciHum.Articles.ID_Art, OST_Expanded_SciHum.Articles.Titre, OST_Expanded_SciHum.Articles.Annee_Bibliographique, OST_Expanded_SciHum.Articles.Code_Revue, OST_Expanded_SciHum.Articles.ItemID_Ref, OST_Expanded_SciHum.Auteurs.Nom, OST_Expanded_SciHum.Auteurs.Ordre
                                    FROM OST_Expanded_SciHum.Articles
                                    JOIN OST_Expanded_SciHum.Auteurs ON OST_Expanded_SciHum.Articles.ID_Art=OST_Expanded_SciHum.Auteurs.ID_Art")) %>%  data.table
