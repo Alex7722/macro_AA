@@ -1,0 +1,22 @@
+# Add any directories, files, or patterns you don't want to be tracked by version control
+# Ignore data files
+*.rds
+*.Rdata
+*.RData
+*.RDS
+*.Rproj
+*.csv
+*.png
+
+# Ignoring html (usually compiled from Rmd)
+*.html
+
+# Ignore compiled files
+**.pyc
+# Ignore directories (e.g., with config files)
+**/.idea
+**/__pycache__
+**_cache/
+.Rproj.user
+.Rhistory
+
