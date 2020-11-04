@@ -49,7 +49,12 @@ library(scales)
 library(RColorBrewer)
 require(DescTools)
 require(stringr)
-
+color = data.table(
+  Leiden1 = 1:500,
+  color = brewer.pal(8, name = "Dark2"))
+color[Leiden1>8 & Leiden1<=16, color:=brewer.pal(8, name = "Set1")]
+color[,Leiden1:=sprintf("%02d", Leiden1)]
+color[,Leiden1:=as.character(Leiden1)]
 ```
 
 # The JEL corpus
@@ -68,14 +73,13 @@ nrow(dt_JEL_Articles)
 With the following distribution :
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
-ggplot(dt_JEL_Articles, aes(Year.V1)) + 
-  theme(axis.text=element_text(size=8)) +
+ggplot(dt_JEL_Articles, aes(as.numeric(Year.V1))) + 
   geom_bar()
 
 
 ```
 
-# Matching with Web of Science
+## Matching with Web of Science
 
 We matched our list of articles with the Web of Science data base using two techniques:  
 
@@ -88,6 +92,7 @@ We matched **40 433 articles**
   
 3. Finally, we brought the two corpus together and only kept unique articles, for a total of **44 833 unique articles**.
 
+The growth rate of the corpus is similar, therefore there is probably not a lot of mismatching
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
 JEL_matched_corpus_nodes <- readRDS("Corpus_Econlit_Matched_WoS/JEL_matched_corpus_nodes.rds")
@@ -97,11 +102,229 @@ nrow(JEL_matched_corpus_nodes)
 ```
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
-ggplot(JEL_matched_corpus_nodes, aes(as.character(Annee_Bibliographique))) + 
-  theme(axis.text=element_text(size=8)) +
+ggplot(JEL_matched_corpus_nodes, aes(Annee_Bibliographique)) + 
   geom_bar()
 
 
+```
+
+
+# Extending the corpus 
+
+## Finding the Core
+
+The first step to extended our corpus beyond JEL codes, is to find the core references of our corpus. We first find the most referenced articles and defined a threshold to keep only relevant articles. The threshold is found by looking for a point of inflection in the growth rate of the corpus given different thresholds).
+
+We chose a threshold of **9** giving us **16 822** articles, **13 670** articles of which are on WoS.
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+
+tresholds_core.png <- readPNG('Corpus_Extended/tresholds_core.png')
+grid.raster(tresholds_core.png)
+
+```
+
+
+## Extending the Core
+
+From this Core, we find all relevant articles to macro. These articles are not necessarily macro per se, but they are relevant to understand the structural relationships that make macro.
+
+We follow the same procedure and find a relevant threshold for the most cited articles by our Core, but also for the articles citing our Core the most:
+
+1. For citations to the core we chose a threshold of **6**, and matched **88 425 articles**
+
+2. For references of the core we chose a threshold of **7**, and giving us  **8 213 articles**, **6 819** articles of which are on WoS.
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+
+tresholds_citations_to_core.png <- readPNG('Corpus_Extended/tresholds_citations_to_core.png')
+grid.raster(tresholds_citations_to_core.png)
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+
+tresholds_references_to_core.png <- readPNG('Corpus_Extended/tresholds_references_to_core.png')
+grid.raster(tresholds_references_to_core.png)
+
+```
+
+
+
+# A look at the network
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+# JEL_matched_corpus_nodes <- readRDS("Corpus_Econlit_Matched_WoS/JEL_matched_corpus_nodes.rds")
+# JEL_matched_corpus_edges <- readRDS("Corpus_Econlit_Matched_WoS/JEL_matched_corpus_edges.rds")
+# JEL_matched_corpus_edges <- JEL_matched_corpus_edges[ItemID_Ref!=0]
+# 
+# nb_cit<-JEL_matched_corpus_edges[,.N,ItemID_Ref]
+# 
+# JEL_matched_corpus_nodes <- JEL_matched_corpus_nodes[Annee_Bibliographique<1995]
+# JEL_matched_corpus_nodes <- merge(JEL_matched_corpus_nodes,nb_cit, by = "ItemID_Ref", all.x = "TRUE")
+# JEL_matched_corpus_nodes[N=="NA",N:=0]
+# JEL_matched_corpus_nodes[N>3]
+# setnames(JEL_matched_corpus_nodes,"N", "nb_cit")
+# 
+# JEL_matched_corpus_edges <- JEL_matched_corpus_edges[ID_Art %in% JEL_matched_corpus_nodes$ID_Art]
+# 
+# bibliographic_coupling <- function(dt, source, ref, normalized_weight_only=TRUE, y)
+# {
+#   #' function for edges of bibliographic coupling
+#   #' 
+#   #' This function creates the cosine normalized edges of the bibliographic coupling network, from a direct
+#   #' citation data frame.
+#   #' 
+#   #' @param dt
+#   #' The table with citing and cited documents.
+#   #' 
+#   #' @param source
+#   #' the column name of the source identifiers, that is the documents that are citing. 
+#   #'
+#   #' @param ref
+#   #'the column name of the references that are cited.
+#   #'
+#   #' @normalized_weight_only
+#   #' if set to FALSE, the function returns the weights normalized by the cosine measure, 
+#   #' but also simply the number of shared references.
+#     # Making sure the table is a datatable
+#     dt <- data.table(dt)
+#   # Renaming and simplifying 
+#   setnames(dt, c(source,ref), c("id_art", "id_ref"))
+#   dt <- dt[,list(id_art,id_ref)]
+#   setkey(dt,id_ref,id_art)
+#   # Computing how many items each citing document has (necessary for normalization later)
+#   id_nb_cit <-  dt[,list(nb_cit = .N),by=id_art]
+#   # Removing references cited only once:
+#   dt <- dt[,N := .N, by = id_ref][N > 1][, list(id_art,id_ref)]
+#   #Creating every combinaison of articles per references
+#   bib_coup <- dt[,list(Target = rep(id_art[1:(length(id_art)-1)],(length(id_art)-1):1),
+#                        Source = rev(id_art)[sequence((length(id_art)-1):1)]),
+#                  by= id_ref]
+#   # remove loop
+#   bib_coup <- bib_coup[Source!=Target]
+#   #Calculating the weight
+#   bib_coup <- bib_coup[,.N,by=list(Target,Source)] # This is the number of go references
+#   bib_coup <- bib_coup[N>y]
+#   # We than do manipulations to normalize this number with the cosine measure
+#   bib_coup <-  merge(bib_coup, id_nb_cit, by.x = "Target",by.y = "id_art" )
+#   setnames(bib_coup,"nb_cit", "nb_cit_Target")
+#   bib_coup <-  merge(bib_coup, id_nb_cit, by.x = "Source",by.y = "id_art" )
+#   setnames(bib_coup,"nb_cit", "nb_cit_Source")
+#   bib_coup[,weighted_edge := N/sqrt(nb_cit_Target*nb_cit_Source)] # cosine measure
+#   # Renaming columns
+#   setnames(bib_coup, c("Source", "Target","N"), 
+#            c(paste0(source,"_Source"), paste0(source,"_Target"), "nb_shared_references"))
+#   # Selecting which columns to return
+#   if(normalized_weight_only==TRUE){
+#     return (bib_coup[, c(1,2,6)])  
+#   } else { 
+#     return (bib_coup[, c(1,2,3,6)]) 
+#   }
+# }
+# 
+# JEL_matched_corpus_edges <- bibliographic_coupling(JEL_matched_corpus_edges, "ID_Art", "ItemID_Ref", y=3)
+# JEL_matched_corpus_edges[,from:=as.character(ID_Art_Source)]
+# JEL_matched_corpus_edges[,to:=as.character(ID_Art_Target)]
+# setnames(JEL_matched_corpus_edges,"weighted_edge", "weight")
+# 
+# JEL_matched_corpus_nodes <- JEL_matched_corpus_nodes[ID_Art %in% JEL_matched_corpus_edges$from | ID_Art %in% JEL_matched_corpus_edges$to] 
+# JEL_matched_corpus_nodes[,Id:=as.character(ID_Art)]
+# 
+# 
+# 
+# tbl_coupling <- tbl_graph(nodes = JEL_matched_corpus_nodes, edges = JEL_matched_corpus_edges, directed = FALSE, node_key = "Id")
+```
+
+```{r error=FALSE, message=FALSE, warning=FALSE, cache=FALSE, results=TRUE}
+# 
+# #Inspect the size of the components
+# components <- tbl_coupling %>% 
+#   activate(nodes) %>% 
+#   mutate(components_att = group_components(type = "weak")) %>% 
+#   as.data.table()
+# components[,.N,components_att][order(-N)]
+# 
+# 
+# #Keep Main Component
+# tbl_coupling <- tbl_coupling %>% 
+#   activate(nodes) %>% 
+#   mutate(components_att = group_components(type = "weak")) %>% 
+#   filter(components_att == 1)
+# 
+# #Some metrics
+# tbl_coupling <- tbl_coupling %>% 
+#   activate(nodes) %>% 
+#   mutate(betweenness = centrality_betweenness(
+#     weights = weight,
+#     directed = FALSE,
+#     normalized = TRUE)) %>%
+#   mutate(closeness = centrality_closeness(
+#     weights = weight,
+#     normalized = TRUE)) %>% 
+#   mutate(degree = centrality_degree(
+#     weights = weight,
+#     loops = FALSE,
+#     normalized = FALSE))
+# 
+# #Leiden
+# leiden <- leiden(tbl_coupling, resolution_parameter = 1, n_iterations = -1, weights = weight, seed = 1)
+# tbl_coupling <- tbl_coupling %>% activate(nodes) %>% mutate(Leiden_num = leiden) %>% mutate(Leiden1 = leiden) %>% mutate(Leiden1 = sprintf("%02d", Leiden1)) %>% mutate(Leiden1 = as.character(Leiden1))
+# #Add color to nodes
+# tbl_coupling <- tbl_coupling %>% 
+#   activate(nodes) %>% 
+#   left_join(color)
+# #Mix color for edges of different color
+# tbl_coupling <- tbl_coupling %>% #mix color
+#   activate(edges) %>%
+#   mutate(com_ID_to = .N()$color[to], com_ID_from = .N()$color[from]) %>%
+#   mutate(color_edges = MixColor(com_ID_to, com_ID_from, amount1 = 0.5))  # .N() makes the node data available while manipulating edges
+# 
+# 
+# #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+# #### PART III : Layout #### 
+# #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+# #Force Atlas 2 (without overlap)
+# fa_lay <- layout_forceatlas2(tbl_coupling, ew.influence = 1, kgrav = 1, iter = 10000,
+#                              prevent.overlap = FALSE, fixed = NULL, stopping.tolerance = 0.001,
+#                              barnes.hut = TRUE)
+# 
+# fa_lay <- fa_lay$lay %>% as.data.table
+# tbl_coupling <- tbl_coupling %>% activate(nodes) %>% mutate(x = fa_lay$x, y = fa_lay$y)  
+# 
+# #Force Atlas 2 (with overlap)
+# fa_lay <- layout_forceatlas2(tbl_coupling, ew.influence = 1, kgrav = 1, iter = 1000,
+#                              prevent.overlap = TRUE, fixed = NULL, stopping.tolerance = 0.001,
+#                              barnes.hut = TRUE)
+# 
+# fa_lay <- fa_lay$lay %>% as.data.table
+# tbl_coupling <- tbl_coupling %>% activate(nodes) %>%  mutate(x = fa_lay$x, y = fa_lay$y)  
+# 
+# #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+# #### PART III : Layout #### 
+# #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+# 
+# 
+# label_com <-tbl_coupling %>% 
+#   activate(nodes) %>% 
+#   as.data.table()
+# # label_com <- label_com[,n_pays:=.N,Institution][order(-n_pays)][, head(.SD, 1), Institution][, head(.SD, 4)]
+# label_com <- label_com[order(-nb_cit)][, head(.SD, 3), Leiden1]
+#   
+# 
+# 
+# ggraph(tbl_coupling, "manual", x = x, y = y) +
+#   geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
+#   geom_node_point(aes(fill = color, size = nb_cit), pch=21) +
+#   scale_edge_width_continuous(range = c(0.5, 1)) +
+#   theme_void() +
+#   geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 4, fill = color)) +
+#   theme(legend.position = "none") +
+#   scale_fill_identity() +
+#   scale_edge_colour_identity() +
+#   scale_size_continuous(range = c(1, 6)) +
+#   ggsave("Networks/coupling_alex.png", width=45, height=45, units = "cm")
 ```
 
 
