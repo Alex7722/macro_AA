@@ -12,7 +12,7 @@ library(docstring)
 
 ######################## Building Nodes and Edges #######################------
 
-bibliographic_coupling <- function(dt, source, ref, normalized_weight_only=TRUE)
+bibliographic_coupling <- function(dt, source, ref, normalized_weight_only=TRUE, weight_threshold = 1, output_in_character = TRUE)
 {
   #' function for edges of bibliographic coupling
   #' 
@@ -31,6 +31,14 @@ bibliographic_coupling <- function(dt, source, ref, normalized_weight_only=TRUE)
   #' @normalized_weight_only
   #' if set to FALSE, the function returns the weights normalized by the cosine measure, 
   #' but also simply the number of shared references.
+  #' 
+  #' @param weight_threshold
+  #' Correspond to the value of the non-normalized weights of edges. The function just keeps the edges 
+  #' that have a non-normalized weight superior to the `weight_threshold`.
+  #' 
+  #' @param output_in_character
+  #' If TRUE, the function ends by transforming the `from` and `to` columns in character, to make the
+  #' creation of a tidygraph object easier.
 
     # Making sure the table is a datatable
     dt <- data.table(dt)
@@ -56,22 +64,38 @@ bibliographic_coupling <- function(dt, source, ref, normalized_weight_only=TRUE)
   
   #Calculating the weight
   bib_coup <- bib_coup[,.N,by=list(Target,Source)] # This is the number of go references
+  
+  # keeping edges over threshold
+  bib_coup <- bib_coup[N>=weight_threshold]
+  
   # We than do manipulations to normalize this number with the cosine measure
   bib_coup <-  merge(bib_coup, id_nb_cit, by.x = "Target",by.y = "id_art" )
   setnames(bib_coup,"nb_cit", "nb_cit_Target")
   bib_coup <-  merge(bib_coup, id_nb_cit, by.x = "Source",by.y = "id_art" )
   setnames(bib_coup,"nb_cit", "nb_cit_Source")
-  bib_coup[,weighted_edge := N/sqrt(nb_cit_Target*nb_cit_Source)] # cosine measure
+  bib_coup[,weight := N/sqrt(nb_cit_Target*nb_cit_Source)] # cosine measure
   
   # Renaming columns
-  setnames(bib_coup, c("Source", "Target","N"), 
-           c(paste0(source,"_Source"), paste0(source,"_Target"), "nb_shared_references"))
+  setnames(bib_coup, c("N"), 
+           c("nb_shared_references"))
   
-  # Selecting which columns to return
-  if(normalized_weight_only==TRUE){
-    return (bib_coup[, c(1,2,6)])  
-  } else { 
-    return (bib_coup[, c(1,2,3,6)]) 
+  # Transforming the Source and Target columns in character (and keeping the Source and Target in copy)
+  # Then selection which columns to return
+  if(output_in_character == TRUE){
+    bib_coup$from <- as.character(bib_coup$Source)
+    bib_coup$to <- as.character(bib_coup$Target)
+    if(normalized_weight_only==TRUE){
+      return (bib_coup[, c("from","to","weight","Source","Target")])  
+    } else { 
+      return (bib_coup[, c("from","to","weight","nb_shared_references","Source","Target")]) 
+    }
+  }
+  else{
+    if(normalized_weight_only==TRUE){
+      return (bib_coup[, c("Source","Target","weight")])  
+    } else { 
+      return (bib_coup[, c("Source","Target","weight","nb_shared_references")]) 
+    }
   }
 
 }
@@ -492,7 +516,7 @@ naming_communities <- function(graph, centrality_measure = "Strength",naming = "
     left_join(Community_names, by = "Com_ID_2")
 }
   
-  # Reproducing the same operation for Com_ID_2 if it exists
+  # Reproducing the same operation for Com_ID_3 if it exists
 if(!is.null(V(graph)$Com_ID_3)){ 
   Community_names <- graph %>%
     activate(nodes) %>%
@@ -595,11 +619,67 @@ force_atlas <- function(graph,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 =
 }
 
 # Simple functions for keeping a number n of nodes with highest centrality measures per communities
-top_centrality_com <- function(graph, top_n = 3){
-  top_strength_com <- as_tibble(graph) %>%
-    arrange(desc(Strength)) %>%
+top_centrality_com <- function(graph, centrality, top_n = 3){
+  top_centrality_com <- graph %>%
+    activate(nodes) %>%
+    as_tibble() %>%
+    arrange(desc(centrality)) %>%
     group_by(Com_ID) %>% 
     slice(1:top_n)
+  
+  top_centrality_com <- graph %>%
+    activate(nodes) %>%
+    as_tibble() %>%
+    arrange(desc(centrality)) %>%
+    group_by(Com_ID) %>% 
+    slice(1:top_n)
+  
+  top_centrality
+}
+
+# Simple functions for keeping a number n of nodes with highest citations measures per communities
+top_citations <- function(graph, top_n = 20, top_n_com = 1){
+  #' Displaying the highest cited nodes
+  #' 
+  #' A simple functions for keeping a number n of nodes with highest citations 
+  #' per communities and a number m of nodes with highest citations in general.
+  #' 
+  #' @param graph
+  #' A tidygraph object.
+  #' 
+  #' @param top_n
+  #' The number of highest cited nodes in general to display.
+  #' 
+  #' @param top_n_com
+  #' The number of highest cited nodes per community to display.
+  #' 
+  #' @details 
+  #' Works only if you have a column called `nb_cit`
+  #' 
+  #' @section Future improvements
+  #' Finding a way to name the column in the arguments of the function. The problem here
+  #' is that you need to put the column name between quotation marks in the function, but
+  #' you have to use it without quotation mark in the function.
+  
+  # Most citing nodes per community
+  top_citations_com <- graph %>%
+    activate(nodes) %>%
+    as_tibble() %>%
+    arrange(desc(nb_cit)) %>%
+    group_by(Com_ID) %>% 
+    slice(1:top_n_com) %>%
+    as.data.table()
+ 
+  # Most citing nodes in general 
+  top_citations_general <- graph %>%
+    activate(nodes) %>%
+    as_tibble() %>%
+    arrange(desc(nb_cit)) %>%
+    slice(1:top_n)%>%
+    as.data.table()
+  
+  # adding the two and removing the doublons
+  top_centrality_sum <- unique(rbind(top_citations_general, top_citations_com))
 }
 
 # Ideally, a parameter to choose which centrality measure to apply
@@ -609,7 +689,7 @@ important_nodes <- function(graph, top_n = 3){
     strength_range <- as_tibble(graph) %>%
     arrange(desc(Strength)) %>%
       group_by(Com_ID) %>% 
-      slice(1:top_n)
+      slice(1:top_n) 
 
     betweeness_range <-  as_tibble(graph) %>%
       arrange(desc(Betweeness)) %>% 
