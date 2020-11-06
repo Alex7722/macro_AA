@@ -6,11 +6,13 @@ if ("docstring" %in% installed.packages()==FALSE)
 }
 library(docstring)
 
-#########################################################################
-############ General functions for network analysis #####################-----
-#########################################################################
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+################## PART I: GENERAL FUNCTIONS FOR NETWORK ANALYSIS #######################-----
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
-######################## Building Nodes and Edges #######################------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+######################## 1) Building Nodes and Edges ########################------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
 bibliographic_coupling <- function(dt, source, ref, normalized_weight_only=TRUE, weight_threshold = 1, output_in_character = TRUE)
 {
@@ -48,11 +50,17 @@ bibliographic_coupling <- function(dt, source, ref, normalized_weight_only=TRUE,
   dt <- dt[,list(id_art,id_ref)]
   setkey(dt,id_ref,id_art)
   
-  # Computing how many items each citing document has (necessary for normalization later)
-  id_nb_cit <-  dt[,list(nb_cit = .N),by=id_art]
+  # removing duplicated citations with exactly the same source and target
+  dt <- unique(dt)
+  
+  # remove loop
+  dt <- dt[source!=ref]
   
   # Removing references cited only once:
   dt <- dt[,N := .N, by = id_ref][N > 1][, list(id_art,id_ref)]
+  
+  # Computing how many items each citing document has (necessary for normalization later)
+  id_nb_cit <-  dt[,list(nb_cit = .N),by=id_art]
   
   #Creating every combinaison of articles per references
   bib_coup <- dt[,list(Target = rep(id_art[1:(length(id_art)-1)],(length(id_art)-1):1),
@@ -136,14 +144,17 @@ bibliographic_cocitation <- function(dt, source, ref, normalized_weight_only=TRU
   dt <- dt[,list(id_art,id_ref)]
   setkey(dt,id_ref,id_art)
   
-  # Computing how many items each cited document has (necessary for normalization later)
-  id_nb_cit <-  dt[,list(nb_cit = .N),by=id_ref]
-  
   # removing duplicated citations with exactly the same source and target
   dt <- unique(dt)
   
-  # Removing references cited only once:
+  # remove loop
+  dt <- dt[source!=ref]
+  
+  # Removing documents with only one reference:
   dt <- dt[, N := .N, by = id_art][N > 1][, list(id_art,id_ref)]
+  
+  # Computing how many items each cited document has (necessary for normalization later)
+  id_nb_cit <-  dt[,list(nb_cit = .N),by=id_ref]
   
   #Creating every combinaison of articles per references
   bib_cocit <- dt[,list(Target = rep(id_ref[1:(length(id_ref)-1)],(length(id_ref)-1):1),
@@ -197,8 +208,9 @@ bibliographic_cocitation <- function(dt, source, ref, normalized_weight_only=TRU
   
 }
 
-docstring(bibliographic_cocitation)
-#################### Building graphs ##################################---------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+############################# 2) Building graphs - Basics ############################---------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
 tbl_main_components  <- function(edges, nodes, directed = FALSE, node_key = NULL, nb_components = 1, threshold_alert = 0.05){
   #' Main component tidygraph from edges and nodes
@@ -381,8 +393,6 @@ leiden_improved <- function(graph, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iter
 }
 
 # function for integrating the color to the communities
-
-# Running Leiden for two different resolutions and associating edges to communities
 community_colors <- function(graph, palette){
   #' Creates color attribute depending on communities
   #' 
@@ -618,25 +628,6 @@ force_atlas <- function(graph,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 =
     mutate(x = fa$x, y = fa$y)
 }
 
-# Simple functions for keeping a number n of nodes with highest centrality measures per communities
-top_centrality_com <- function(graph, centrality, top_n = 3){
-  top_centrality_com <- graph %>%
-    activate(nodes) %>%
-    as_tibble() %>%
-    arrange(desc(centrality)) %>%
-    group_by(Com_ID) %>% 
-    slice(1:top_n)
-  
-  top_centrality_com <- graph %>%
-    activate(nodes) %>%
-    as_tibble() %>%
-    arrange(desc(centrality)) %>%
-    group_by(Com_ID) %>% 
-    slice(1:top_n)
-  
-  top_centrality
-}
-
 # Simple functions for keeping a number n of nodes with highest citations measures per communities
 top_citations <- function(graph, top_n = 20, top_n_com = 1){
   #' Displaying the highest cited nodes
@@ -669,7 +660,7 @@ top_citations <- function(graph, top_n = 20, top_n_com = 1){
     group_by(Com_ID) %>% 
     slice(1:top_n_com) %>%
     as.data.table()
- 
+  
   # Most citing nodes in general 
   top_citations_general <- graph %>%
     activate(nodes) %>%
@@ -682,6 +673,28 @@ top_citations <- function(graph, top_n = 20, top_n_com = 1){
   top_centrality_sum <- unique(rbind(top_citations_general, top_citations_com))
 }
 
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+################### 3) Building Graphs - Secondary and to be improved ################-------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+# Simple functions for keeping a number n of nodes with highest centrality measures per communities
+top_centrality_com <- function(graph, centrality, top_n = 3){
+  top_centrality_com <- graph %>%
+    activate(nodes) %>%
+    as_tibble() %>%
+    arrange(desc(centrality)) %>%
+    group_by(Com_ID) %>% 
+    slice(1:top_n)
+  
+  top_centrality_com <- graph %>%
+    activate(nodes) %>%
+    as_tibble() %>%
+    arrange(desc(centrality)) %>%
+    group_by(Com_ID) %>% 
+    slice(1:top_n)
+  
+  top_centrality
+}
 # Ideally, a parameter to choose which centrality measure to apply
 
 # A function to build a list of nodes with highest values for different centrality measures
@@ -791,191 +804,3 @@ tf_idf_table  <- merge(tf_idf_table,unique(titles_df[,c("Com_ID","Community_name
 # In this function, you should enter your data frame with the titles of articles, their Com_ID, and the
 # name of this community. The ouptut is a tidy object with tf-idf values that you can plot (output should 
 # not be the same as input)
-
-##################### Specific functions for the co-authorship BoE network analysis script #####################
-
-# A function to compute the share of articles published by an author in the Financial stability Directorate
-# for each community. Information is added to the BoE graph with communities as nodes
-
-FS_com <- function(Communities_with_doc_and_prosopo,graph){
-Directorates_and_communities <- Communities_with_doc_and_prosopo[Category=="4 - Directorate"| Category=="3 - Monetary Policy Committee"]
-Directorates_and_communities <-  Directorates_and_communities[,Nb_units_per_com:= .(.N), by = "Com_ID"]
-Directorates_and_communities <- Directorates_and_communities[, fr_units_per_com:= .(.N), by = c("Com_ID","Position")]
-Directorates_and_communities <- Directorates_and_communities[, fr_units_per_com:= fr_units_per_com/Nb_units_per_com]
-Directorates_and_communities <- unique(Directorates_and_communities[Position == "Financial Stability Directorate", c("Position","Com_ID","Community_name","fr_units_per_com")])
-
-graph_FS <- graph %>%
-  activate(nodes)  %>%
-  left_join(Directorates_and_communities[,c("Community_name","fr_units_per_com")], by = c("name" = "Community_name"))%>%
-  mutate(fr_units_per_com = replace(fr_units_per_com, is.na(fr_units_per_com),0))
-}
-
-########################### Functions specific to WoS network analysis ###########################
-
-# Function to create a co-citation graph with a references table
-graph_cocit_from_WoS <- function(References,start_date,end_date,seed = NULL, 
-                                 ew.influence = 1, kgrav = 1, iter_1 = 3000, iter_2 = 200,
-                                 barnes.hut = FALSE, res_1 = 1, res_2 = 0.5, size_max = 100, size_min = 2){
-  # creation of the nodes
-  nodes <- References[between(Year,start_date,end_date)]
-  
-  # calculating the number of citations of each reference. Keeping refs cited at least twice
-  nodes <- nodes[, n_cit := .(.N), by = "ItemID_Ref"]
-  nodes <- nodes[n_cit > 1]
-  
-  # creation of the citations file : from BoE articles to refs
-  citations <- nodes[,c("ID_Art","ItemID_Ref")]
-  
-  # removing doublons of refs in nodes file
-  nodes <- unique(nodes[,-c("ID_Art","Year")])
-  doublons <- which(duplicated(nodes$ItemID_Ref))
-  nodes <- nodes[-doublons]
-  
-  # extracting citations (from BoE articles to references) and building an adjacency matrix
-  
-  adj <- as.matrix(table(citations$ItemID_Ref,citations$ID_Art))
-  adj <- adj %*% t(adj)
-  diag(adj) <- 0
-  
-  # first step for creating the graph: from adjacency matrix, then extracting the edges
-  graph <- graph_from_adjacency_matrix(adj, mode = c("undirected"), weighted = TRUE)
-  edges <- get.data.frame(graph)
-  names(edges)[1:3] <- c("from", "to", "weight")
-  
-  # weigthing edges by total number of references of the two docs
-  # Using "Salton's cosine index"
-  
-  edges <- merge(edges, nodes[,c("ItemID_Ref","n_cit")], by.x="from", by.y="ItemID_Ref")
-  edges <- merge(edges, nodes[,c("ItemID_Ref","n_cit")], by.x="to", by.y="ItemID_Ref")
-  edges <- as.data.table(edges)
-  edges <- edges[, weight:= weight/sqrt(n_cit.x*n_cit.y)]
-  
-  # last step: creating the graph with edges and nodes, transforming in tidygraph and keeping main component
-  
-  graph <- tbl_main_components(edges, nodes)
-  
-  # Leiden community detection
-  graph <- leiden_improved(graph, res_1 = res_1, res_2 = res_2)
-  
-  # Adding centrality measures to the graph nodes
-  graph <- centrality(graph)
-  
-  # Adding a size variable for the avoid.overlapping with force atlas
-  graph <- graph %>%
-    activate(nodes) %>%
-    mutate(size = ((n_cit - min(n_cit))/(max(n_cit) - min(n_cit)))*(size_max - size_min) + size_min)
-  
-  
-  # Assign node with highest Strength measure as name for each community
-  #graph <- naming_communities(graph)
-  
-  # Running Force Atlas 2 algorithm
-  graph <- force_atlas(graph, seed = seed, ew.influence = ew.influence, kgrav = kgrav, iter_1 = iter_1, iter_2 = iter_2, barnes.hut = barnes.hut)
-}
-
-# the first input is the WoS table with all your references. Then you can choose start_date and end_date 
-# to fix the period of citations (wich citing articles do you want to take into account). 
-# The function then creates an adjacency matrix, transforms it in a graph, and run several operations on
-# the graph for it to be ready to plot.
-
-# Function to create a bibliographic coupling graph with a references table from WoS
-graph_coupling_from_WoS <- function(Articles,References,start_date,end_date,seed = NULL, 
-                                 ew.influence = 1, kgrav = 1, iter_1 = 3000, iter_2 = 200,
-                                 barnes.hut = FALSE, res_1 = 1, res_2 = 0.5, size_max = 8, size_min = 0.1,
-                                 citation_period = 5){
-  # creation of the nodes
-  nodes <- Articles[between(Year,start_date, end_date)]
-  
-  # calculating the number of references cited by each BoE article
-  citations <- References[between(Year,start_date, end_date),c("ID_Art","ItemID_Ref")]
-  citations <- citations[, n_ref := .(.N), by = "ID_Art"]
-  
-  # merging the number of reference stat with nodes
-  nodes <- merge(nodes,unique(citations[,c("ID_Art","n_ref")]), by = "ID_Art")
-  
-  # calculating the number of citations of the nodes, between the start date and five years after the end date
-  # (in order to avoid underestimating too much the more recent papers)
-  
-  citations_BoE <- BoE_refs_reduce[between(Year,start_date, end_date + citation_period),c("ID_Art","ItemID_Ref")]
-  citations_BoE <- citations_BoE[, n_cit := .(.N), by = "ItemID_Ref"]
-  citations_BoE <- citations_BoE[ItemID_Ref %in% nodes$ItemID_Ref]
-  
-  # merging with nodes
-  nodes <- merge(nodes,unique(citations_BoE[, c("ItemID_Ref","n_cit")]), by = "ItemID_Ref", all.x = TRUE)
-  nodes[is.na(n_cit)]$n_cit <- 1
-  
-  # removing doublons of refs in nodes file
-  nodes <- unique(nodes[,-c("ItemID_Ref")])
-  doublons <- which(duplicated(nodes$ID_Art))
-  nodes <- nodes[-doublons]
-  
-  # extracting citations (from BoE articles to references) and building an adjacency matrix
-  
-  adj <- as.matrix(table(citations$ID_Art,citations$ItemID_Ref))
-  adj <- adj %*% t(adj)
-  diag(adj) <- 0
-  
-  # first step for creating the graph: from adjacency matrix, then extracting the edges
-  graph <- graph_from_adjacency_matrix(adj, mode = c("undirected"), weighted = TRUE)
-  edges <- get.data.frame(graph)
-  names(edges)[1:3] <- c("from", "to", "weight")
-  
-  # weigthing edges by total number of references in bibliographies of the two docs
-  # Using "Salton's cosine index"
-  
-  edges <- merge(edges, nodes[,c("ID_Art","n_ref")], by.x="from", by.y="ID_Art")
-  edges <- merge(edges, nodes[,c("ID_Art","n_ref")], by.x="to", by.y="ID_Art")
-  edges <- as.data.table(edges)
-  edges <- edges[, weight:= weight/sqrt(n_ref.x*n_ref.y)]
-  
-  # last step: creating the graph with edges and nodes, transforming in tidygraph and keeping main component
-  
-  graph <- tbl_main_components(edges, nodes)
-  
-  # Leiden community detection
-  graph <- leiden_improved(graph, res_1 = res_1, res_2 = res_2)
-  
-  # Adding centrality measures to the graph nodes
-  graph <- centrality(graph)
-  
-  # Adding a size variable for the avoid.overlapping with force atlas
-  graph <- graph %>%
-    activate(nodes) %>%
-    mutate(size = ((n_cit - min(n_cit))/(max(n_cit) - min(n_cit)))*(size_max - size_min) + size_min)
-  
-  # Assign node with highest Strength measure as name for each community
-  #graph <- naming_communities(graph)
-  
-  # Running Force Atlas 2 algorithm
-  graph <- force_atlas(graph, seed = seed, ew.influence = ew.influence, kgrav = kgrav, iter_1 = iter_1, iter_2 = iter_2, barnes.hut = barnes.hut)
-}
-# the first input is the WoS table with all your references. Then you can choose start_date and end_date 
-# to fix the period of citations (wich citing articles do you want to take into account). 
-# The function then creates an adjacency matrix, transforms it in a graph, and run several operations on
-# the graph for it to be ready to plot.
-
-
-# A function used for the BoE project, to display the nodes with the highest citations withing each community
-# and with the highest citation in general.
-
-highest_citations <- function(graph,n_com = 2,n_general = 10){
-Highest_citations <- as_tibble(graph) %>%
-  arrange(desc(n_cit)) %>%
-  group_by(Com_ID) %>% 
-  slice(1:n_com) %>%
-  as_tibble()
-
-Highest_citations_bis <- as_tibble(graph) %>%
-  arrange(desc(n_cit)) %>%
-  slice(1:n_general)%>%
-  as_tibble()
-
-Highest_citations <- rbind(Highest_citations,Highest_citations_bis)
-Highest_citations <- unique(Highest_citations)
-}
-# Two parameters: 
-# - the number of nodes with highest number of citations to take for each community
-# - the number of nodes with highest number of citations to take for the whole graph
-# The output is a df with the nodes and their coordinates for plotting on the graph. 
-# It allows to characterize each community, as well as to see the most important nodes 
-# of the graph.
