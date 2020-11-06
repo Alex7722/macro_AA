@@ -1,3 +1,17 @@
+---
+title: "Static_Network_Analysis"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+    toc_float: true
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 ############################## PART I: LOADING PACKAGES, PATH AND DATA ####################################--------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -7,7 +21,7 @@
 package_list <-  c("data.table","magrittr","tidyverse", "ggnewscale", "igraph",
                    "tm","quanteda","tidytext","ggraph","tidygraph", "ggrepel", "vite",
                    "reticulate","leiden","reshape2","scales","scico",
-                   "ggforce","directlabels","patchwork","DescTools")
+                   "ggforce","directlabels","patchwork","DescTools","DT")
 for(p in package_list){
   if (p %in% installed.packages()==FALSE){install.packages(p,dependencies = TRUE)}
   library(p,character.only=TRUE)
@@ -25,19 +39,23 @@ picture_path <- "/home/aurelien/macro_AA/Static_Network_Analysis/"
 source("/home/aurelien/macro_AA/Static_Network_Analysis/functions_for_network_analysis.R")
 
 mypalette <- c("#1969B3","#01A5D8","#DA3E61","#3CB95F","#E0AF0C","#E25920","#6C7FC9","#DE9493","#CD242E","#6F4288","#B2EEF8","#7FF6FD","#FDB8D6","#8BF9A9","#FEF34A","#FEC57D","#DAEFFB","#FEE3E1","#FBB2A7","#EFD7F2","#5CAADA","#37D4F5","#F5779B","#62E186","#FBDA28","#FB8F4A","#A4B9EA","#FAC2C0","#EB6466","#AD87BC","#0B3074","#00517C","#871B2A","#1A6029","#7C4B05","#8A260E","#2E3679","#793F3F","#840F14","#401C56","#003C65","#741A09","#602A2A","#34134A","#114A1B","#27DDD1","#27DD8D","#4ADD27","#D3DD27","#DDA427","#DF2935","#DD27BC","#BA27DD","#3227DD","#2761DD","#27DDD1")
+
 # table of the colors for communities:
 color = data.table(
   Com_ID = 1:500,
   color = mypalette)
 color<-color %>%  mutate(Com_ID = sprintf("%02d", Com_ID)) %>% mutate(Com_ID = as.character(Com_ID))
 
-
 # Loading files
 nodes_JEL <- readRDS(paste0(data_path,"JEL_matched_corpus_nodes.rds"))
 edges_JEL <- readRDS(paste0(data_path,"JEL_matched_corpus_edges.rds"))
 authors_JEL <- readRDS(paste0(data_path,"JEL_matched_corpus_authors.rds"))
+```
+
+# Building the coupling and the cocitation graph
 
 
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 ################################ PART II: NETWORK ANALYSIS #################################
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -65,7 +83,14 @@ nodes_cocit_JEL_1990s <- nodes_cocit_JEL_1990s[, New_id2:= as.character(New_id2)
 graph_cocit <- tbl_main_components(edges = edges_cocit_JEL_1990s, nodes = nodes_cocit_JEL_1990s, node_key = "New_id2", threshold_alert = 0.05, directed = FALSE)
 
 # Optionnal: studying the distribution of nodes in each component of the graph
-#components <- components_distribution(edges = edges_cocit_JEL_1990s, nodes = nodes_cocit_JEL_1990s, node_key = "New_id2")
+components_cocit <- components_distribution(edges = edges_cocit_JEL_1990s, nodes = nodes_cocit_JEL_1990s, node_key = "New_id2")
+
+# projecting datatable for components to have an idea of the distribution of components
+datatable(components_cocit, rownames = FALSE, 
+          options =  list(scrollY = "400px",
+  scrollCollapse = TRUE,
+  scrollX = "300px",
+  paging = FALSE))
 
 ############################### Building Nodes and Edges for coupling #######################-----------
 
@@ -81,7 +106,7 @@ rm(nb_cit) # not useful anymore
 nodes_coupling_JEL_1990s[is.na(nb_cit),]$nb_cit <- 0
 
 # reducing the number of nodes depending of the number of citations
-nodes_coupling_JEL_1990s <- unique(nodes_coupling_JEL_1990s[nb_cit >= 2,c("ID_Art","Annee_Bibliographique","Nom","Label","Titre","Revue","ESpecialite","nb_cit","ItemID_Ref")])
+nodes_coupling_JEL_1990s <- unique(nodes_coupling_JEL_1990s[nb_cit >= 2,c("ID_Art","Annee_Bibliographique","Nom","Label","Titre","nb_cit","Code_Revue","ItemID_Ref")])
 
 # building edges
 edges_JEL_1990s_bis <- edges_JEL[ID_Art %in% nodes_coupling_JEL_1990s$ID_Art]
@@ -95,54 +120,23 @@ nodes_coupling_JEL_1990s <- nodes_coupling_JEL_1990s[, ID_Art:= as.character(ID_
 graph_coupling <- tbl_main_components(edges = edges_coupling_JEL_1990s, nodes = nodes_coupling_JEL_1990s, node_key = "ID_Art", threshold_alert = 0.05, directed = FALSE)
 
 # Optionnal: studying the distribution of nodes in each component of the graph
-#components <- components_distribution(edges = edges_coupling_JEL_1990s, nodes = nodes_coupling_JEL_1990s, node_key = "ID_Art")
+components_coupling <- components_distribution(edges = edges_coupling_JEL_1990s, nodes = nodes_coupling_JEL_1990s, node_key = "ID_Art")
 
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-############################ 2) Bibliographic Co-citation #################################-------
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+# projecting datatable for components to have an idea of the distribution of components
+datatable(components_coupling, rownames = FALSE, 
+          options =  list(scrollY = "400px",
+  scrollCollapse = TRUE,
+  scrollX = "300px",
+  paging = FALSE))
 
-######################### Working on the tidygraph for cocitation and its attributes #################################-------
+```
 
-# Identifying communities with Leiden algorithm                         
-graph_cocit <- leiden_improved(graph_cocit, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iterations = 500)       
+# Bibliographic Coupling 
 
-# Giving colors to communities
-graph_cocit <- community_colors(graph_cocit,mypalette)
+## Projecting the Graph
 
-# Calculating different centrality measures
-graph_cocit <- centrality(graph_cocit)
-
-# Integration a size variable for implementing non-overlapping function of Force Atlast
-graph_cocit <- graph_cocit %>%
-  activate(nodes) %>%
-  mutate(size=nb_cit)
-
-# Running Force Atlas layout  
-graph_cocit <- force_atlas(graph_cocit,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 = 6000, iter_2 = 2000, barnes.hut = TRUE, size_min = 50, size_max = 200)
-
-# Saving the graph
-saveRDS(graph_cocit, paste0(graph_data_path,"graph_cocit.rds"))
-
-############################# Projection of the graph #########################
-
-# loading the graph if necessary
-#graph_cocit <- readRDS(paste0(graph_data_path,"graph_cocit.rds"))
-
-# Identifying the labels of the most important authors
-important_nodes <- top_citations(graph_cocit)
-
-# Plotting the graph  
-ggraph(graph_cocit, "manual", x = x, y = y) + 
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
-  scale_edge_width_continuous(range = c(0.1,2)) +
-  geom_node_point(aes(x=x, y=y, size = size, fill = color), pch = 21, alpha = 0.8, show.legend = FALSE) +
-  scale_size_continuous(range = c(0.1,10)) +
-  scale_fill_identity() +
-  scale_edge_colour_identity() +
-  geom_label_repel(data=important_nodes, aes(x=x, y=y, label = paste0(Nom,Annee), fill = color), size = 4, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
-  #scale_size_continuous(range = c(1,4)) +
-  theme_void() +
-  ggsave(paste0(picture_path,"graph_cocit.png"), width=30, height=30, units = "cm")
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+#NOT RUN BECAUSE TO LONG - JUST INTEGRATE THE PICTURE
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 ################################# 2) Bibliographic Coupling ##################################------
@@ -151,50 +145,65 @@ ggraph(graph_cocit, "manual", x = x, y = y) +
 ################## Working on the coupling tidygraph and its attributes ######################----
 
 # Identifying communities with Leiden algorithm                         
-graph_coupling <- leiden_improved(graph_coupling, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iterations = 500)       
+#graph_coupling <- leiden_improved(graph_coupling, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iterations = 500)       
 
 # Giving colors to communities
-graph_coupling <- community_colors(graph_coupling,mypalette)
+#graph_coupling <- community_colors(graph_coupling,mypalette)
 
 # Calculating different centrality measures
-graph_coupling <- centrality(graph_coupling)
+#graph_coupling <- centrality(graph_coupling)
 
-# Naming communities
-graph_coupling <-naming_communities(graph_coupling, centrality_measure = "nb_cit", naming = "Label")
+# Naming communities by the most cited node for each community
+#graph_coupling <-naming_communities(graph_coupling, centrality_measure = "nb_cit", naming = "Label")
 
 # Integration a size variable for implementing non-overlapping function of Force Atlast
-graph_coupling <- graph_coupling %>%
-  activate(nodes) %>%
-  mutate(size=nb_cit)
+#graph_coupling <- graph_coupling %>%
+#  activate(nodes) %>%
+#  mutate(size=nb_cit)
 
 # Running Force Atlas layout  
-graph_coupling <- force_atlas(graph_coupling,seed = 1, ew.influence = 1, kgrav = 1, iter_1 = 4000, iter_2 = 1000, barnes.hut = TRUE, size_min = 50, size_max = 200)
+#graph_coupling <- force_atlas(graph_coupling,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 = 4000, iter_2 = 1000, barnes.hut = TRUE, size_min = 50, size_max = 200)
 
 # Saving the graph
-saveRDS(graph_coupling, paste0(graph_data_path,"graph_coupling.rds"))
+#saveRDS(graph_coupling, paste0(graph_data_path,"graph_coupling.rds"))
 
 ############################# Projection of the graph #########################
 
 # loading the graph if necessary
-graph_coupling <- readRDS(paste0(graph_data_path,"graph_coupling.rds"))
+#graph_coupling <- readRDS(paste0(graph_data_path,"graph_coupling.rds"))
 
 # Identifying the labels of the most important authors
-important_nodes <- top_citations(graph_coupling, top_n_com = 2)
+#important_nodes <- top_citations(graph_coupling)
 
 # Plotting the graph  
-ggraph(graph_coupling, "manual", x = x, y = y) + 
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
-  scale_edge_width_continuous(range = c(0.1,2)) +
-  scale_edge_colour_identity() +
-  geom_node_point(aes(x=x, y=y, size = size, fill = color), pch = 21, alpha = 0.8, show.legend = FALSE) +
-  scale_size_continuous(range = c(0.1,10)) +
-  scale_fill_identity() +
-  geom_label_repel(data=important_nodes, aes(x=x, y=y, label = paste0(Nom,Annee_Bibliographique), fill = color), size = 4, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
+#ggraph(graph_coupling, "manual", x = x, y = y) + 
+ # geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
+ # scale_edge_width_continuous(range = c(0.1,2)) +
+  #scale_edge_colour_identity() +
+#  geom_node_point(aes(x=x, y=y, size = size, fill = color), pch = 21, alpha = 0.8, show.legend = FALSE) +
+ # scale_size_continuous(range = c(0.1,10)) +
+  #scale_fill_identity() +
+#  geom_label_repel(data=important_nodes, aes(x=x, y=y, label = paste0(Nom,Annee_Bibliographique), fill = color), size = 4, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
   #scale_size_continuous(range = c(1,4)) +
-  theme_void() +
-  ggsave(paste0(picture_path,"graph_coupling.png"), width=30, height=30, units = "cm")
+ # theme_void() +
+#  ggsave(paste0(picture_path,"graph_coupling.png"), width=30, height=30, units = "cm")
+```
 
-##################################### Basic Statistics of Communities ###############################------
+![](/home/aurelien/macro_AA/Static_Network_Analysis/graph_coupling.png)
+
+## Basic Statistics on communities
+
+Follows a table summarizing major information about the communities of the bibliographic coupling network.  
+
+To see how communities are positionned on the graph below, just look at the label of the most cited nodes in the table, and spot it on the graph.  
+
+*Commentary 1:* Community 01 is a bit weird. It seems to aggregate kind of New-Keynesian stuff on credit cycle, monetary policy channel of transmission, citing Bernanke and Friedman 63, with post-keynesian stuff, citing Keynes, with author like LR Wray. Perhaps that's the post-keynesian that are citing a lot the New-Keynesian/Bernanke stuff. But perhaps it would also disappear with a different Leiden resolution, or with CMP. Community 01 has also an interesting structure: the most cited nodes (Bernanke, Kiyotaki, etc.), which are New-Keynesian references, are central in the graph, whereas the rest of the community is peripheral, south of the graph. It strengthens the idea of something weird with this community. 
+
+*Commentary 2:* Problem similar with community 06: the bigger node is Clarida 1999, which is a standard reference in New Keynesian Macro. But you have the bigger part of the community which is peripheral, north of the graph. Most of the work seems to be on the term structure of interest rates. Part are published in Finance journals, other in econometric or monetary macro journals (Management represents 33% of the nodes). Perhaps we should check in the peripheral nodes are not thus published in finance journal, and the more central in monetary macro journals, strengthening the idea of a strong division between macro and finance people (even when they are dealing with a similar topic, aka term structure).
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+# loading the graph if necessary
+graph_coupling <- readRDS(paste0(graph_data_path,"graph_coupling.rds"))
 
 # Extracting the nodes of the network
 Nodes_coupling <- graph_coupling %>%
@@ -286,4 +295,112 @@ coupling_com <- merge(unique(references_extended[,c("Com_ID","size_com","share_c
 coupling_com <- cbind(coupling_com,most_cited_nodes[, c("Label","Titre")],most_cited_ref[, c("cited_author","Annee","share_cit_ref")], 
                       main_author[, c("citing_author","main_author")], main_journal[, c("Revue","main_journal")])
 coupling_com <- merge(coupling_com, main_discipline, by = c("Com_ID","rank"), all.x = TRUE)
-  
+
+# Projecting the table with all these data
+
+datatable(coupling_com, rownames = TRUE, 
+          options =  list(scrollY = "630px",
+  scrollCollapse = TRUE,
+  scrollX = "400px",
+  paging = FALSE))
+```
+
+## TF-IDF on communities
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+# Calculating the size of communities and keeping only communities with at least x% of the nodes
+big_com <- Nodes_coupling[, size_com := .N, by = "Com_ID"][, share_com := size_com/length(Nodes_coupling$ID_Art)][share_com >= 0.01,]
+
+graph_coupling <- graph_coupling %>% activate(nodes)  %>%  filter(Com_ID %in% big_com$Com_ID)
+TF_IDF <- tf_idf(graph_coupling)
+
+TF_IDF$plot
+```
+
+## Analyzing relations between coupling communities
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+# Using the function we have built
+graph_coupling_community <- graph_community(graph_coupling)
+
+# Saving the graph
+saveRDS(graph_coupling_community, paste0(graph_data_path,"graph_coupling_community.rds"))
+
+############################# Projection of the graph #########################
+
+# loading the graph if necessary
+#graph_cocit <- readRDS(paste0(graph_data_path,"graph_cocit.rds"))
+
+# Plotting the graph  
+ggraph(graph_coupling_community, "manual", x = x, y = y) + 
+  geom_edge_arc(aes(width = weight), color = "Black", alpha = 0.3, strength = 0.2, show.legend = FALSE) +
+  scale_edge_width_continuous(range = c(0.1,10)) +
+  geom_node_point(aes(x=x, y=y, size = size, fill = color), pch = 21, alpha = 0.9, show.legend = FALSE) +
+  scale_size_continuous(range = c(1,60)) +
+  scale_fill_identity() +
+  scale_edge_colour_identity() +
+  geom_label_repel(aes(x=x, y=y, label = Id, fill = color), size = 4, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
+  #scale_size_continuous(range = c(1,4)) +
+  theme_void() +
+  ggsave(paste0(picture_path,"graph_coupling_community.png"), width=20, height=20, units = "cm")
+
+```
+
+
+# Bibliographic Cocitation
+
+## Projecting the Graph
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+#NOT RUN BECAUSE TO LONG - JUST INTEGRATE THE PICTURE
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+############################ 2) Bibliographic Co-citation #################################-------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+######################### Working on the tidygraph for cocitation and its attributes #################################-------
+
+# Identifying communities with Leiden algorithm                         
+#graph_cocit <- leiden_improved(graph_cocit, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iterations = 500)       
+
+# Giving colors to communities
+#graph_cocit <- community_colors(graph_cocit,mypalette)
+
+# Calculating different centrality measures
+#graph_cocit <- centrality(graph_cocit)
+
+# Integration a size variable for implementing non-overlapping function of Force Atlas
+#graph_cocit <- graph_cocit %>%
+#  activate(nodes) %>%
+#  mutate(size=nb_cit)
+
+# Running Force Atlas layout  
+#graph_cocit <- force_atlas(graph_cocit,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 = 6000, iter_2 = 2000, barnes.hut = TRUE, size_min = 50, size_max = 200)
+
+# Saving the graph
+#saveRDS(graph_cocit, paste0(graph_data_path,"graph_cocit.rds"))
+
+############################# Projection of the graph #########################
+
+# loading the graph if necessary
+#graph_cocit <- readRDS(paste0(graph_data_path,"graph_cocit.rds"))
+
+# Identifying the labels of the most important authors
+#important_nodes <- top_citations(graph_cocit)
+
+# Plotting the graph  
+#ggraph(graph_cocit, "manual", x = x, y = y) + 
+#  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
+#  scale_edge_width_continuous(range = c(0.1,2)) +
+#  geom_node_point(aes(x=x, y=y, size = size, fill = color), pch = 21, alpha = 0.8, show.legend = FALSE) +
+#  scale_size_continuous(range = c(0.1,10)) +
+#  scale_fill_identity() +
+#  scale_edge_colour_identity() +
+#  geom_label_repel(data=important_nodes, aes(x=x, y=y, label = paste0(Nom,Annee), fill = color), size = 4, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
+  #scale_size_continuous(range = c(1,4)) +
+#  theme_void() +
+#  ggsave(paste0(picture_path,"graph_cocit.png"), width=30, height=30, units = "cm")
+```
+
+
+![](/home/aurelien/macro_AA/Static_Network_Analysis/graph_cocit.png)
