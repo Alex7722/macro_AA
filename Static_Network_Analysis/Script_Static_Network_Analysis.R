@@ -35,7 +35,7 @@ edges_JEL <- readRDS(paste0(data_path,"JEL_matched_corpus_edges.rds"))
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-############################ 1) Bibliographic Co-citation #################################-------
+############################ 1) Building Nodes and Edges #################################-------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
 ############################### Building Nodes and Edges for co-citation #######################
@@ -52,13 +52,48 @@ edges_JEL_1990s <- edges_JEL[New_id2 %in% nodes_cocit_JEL_1990s$New_id2
 
 edges_cocit_JEL_1990s <- bibliographic_cocitation(edges_JEL_1990s, source = "ID_Art", ref = "New_id2",weight_threshold = 2)
 
-######################### Creation of the graph and its attributes #################################-------
 # creating the tidygraph object  
 nodes_cocit_JEL_1990s <- nodes_cocit_JEL_1990s[, New_id2:= as.character(New_id2)]
 graph_cocit <- tbl_main_components(edges = edges_cocit_JEL_1990s, nodes = nodes_cocit_JEL_1990s, node_key = "New_id2", threshold_alert = 0.05, directed = FALSE)
 
 # Optionnal: studying the distribution of nodes in each component of the graph
-   #components <- components_distribution(edges = edges_cocit_JEL_1990s, nodes = nodes_cocit_JEL_1990s, node_key = "New_id2")
+#components <- components_distribution(edges = edges_cocit_JEL_1990s, nodes = nodes_cocit_JEL_1990s, node_key = "New_id2")
+
+############################### Building Nodes and Edges for coupling #######################-----------
+
+# creating the nodes with the number of citation of the nodes in the corpus
+nodes_coupling_JEL_1990s <- nodes_JEL[between(Annee_Bibliographique,1991,1999),]
+nb_cit<- edges_JEL[,nb_cit := .N,ItemID_Ref]
+nodes_coupling_JEL_1990s <- merge(nodes_coupling_JEL_1990s,nb_cit[,c("ItemID_Ref","nb_cit")], by = "ItemID_Ref", all.x = "TRUE")
+
+rm(nb_cit) # not useful anymore
+# replacing NA value by 0 in nb_cit (it means that the nodes will be used in Leiden and Force Atlas, but
+# not displayed in the graph)
+
+nodes_coupling_JEL_1990s[is.na(nb_cit),]$nb_cit <- 0
+
+# reducing the number of nodes depending of the number of citations
+nodes_coupling_JEL_1990s <- unique(nodes_coupling_JEL_1990s[nb_cit >= 2,c("ID_Art","Annee_Bibliographique","Nom","Label","Titre","nb_cit","Code_Revue","ItemID_Ref")])
+
+# building edges
+edges_JEL_1990s_bis <- edges_JEL[ID_Art %in% nodes_coupling_JEL_1990s$ID_Art]
+
+# creation of the edges for the co-citation network
+
+edges_coupling_JEL_1990s <- bibliographic_coupling(edges_JEL_1990s_bis, source = "ID_Art", ref = "New_id2", weight_threshold = 2)
+
+# creating the tidygraph object  
+nodes_coupling_JEL_1990s <- nodes_coupling_JEL_1990s[, ID_Art:= as.character(ID_Art)]
+graph_coupling <- tbl_main_components(edges = edges_coupling_JEL_1990s, nodes = nodes_coupling_JEL_1990s, node_key = "ID_Art", threshold_alert = 0.05, directed = FALSE)
+
+# Optionnal: studying the distribution of nodes in each component of the graph
+#components <- components_distribution(edges = edges_coupling_JEL_1990s, nodes = nodes_coupling_JEL_1990s, node_key = "ID_Art")
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+############################ 2) Bibliographic Co-citation #################################-------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+######################### Working on the tidygraph for cocitation and its attributes #################################-------
 
 # Identifying communities with Leiden algorithm                         
 graph_cocit <- leiden_improved(graph_cocit, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iterations = 500)       
@@ -105,35 +140,7 @@ ggraph(graph_cocit, "manual", x = x, y = y) +
 ################################# 2) Bibliographic Coupling ##################################------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
-############################### Building Nodes and Edges for coupling #######################-----------
-
-# creating the nodes with the number of citation of the nodes in the corpus
-nodes_coupling_JEL_1990s <- nodes_JEL[between(Annee_Bibliographique,1991,1999),]
-nb_cit<- edges_JEL[,nb_cit := .N,ItemID_Ref]
-nodes_coupling_JEL_1990s <- merge(nodes_coupling_JEL_1990s,nb_cit[,c("ItemID_Ref","nb_cit")], by = "ItemID_Ref", all.x = "TRUE")
-
-rm(nb_cit) # not useful anymore
-# replacing NA value by 0 in nb_cit (it means that the nodes will be used in Leiden and Force Atlas, but
-# not displayed in the graph)
-
-nodes_coupling_JEL_1990s[is.na(nb_cit),]$nb_cit <- 0
-
-# reducing the number of nodes depending of the number of citations
-nodes_coupling_JEL_1990s <- unique(nodes_coupling_JEL_1990s[nb_cit >= 2,c("ID_Art","Annee_Bibliographique","Nom","Label","Titre","nb_cit","Code_Revue","ItemID_Ref")])
-
-# building edges
-edges_JEL_1990s_bis <- edges_JEL[ID_Art %in% nodes_coupling_JEL_1990s$ID_Art]
-
-# creation of the edges for the co-citation network
-
-edges_coupling_JEL_1990s <- bibliographic_coupling(edges_JEL_1990s_bis, source = "ID_Art", ref = "New_id2", weight_threshold = 2)
-
-# creating the tidygraph object  
-nodes_coupling_JEL_1990s <- nodes_coupling_JEL_1990s[, ID_Art:= as.character(ID_Art)]
-graph_coupling <- tbl_main_components(edges = edges_coupling_JEL_1990s, nodes = nodes_coupling_JEL_1990s, node_key = "ID_Art", threshold_alert = 0.05, directed = FALSE)
-
-# Optionnal: studying the distribution of nodes in each component of the graph
-#components <- components_distribution(edges = edges_coupling_JEL_1990s, nodes = nodes_coupling_JEL_1990s, node_key = "ID_Art")
+################## Working on the coupling tidygraph and its attributes ######################----
 
 # Identifying communities with Leiden algorithm                         
 graph_coupling <- leiden_improved(graph_coupling, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iterations = 500)       
