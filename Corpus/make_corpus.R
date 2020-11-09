@@ -178,7 +178,7 @@ gc()
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
 # all art and all refs
-all_ref <-  dbGetQuery(ESH, paste0("SELECT OST_Expanded_SciHum.References7.New_id2, OST_Expanded_SciHum.References7.ItemID_Ref, OST_Expanded_SciHum.References7.Annee, OST_Expanded_SciHum.References7.Nom, OST_Expanded_SciHum.References7.ID_Art FROM OST_Expanded_SciHum.References7 WHERE New_id2 != 0;")) %>%  data.table
+all_ref <-  dbGetQuery(ESH, paste0("SELECT OST_Expanded_SciHum.References7.New_id2, OST_Expanded_SciHum.References7.ItemID_Ref, OST_Expanded_SciHum.References7.Annee, OST_Expanded_SciHum.References7.Nom, OST_Expanded_SciHum.References7.ID_Art, OST_Expanded_SciHum.References7.Revue_Abbrege FROM OST_Expanded_SciHum.References7 WHERE New_id2 != 0;")) %>%  data.table
 all_aut <-  dbGetQuery(ESH, paste0("SELECT OST_Expanded_SciHum.Articles.ID_Art, OST_Expanded_SciHum.Articles.Titre, OST_Expanded_SciHum.Articles.Annee_Bibliographique, OST_Expanded_SciHum.Articles.Code_Revue, OST_Expanded_SciHum.Articles.ItemID_Ref, OST_Expanded_SciHum.Auteurs.Nom, OST_Expanded_SciHum.Auteurs.Ordre
                                    FROM OST_Expanded_SciHum.Articles
                                    JOIN OST_Expanded_SciHum.Auteurs ON OST_Expanded_SciHum.Articles.ID_Art=OST_Expanded_SciHum.Auteurs.ID_Art")) %>%  data.table
@@ -202,6 +202,7 @@ saveRDS(JEL_matched_corpus_authors, file = "Corpus_Econlit_Matched_WoS/JEL_match
 JEL_matched_corpus_nodes <- all_aut[Ordre==1][ID_Art %in% base_corpus$ID_Art]
 # Label column
 JEL_matched_corpus_nodes <- JEL_matched_corpus_nodes[, name_short:=  gsub("-.*","",Nom)]
+JEL_matched_corpus_nodes$name_short <- toupper(JEL_matched_corpus_nodes$name_short)
 JEL_matched_corpus_nodes <- JEL_matched_corpus_nodes[,Label:=paste0(name_short,",",Annee_Bibliographique)]
 JEL_matched_corpus_nodes[, c("name_short"):=NULL]
 # Disciplines and journals
@@ -215,11 +216,25 @@ saveRDS(JEL_matched_corpus_nodes, file = "Corpus_Econlit_Matched_WoS/JEL_matched
 #### Edges ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
-# 1 398 679 edges
+# 1 397 008 edges
 JEL_matched_corpus_edges <- all_ref[ID_Art %in% base_corpus$ID_Art]
 
 saveRDS(JEL_matched_corpus_edges, file = "Corpus_Econlit_Matched_WoS/JEL_matched_corpus_edges.rds")
 
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Refs ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+rm(all_aut, all_ref)
+gc()
+all_art <-  dbGetQuery(ESH, paste0("SELECT * FROM OST_Expanded_SciHum.Articles WHERE ItemID_Ref != 0;")) %>%  data.table
+
+JEL_matched_corpus_references <- merge(JEL_matched_corpus_edges, all_art[,.(ItemID_Ref, Titre, Code_Revue)], by = "ItemID_Ref", all.x = TRUE)
+JEL_matched_corpus_references <- merge(JEL_matched_corpus_references, revues[,.(Code_Revue, Code_Discipline)], by="Code_Revue", all.x = TRUE)
+JEL_matched_corpus_references <- merge(JEL_matched_corpus_references, disciplines, by="Code_Discipline", all.x = TRUE)
+rm(all_art)
+gc()
+
+saveRDS(JEL_matched_corpus_references, file = "Corpus_Econlit_Matched_WoS/JEL_matched_corpus_references_info.rds")
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### PART IV: EXTENDING THE CORPUS ####
