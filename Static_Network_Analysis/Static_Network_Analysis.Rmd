@@ -106,7 +106,7 @@ rm(nb_cit) # not useful anymore
 nodes_coupling_JEL_1990s[is.na(nb_cit),]$nb_cit <- 0
 
 # reducing the number of nodes depending of the number of citations
-nodes_coupling_JEL_1990s <- unique(nodes_coupling_JEL_1990s[nb_cit >= 2,c("ID_Art","Annee_Bibliographique","Nom","Label","Titre","nb_cit","Code_Revue","ItemID_Ref")])
+nodes_coupling_JEL_1990s <- unique(nodes_coupling_JEL_1990s[nb_cit >= 2,c("ID_Art","Annee_Bibliographique","Nom","Label","Titre","Revue","ESpecialite","nb_cit","ItemID_Ref")])
 
 # building edges
 edges_JEL_1990s_bis <- edges_JEL[ID_Art %in% nodes_coupling_JEL_1990s$ID_Art]
@@ -173,7 +173,7 @@ datatable(components_coupling, rownames = FALSE,
 #graph_coupling <- readRDS(paste0(graph_data_path,"graph_coupling.rds"))
 
 # Identifying the labels of the most important authors
-#important_nodes <- top_citations(graph_coupling)
+#important_nodes <- top_ordering(graph_coupling)
 
 # Plotting the graph  
 #ggraph(graph_coupling, "manual", x = x, y = y) + 
@@ -319,7 +319,10 @@ TF_IDF$plot
 
 ## Analyzing relations between coupling communities
 
-```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=FALSE, cache=FALSE}
+# loading the graph if necessary
+graph_coupling <- readRDS(paste0(graph_data_path,"graph_coupling.rds"))
+
 # Using the function we have built
 graph_coupling_community <- graph_community(graph_coupling)
 
@@ -332,11 +335,11 @@ saveRDS(graph_coupling_community, paste0(graph_data_path,"graph_coupling_communi
 #graph_cocit <- readRDS(paste0(graph_data_path,"graph_cocit.rds"))
 
 # Plotting the graph  
-ggraph(graph_coupling_community, "manual", x = x, y = y) + 
+plot_graph_community <- ggraph(graph_coupling_community, "manual", x = x, y = y) + 
   geom_edge_arc(aes(width = weight), color = "Black", alpha = 0.3, strength = 0.2, show.legend = FALSE) +
   scale_edge_width_continuous(range = c(0.1,10)) +
   geom_node_point(aes(x=x, y=y, size = size, fill = color), pch = 21, alpha = 0.9, show.legend = FALSE) +
-  scale_size_continuous(range = c(1,60)) +
+  scale_size_continuous(range = c(1,50)) +
   scale_fill_identity() +
   scale_edge_colour_identity() +
   geom_label_repel(aes(x=x, y=y, label = Id, fill = color), size = 4, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
@@ -346,6 +349,40 @@ ggraph(graph_coupling_community, "manual", x = x, y = y) +
 
 ```
 
+![](/home/aurelien/macro_AA/Static_Network_Analysis/graph_coupling_community.png)
+
+## Studying other attributes
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=FALSE, cache=FALSE}
+# Using the function we have built
+graph_journal <- graph_from_attribute(nodes = nodes_coupling_JEL_1990s, edges = edges_coupling_JEL_1990s, palette = mypalette, Attribute_name = "Revue")
+
+# Saving the graph
+#saveRDS(graph_journal, paste0(graph_data_path,"graph_coupling_attribute.rds"))
+
+############################# Projection of the graph #########################
+
+# loading the graph if necessary
+#graph_cocit <- readRDS(paste0(graph_data_path,"graph_coupling_attribute.rds"))
+
+# Biggest journal per community
+important_journals <- top_ordering(graph_journal, ordering_column = "Size_com", top_n = 12, top_n_com = 1)
+
+# Plotting the graph  
+plot_graph_journal <- ggraph(graph_journal, "manual", x = x, y = y) + 
+  geom_edge_arc(aes(width = weight, color = color_edges), alpha = 0.3, strength = 0.2, show.legend = FALSE) +
+  scale_edge_width_continuous(range = c(0.1,10)) +
+  geom_node_point(aes(x=x, y=y, size = size, fill = color), pch = 21, alpha = 0.9, show.legend = FALSE) +
+  scale_size_continuous(range = c(0.5,25)) +
+  scale_fill_identity() +
+  scale_edge_colour_identity() +
+  geom_label_repel(data = important_journals, aes(x=x, y=y, label = Id, fill = color), size = 3, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
+  #scale_size_continuous(range = c(1,4)) +
+  theme_void() +
+  ggsave(paste0(picture_path,"graph_revue.png"), width=30, height=30, units = "cm")
+```
+
+![](/home/aurelien/macro_AA/Static_Network_Analysis/graph_revue.png)
 
 # Bibliographic Cocitation
 
@@ -386,7 +423,7 @@ ggraph(graph_coupling_community, "manual", x = x, y = y) +
 #graph_cocit <- readRDS(paste0(graph_data_path,"graph_cocit.rds"))
 
 # Identifying the labels of the most important authors
-#important_nodes <- top_citations(graph_cocit)
+#important_nodes <- top_ordering(graph_cocit)
 
 # Plotting the graph  
 #ggraph(graph_cocit, "manual", x = x, y = y) + 

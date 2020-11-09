@@ -626,7 +626,7 @@ force_atlas <- function(graph,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 =
 }
 
 # Simple functions for keeping a number n of nodes with highest citations measures per communities
-top_citations <- function(graph, top_n = 20, top_n_com = 1){
+top_ordering <- function(graph, ordering_column ="nb_cit" , top_n = 20, top_n_com = 1){
   #' Displaying the highest cited nodes
   #' 
   #' A simple functions for keeping a number n of nodes with highest citations 
@@ -634,6 +634,10 @@ top_citations <- function(graph, top_n = 20, top_n_com = 1){
   #' 
   #' @param graph
   #' A tidygraph object.
+  #' 
+  #' @param ordering_column
+  #' The name of the column you want to use to select the most important nodes of your network.
+  #' By default, "nb_cit", which usually corresponds to the number of citations of nodes.
   #' 
   #' @param top_n
   #' The number of highest cited nodes in general to display.
@@ -649,25 +653,36 @@ top_citations <- function(graph, top_n = 20, top_n_com = 1){
   #' is that you need to put the column name between quotation marks in the function, but
   #' you have to use it without quotation mark in the function.
   
-  # Most citing nodes per community
-  top_citations_com <- graph %>%
+  # Top nodes per community for the variable chosen
+  top_variable_com <- graph %>%
     activate(nodes) %>%
-    as_tibble() %>%
-    arrange(desc(nb_cit)) %>%
+    as_tibble()
+  
+  # Changing the name of the variable chosen
+  colnames(top_variable_com)[colnames(top_variable_com) == ordering_column] = "ordering_column"
+  
+  # Keeping the n top nodes per community
+  top_variable_com <- top_variable_com %>%
+    arrange(desc(ordering_column)) %>%
     group_by(Com_ID) %>% 
     slice(1:top_n_com) %>%
     as.data.table()
   
-  # Most citing nodes in general 
-  top_citations_general <- graph %>%
+  # Top nodes in general for the chosen variable
+  top_variable_general <- graph %>%
     activate(nodes) %>%
-    as_tibble() %>%
-    arrange(desc(nb_cit)) %>%
+    as_tibble() 
+  
+  colnames(top_variable_general)[colnames(top_variable_general) == ordering_column] = "ordering_column"
+  
+  
+  top_variable_general <- top_variable_general %>%
+    arrange(desc(ordering_column)) %>%
     slice(1:top_n)%>%
     as.data.table()
   
   # adding the two and removing the doublons
-  top_centrality_sum <- unique(rbind(top_citations_general, top_citations_com))
+  top_variable_sum <- unique(rbind(top_variable_general, top_variable_com))
 }
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -706,6 +721,10 @@ graph_community <- function(graph, Community_name = "Community_name", nb_compone
   #'function, as in general one doesn't have more than 40/50 communities and that you don't need
   #'to adjust the parameters. If one has many communities and one wants to find the communities of these 
   #'communities as node, it is possible to do out from the output of the function.
+  #'
+  #'@details
+  #'The links between nodes(ie communities) are normalized such as not being overestimated for bigger 
+  # communities with more edges.
   
   
   Nodes_Com <- graph %>% 
@@ -777,8 +796,114 @@ graph_community <- function(graph, Community_name = "Community_name", nb_compone
     graph_community <- force_atlas(graph_community,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 = 6000, iter_2 = 2000, barnes.hut = FALSE, size_min = 50, size_max = 200)
   }
 }
-# The links between nodes(ie communities) are normalized such as not being overestimated for bigger 
-# communities with more edges.
+
+
+# A function to concentrate nodes with a similar attribute in one singular node and build the corresponding graph
+graph_from_attribute <- function(nodes, edges, palette, Attribute_name, nb_components = 1, preparing_graph = TRUE, size_min = 50, size_max = 200){
+  #'Function for building of graph with community as nodes
+  #'
+  #'This function takes as input a tidygraph object, it switches the names of individual nodes 
+  #'by one of their attribute, calculate the number of nodes having this attribute, and 
+  #'transforms all the nodes with this attribute as a unique node.
+  #'
+  #'@param nodes
+  #'The list of the nodes of your network.
+  #'
+  #'@param edges
+  #'The list of the edges of your network.
+  #'
+  #'@param palette
+  #'A color palette that will be used to attribute color to the communities calculated
+  #'by the Leiden algorithm
+  #'
+  #'@param Attribute_name
+  #'Select the column that you want to be used for aggregating the nodes.
+  #'
+  #'@param nb_components
+  #'The number of components you want to keep in the network. Usually, as nodes are community, it is
+  #'likely that no node is isolated from the rest of the network.
+  #'
+  #'@param preparing_graph 
+  #'If `TRUE`, the function prepares the graph to be plotted with ggraph. It will run Leiden, attribute
+  #'color to the community, calculate some centrality measures and then run the Force Atlast
+  #'algorithm to calculate the position of nodes.
+  #'
+  #'@param size_min
+  #'A parameter used in the Force Atlas algorithm to avoid the overlappping of nodes. See the 
+  #'`force_atlas` function for documentation.
+  #'
+  #'@param size_max
+  #'See `size_min`.
+  #'
+
+  colnames(nodes)[colnames(nodes) == Attribute_name] <- "Attribute_name"
+  graph <- tbl_main_components(edges = edges, nodes = nodes, node_key = "ID_Art", threshold_alert = 0.05, directed = FALSE)
+  
+  Nodes_Com <- graph %>% 
+    activate(nodes) %>%
+    as_tibble()   %>%
+    mutate(name = Attribute_name) %>% 
+    select(name) %>% 
+    group_by(name) %>%
+    mutate(Size_com = n()) %>%
+    arrange(desc(Size_com)) %>%
+    unique()
+  
+  # associating the two nodes of each edge with their respective community name
+  # summing the weights of the similar edges
+  Edges_Com <- graph %>% 
+    activate(edges) %>% 
+    mutate(Att_name_from = .N()$Attribute_name[from], Att_name_to = .N()$Attribute_name[to])  %>%
+    as_tibble() %>% 
+    select(Att_name_from,Att_name_to,weight) %>%
+    group_by(Att_name_from,Att_name_to) %>%
+    mutate(weight=sum(weight)) %>%
+    unique() %>%
+    as.data.table()
+  
+  # calculating the sum of weigths for each node (i.e. each community), that is the sum
+  # of the weights of all the node edges
+  Weight_com1 <- Edges_Com[Att_name_from != Att_name_to,c("Att_name_from","weight")]
+  Weight_com2 <- Edges_Com[Att_name_from != Att_name_to,c("Att_name_to","weight")]
+  Weight_com3 <- Edges_Com[Att_name_from == Att_name_to,c("Att_name_from","weight")]
+  Weight_com <- rbind(Weight_com1,Weight_com2,Weight_com3, use.names = FALSE)
+  Weight_com <- Weight_com[, Com_weight := sum(weight), by = "Att_name_from"]
+  colnames(Weight_com)[1] <- "Att_name"
+  Weight_com <- unique(Weight_com[,c("Att_name","Com_weight")])
+  
+  # merging the two nodes of each edge with their respective total weight
+  Edges_Com <- merge(Edges_Com,Weight_com,by.x="Att_name_from",by.y="Att_name")
+  Edges_Com <- merge(Edges_Com,Weight_com,by.x="Att_name_to",by.y="Att_name")
+  Edges_Com <- Edges_Com[, c("Att_name_from","Att_name_to","weight","Com_weight.x","Com_weight.y")]
+  colnames(Edges_Com) <- c("from","to","weight","Att_name_from","Att_name_to")
+  
+  # Cosine normalization of the edges weights
+  Edges_Com <- Edges_Com[, weight := weight/sqrt(Att_name_from*Att_name_to), by = c("from","to")]
+  
+  # using our tbl_main_components function to build the tidygraph with a main component
+  graph_community <- tbl_main_components(Edges_Com,Nodes_Com,node_key = "name",nb_components = nb_components)
+  
+  if(preparing_graph == TRUE){
+    # Identifying communities with Leiden algorithm                         
+    graph_community <- leiden_improved(graph_community, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iterations = 500)       
+    
+    # Giving colors to communities
+    graph_community <- community_colors(graph_community,palette)
+    
+    # Calculating different centrality measures
+    graph_community <- centrality(graph_community)
+    
+    # Integration a size variable for implementing non-overlapping function of Force Atlas
+    graph_community <- graph_community %>%
+      activate(nodes) %>%
+      mutate(size=Size_com)
+    
+    # Running Force Atlas layout  
+    graph_community <- force_atlas(graph_community,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 = 6000, iter_2 = 2000, barnes.hut = TRUE, size_min = size_min, size_max = size_max)
+  }
+  
+}
+
 # Simple functions for keeping a number n of nodes with highest centrality measures per communities
 top_centrality_com <- function(graph, centrality, top_n = 3){
   top_centrality_com <- graph %>%

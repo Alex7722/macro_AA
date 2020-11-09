@@ -129,7 +129,7 @@ saveRDS(graph_cocit, paste0(graph_data_path,"graph_cocit.rds"))
 #graph_cocit <- readRDS(paste0(graph_data_path,"graph_cocit.rds"))
 
 # Identifying the labels of the most important authors
-important_nodes <- top_citations(graph_cocit)
+important_nodes <- top_ordering(graph_cocit)
 
 # Plotting the graph  
 ggraph(graph_cocit, "manual", x = x, y = y) + 
@@ -179,7 +179,7 @@ saveRDS(graph_coupling, paste0(graph_data_path,"graph_coupling.rds"))
 graph_coupling <- readRDS(paste0(graph_data_path,"graph_coupling.rds"))
 
 # Identifying the labels of the most important authors
-important_nodes <- top_citations(graph_coupling, top_n_com = 2)
+important_nodes <- top_ordering(graph_coupling, top_n_com = 2)
 
 # Plotting the graph  
 ggraph(graph_coupling, "manual", x = x, y = y) + 
@@ -286,4 +286,3 @@ coupling_com <- merge(unique(references_extended[,c("Com_ID","size_com","share_c
 coupling_com <- cbind(coupling_com,most_cited_nodes[, c("Label","Titre")],most_cited_ref[, c("cited_author","Annee","share_cit_ref")], 
                       main_author[, c("citing_author","main_author")], main_journal[, c("Revue","main_journal")])
 coupling_com <- merge(coupling_com, main_discipline, by = c("Com_ID","rank"), all.x = TRUE)
-  
