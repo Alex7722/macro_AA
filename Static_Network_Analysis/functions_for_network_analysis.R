@@ -317,6 +317,9 @@ leiden_improved <- function(graph, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iter
   #' communities partitions comparison when we vary the resolution. A low resolution means fewer communities. For instance, if 
   #' the second resolution is smaller than the first one, we can observe how decreasing the resolution led some communities to disappear
   #' and to be merged with other communities. Sankey diagrams enable interesting analysis of the different partitions.
+  #' @description The function also automatically calculates the percentage of total nodes that are gathered in each 
+  #' community, in the column `Size_com`. This calculation is only done for `Com_ID`, that is for the resolution equals to
+  #' 1.
   #' 
   #' @param graph A tidygraph object.
   #' @param res_1 The first resolution used for running the Leiden algorithm. 1 by default.
@@ -348,9 +351,16 @@ leiden_improved <- function(graph, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iter
   
   # Add the resulting partition as an attribute of nodes
   # (to make plotting easier, put a 0 before one digit community)
-  graph <- graph %>% mutate(Com_ID = sprintf("%02d", leiden)) %>% 
+  graph <- graph %>%  activate (nodes) %>% 
+    mutate(Com_ID = sprintf("%02d", leiden)) %>% 
     mutate(Com_ID = as.character(Com_ID))
   
+  # calculate the size of the community
+  graph <- graph %>% group_by(Com_ID) %>%
+    mutate(Size_com = n()) %>%
+    mutate(Size_com = Size_com / length(V(graph)$Com_ID)) %>%
+    ungroup()
+    
   # Add an attribute to edges, depending on the community of their nodes
   # (If communities are different between the two nodes, edges takes the total number of communities plus 1 as attribute)
   # (Another possibility in the future would be for edges with nodes from different communities to be the average of the 
@@ -358,6 +368,7 @@ leiden_improved <- function(graph, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iter
   graph <- graph %>% 
     activate(edges) %>%
     mutate(com_ID_to = .N()$Com_ID[to], com_ID_from = .N()$Com_ID[from], Com_ID = ifelse(com_ID_from == com_ID_to, com_ID_from,(max(leiden)+1))) # .N() makes the node data available while manipulating edges
+  
   
   # Doing the same for the second resolution
   if(is.null(res_2)){
@@ -626,7 +637,7 @@ force_atlas <- function(graph,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 =
 }
 
 # Simple functions for keeping a number n of nodes with highest citations measures per communities
-top_ordering <- function(graph, ordering_column ="nb_cit" , top_n = 20, top_n_com = 1){
+top_ordering <- function(graph, ordering_column ="nb_cit" , top_n = 20, top_n_com = 1, biggest_community = FALSE, community_threshold = 0.01){
   #' Displaying the highest cited nodes
   #' 
   #' A simple functions for keeping a number n of nodes with highest citations 
@@ -645,6 +656,14 @@ top_ordering <- function(graph, ordering_column ="nb_cit" , top_n = 20, top_n_co
   #' @param top_n_com
   #' The number of highest cited nodes per community to display.
   #' 
+  #' @param biggest_community
+  #' If true, you have the possibility to remove the smallest community, depending of the `community_threshold`
+  #' you have set.
+  #' 
+  #' @param community_threshold
+  #' If `biggest_community` is true, the function selects the nodes that belong to communities which represent
+  #' at least x% of the total number of nodes. By default, the parameter is set to 1%.
+  #' 
   #' @details 
   #' Works only if you have a column called `nb_cit`
   #' 
@@ -661,6 +680,12 @@ top_ordering <- function(graph, ordering_column ="nb_cit" , top_n = 20, top_n_co
   # Changing the name of the variable chosen
   colnames(top_variable_com)[colnames(top_variable_com) == ordering_column] = "ordering_column"
   
+  # Keeping only the biggest communites if the parameter is TRUE
+  if(biggest_community == TRUE){
+    top_variable_com <- top_variable_com %>%
+      filter(Size_com > community_threshold)
+  }
+  
   # Keeping the n top nodes per community
   top_variable_com <- top_variable_com %>%
     arrange(desc(ordering_column)) %>%
@@ -674,7 +699,6 @@ top_ordering <- function(graph, ordering_column ="nb_cit" , top_n = 20, top_n_co
     as_tibble() 
   
   colnames(top_variable_general)[colnames(top_variable_general) == ordering_column] = "ordering_column"
-  
   
   top_variable_general <- top_variable_general %>%
     arrange(desc(ordering_column)) %>%
@@ -845,8 +869,8 @@ graph_from_attribute <- function(nodes, edges, palette, Attribute_name, nb_compo
     mutate(name = Attribute_name) %>% 
     select(name) %>% 
     group_by(name) %>%
-    mutate(Size_com = n()) %>%
-    arrange(desc(Size_com)) %>%
+    mutate(Size_att = n()) %>%
+    arrange(desc(Size_att)) %>%
     unique()
   
   # associating the two nodes of each edge with their respective community name
@@ -896,7 +920,7 @@ graph_from_attribute <- function(nodes, edges, palette, Attribute_name, nb_compo
     # Integration a size variable for implementing non-overlapping function of Force Atlas
     graph_community <- graph_community %>%
       activate(nodes) %>%
-      mutate(size=Size_com)
+      mutate(size=Size_att)
     
     # Running Force Atlas layout  
     graph_community <- force_atlas(graph_community,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 = 6000, iter_2 = 2000, barnes.hut = TRUE, size_min = size_min, size_max = size_max)
