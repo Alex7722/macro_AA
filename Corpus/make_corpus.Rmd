@@ -9,6 +9,10 @@ output:
     df_print: paged
 ---
 
+```{r, set.seed(2000)}
+knitr::opts_chunk$set(cache = T)
+```
+
 ```{r setup, include=FALSE}
 library(knitr)
 knitr::opts_knit$set(root.dir = "/projects/data/macro_AA")
@@ -49,6 +53,13 @@ library(scales)
 library(RColorBrewer)
 require(DescTools)
 require(stringr)
+color = data.table(
+  Leiden1 = 1:500,
+  color = brewer.pal(8, name = "Dark2"))
+color[Leiden1>8 & Leiden1<=16, color:=brewer.pal(8, name = "Set1")]
+color[Leiden1>10, color:="#c2c2c2"]
+color[,Leiden1:=sprintf("%02d", Leiden1)]
+color[,Leiden1:=as.character(Leiden1)]
 
 ```
 
@@ -68,14 +79,13 @@ nrow(dt_JEL_Articles)
 With the following distribution :
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
-ggplot(dt_JEL_Articles, aes(Year.V1)) + 
-  theme(axis.text=element_text(size=8)) +
+ggplot(dt_JEL_Articles, aes(as.numeric(Year.V1))) + 
   geom_bar()
 
 
 ```
 
-# Matching with Web of Science
+## Matching with Web of Science
 
 We matched our list of articles with the Web of Science data base using two techniques:  
 
@@ -88,6 +98,7 @@ We matched **40 433 articles**
   
 3. Finally, we brought the two corpus together and only kept unique articles, for a total of **44 833 unique articles**.
 
+The growth rate of the corpus is similar, therefore there is probably not a lot of mismatching
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
 JEL_matched_corpus_nodes <- readRDS("Corpus_Econlit_Matched_WoS/JEL_matched_corpus_nodes.rds")
@@ -97,11 +108,53 @@ nrow(JEL_matched_corpus_nodes)
 ```
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
-ggplot(JEL_matched_corpus_nodes, aes(as.character(Annee_Bibliographique))) + 
-  theme(axis.text=element_text(size=8)) +
+ggplot(JEL_matched_corpus_nodes, aes(Annee_Bibliographique)) + 
   geom_bar()
 
 
 ```
+
+
+# Extending the corpus 
+
+## Finding the Core
+
+The first step to extended our corpus beyond JEL codes, is to find the core references of our corpus. We first find the most referenced articles and defined a threshold to keep only relevant articles. The threshold is found by looking for a point of inflection in the growth rate of the corpus given different thresholds).
+
+We chose a threshold of **9** giving us **16 822** articles, **13 670** articles of which are on WoS.
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+
+tresholds_core.png <- readPNG('Corpus_Extended/tresholds_core.png')
+grid.raster(tresholds_core.png)
+
+```
+
+
+## Extending the Core
+
+From this Core, we find all relevant articles to macro. These articles are not necessarily macro per se, but they are relevant to understand the structural relationships that make macro.
+
+We follow the same procedure and find a relevant threshold for the most cited articles by our Core, but also for the articles citing our Core the most:
+
+1. For citations to the core we chose a threshold of **6**, and matched **88 425 articles**
+
+2. For references of the core we chose a threshold of **7**, and giving us  **8 213 articles**, **6 819** articles of which are on WoS.
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+
+tresholds_citations_to_core.png <- readPNG('Corpus_Extended/tresholds_citations_to_core.png')
+grid.raster(tresholds_citations_to_core.png)
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+
+tresholds_references_to_core.png <- readPNG('Corpus_Extended/tresholds_references_to_core.png')
+grid.raster(tresholds_references_to_core.png)
+
+```
+
 
 
