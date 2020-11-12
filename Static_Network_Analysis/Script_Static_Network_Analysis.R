@@ -157,7 +157,7 @@ important_nodes <- top_ordering(graph_cocit, top_n_com = 2, top_n = 10, biggest_
 # Plotting the graph  
 graph_cocit <- graph_cocit %>%
   activate(nodes) %>%
-  filter(nb_cit >= 3)
+  filter(nb_cit >= 1)
 
 # Plotting the graph  
 ggraph(graph_cocit, "manual", x = x, y = y) + 
@@ -228,7 +228,7 @@ important_nodes <- top_ordering(graph_coupling, top_n_com = 2, top_n = 25)
 # Plotting the graph  
 graph_coupling <- graph_coupling %>%
   filter(nb_cit >= 2)
-  
+
 ggraph(graph_coupling, "manual", x = x, y = y) + 
   geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
   scale_edge_width_continuous(range = c(0.1,2)) +
@@ -236,10 +236,10 @@ ggraph(graph_coupling, "manual", x = x, y = y) +
   geom_node_point(aes(x=x, y=y, size = size, fill = color), pch = 21, alpha = 0.8, show.legend = FALSE) +
   scale_size_continuous(range = c(0.1,18)) +
   scale_fill_identity() +
-  geom_label_repel(data=important_nodes, aes(x=x, y=y, label = paste0(Nom,Annee_Bibliographique), fill = color), size = 4, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
+  geom_label_repel(data=important_nodes, aes(x=x, y=y, label = Label, fill = color), size = 4, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
   #scale_size_continuous(range = c(1,4)) +
   theme_void() +
-  ggsave(paste0(picture_path,"graph_coupling.png"), width=30, height=30, units = "cm")
+  ggsave(paste0(picture_path,"graph_coupling_test.png"), width=30, height=30, units = "cm")
 
 ##################################### Basic Statistics of Communities ###############################------
 

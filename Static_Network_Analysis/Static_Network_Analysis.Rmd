@@ -228,10 +228,10 @@ references_extended <- merge(Nodes_coupling,authors_JEL[,c("ID_Art","Nom","Titre
 
 # Merging with the reference table
 # We now have the nodes, with community information, plus the references cited by these nodes
-references_extended <- merge(references_extended,edges_JEL[,c("ID_Art","New_id2","Annee","Nom")], by = "ID_Art")
+references_extended <- merge(references_extended,edges_JEL[,c("ID_Art","New_id2","Annee","Nom","Revue_Abbrege","Titre")], by = "ID_Art")
 
 # Renaming columns to avoid confusion
-setnames(references_extended,c("Nom.x","Nom.y"), c("citing_author","cited_author"))
+setnames(references_extended,c("Nom.x","Nom.y","Titre.x","Titre.y"), c("citing_author","cited_author","Titre","Cited_Title"))
 
 # Strategy: keeping the five highest values for different variables, per community
 # fixing n
@@ -245,10 +245,10 @@ most_cited_nodes <- most_cited_nodes %>%
   slice(1:n)
 
 # Keeping the n references the most cited per community
-most_cited_ref <- references_extended[, c("Com_ID","New_id2","cited_author","Annee")]
+most_cited_ref <- references_extended[, c("Com_ID","New_id2","cited_author","Annee","Revue_Abbrege","Cited_Title")]
 most_cited_ref <- most_cited_ref[, share_cit_ref := .N, by = c("Com_ID","New_id2")][, nb_cit_per_com := .N, by = "Com_ID"][, share_cit_ref := share_cit_ref/nb_cit_per_com]
 most_cited_ref <- most_cited_ref %>%
-  select(Com_ID,New_id2,cited_author,Annee,share_cit_ref) %>%
+  select(Com_ID,New_id2,cited_author,Annee,Revue_Abbrege,Cited_Title,share_cit_ref) %>%
   unique() %>%
   group_by(Com_ID) %>%
   arrange(desc(share_cit_ref)) %>%
@@ -317,7 +317,7 @@ rank <- rank %>% arrange(Com_ID)
 
 # Merging all the data on coupling communities
 coupling_com <- merge(unique(references_extended[,c("Com_ID","size_com","share_com","mean_cit_com")]), rank, by = "Com_ID")
-coupling_com <- cbind(coupling_com,most_cited_nodes[, c("Label","Titre")],most_cited_ref[, c("cited_author","Annee","share_cit_ref")], 
+coupling_com <- cbind(coupling_com,most_cited_nodes[, c("Label","Titre")],most_cited_ref[, c("cited_author","Annee","Revue_Abbrege","Cited_Title","share_cit_ref")], 
                       main_author[, c("citing_author","main_author")], main_journal[, c("Revue","main_journal")], 
                       main_institution[,c("Institution","main_institution")], main_country[,c("Pays","main_country")])
 coupling_com <- merge(coupling_com, main_discipline, by = c("Com_ID","rank"), all.x = TRUE)
@@ -338,7 +338,7 @@ datatable(coupling_com, rownames = TRUE,
 big_com <- Nodes_coupling[, size_com := .N, by = "Com_ID"][, share_com := size_com/length(Nodes_coupling$ID_Art)][share_com >= 0.01,]
 
 graph_coupling <- graph_coupling %>% activate(nodes)  %>%  filter(Com_ID %in% big_com$Com_ID)
-TF_IDF <- tf_idf(graph_coupling)
+TF_IDF <- tf_idf(graph = graph_coupling)
 
 TF_IDF$plot
 ```
@@ -540,6 +540,161 @@ plot_graph_authors_coupling_community <- ggraph(graph_authors_coupling_community
   theme_void() +
   ggsave(paste0(picture_path,"graph_authors_coupling_community.png"), width=25, height=25, units = "cm")
 
+```
+
+![](/home/aurelien/macro_AA/Static_Network_Analysis/graph_authors_coupling_community.png)
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+# loading the graph if necessary
+graph_authors_coupling <- readRDS(paste0(graph_data_path,"graph_authors_coupling.rds"))
+
+# Extracting the nodes of the network
+Nodes_authors_coupling <- graph_authors_coupling %>%
+  activate(nodes)%>%
+  select(Id, nb_cit_author,Com_ID, Size_com) %>%
+  filter(Size_com > 0.01) %>%
+  as.data.table()
+
+# Merging with the authors table, to have the list of the authors 
+Nodes_authors_coupling <- merge(Nodes_authors_coupling,authors_JEL[,c("ID_Art","Nom","Titre","Ordre","Institution","Pays")], by.x = "Id", by.y = "Nom")
+
+# Merging with the nodes JEL table
+# We now have the author-nodes and the artilces they have published between the two dates we have chosen, plus the journal and the discipline
+Nodes_authors_coupling <- merge(Nodes_authors_coupling,nodes_JEL[between(Annee_Bibliographique,1991,1999) ,c("ID_Art","Annee_Bibliographique","Revue","ESpecialite")], by = "ID_Art")
+
+# Merging with the reference table
+# We now have the nodes, with community information, plus the references cited by these nodes
+Nodes_authors_coupling <- merge(Nodes_authors_coupling,edges_JEL[,c("ID_Art","New_id2","Annee","Nom","Revue_Abbrege","Titre")], by = "ID_Art")
+
+# Renaming columns to avoid confusion
+setnames(Nodes_authors_coupling,c("Nom","Titre.x","Titre.y"), c("cited_author","citing_title","cited_title"))
+
+# Strategy: keeping the five highest values for different variables, per community
+# fixing n
+n = 5
+
+# Keeping the n nodes with the highest number of citations in our corpus, per community
+most_cited_nodes <- unique(Nodes_authors_coupling[, c("Com_ID","nb_cit_author","Id")])
+most_cited_nodes <- most_cited_nodes %>%
+  group_by(Com_ID) %>%
+  arrange(desc(nb_cit_author)) %>%
+  slice(1:n)
+
+# keeping the n authors the most present in coupling communities
+main_author <- unique(Nodes_authors_coupling[, c("ID_Art","Com_ID","Id")])
+main_author <- main_author[, main_author := .N, by = c("Com_ID","Id")]
+setnames(main_author, "Id","citing_author")
+main_author <- main_author %>%
+  select(Com_ID,citing_author,main_author) %>%
+  unique() %>%
+  group_by(Com_ID) %>%
+  arrange(desc(main_author)) %>%
+  slice(1:n)
+
+# Keeping the n references the most cited per community
+most_cited_ref <- Nodes_authors_coupling[, c("Com_ID","New_id2","cited_author","Annee","Revue_Abbrege","cited_title")]
+most_cited_ref <- most_cited_ref[, share_cit_ref := .N, by = c("Com_ID","New_id2")][, nb_cit_per_com := .N, by = "Com_ID"][, share_cit_ref := share_cit_ref/nb_cit_per_com]
+most_cited_ref <- most_cited_ref %>%
+  select(Com_ID,New_id2,cited_author,Annee,Revue_Abbrege,cited_title,share_cit_ref) %>%
+  unique() %>%
+  group_by(Com_ID) %>%
+  arrange(desc(share_cit_ref)) %>%
+  slice(1:n)
+
+# keeping the n journals where most nodes were published in coupling communities
+main_journal <- unique(Nodes_authors_coupling[, c("ID_Art","Com_ID","Revue")])
+main_journal <- main_journal[, main_journal := .N, by = c("Com_ID","Revue")][, size := .N, by = "Com_ID"][, main_journal:= main_journal/size]
+main_journal <- main_journal %>%
+  select(Com_ID,Revue,main_journal) %>%
+  unique() %>%
+  group_by(Com_ID) %>%
+  arrange(desc(main_journal)) %>%
+  slice(1:n)
+
+# keeping the n top disciplines per community
+main_discipline <- unique(Nodes_authors_coupling[, c("ID_Art","Com_ID","ESpecialite")])
+main_discipline <- main_discipline[, main_discipline := .N, by = c("Com_ID","ESpecialite")][, size := .N, by = "Com_ID"][, main_discipline := main_discipline/size]
+main_discipline <- main_discipline %>%
+  select(Com_ID,ESpecialite,main_discipline) %>%
+  unique() %>%
+  group_by(Com_ID) %>%
+  arrange(desc(main_discipline)) %>%
+  slice(1:n) %>%
+  as.data.table()
+
+main_discipline <- main_discipline[, rank := 1:.N, by = list(Com_ID)]
+
+# keeping the n institutions the most present in coupling communities
+main_institution <- unique(Nodes_authors_coupling[, c("ID_Art","Com_ID","Id","Institution")])
+main_institution <- main_institution[, Total := .N, by = "Com_ID"]
+main_institution <- main_institution[Institution != "NA", main_institution := .N, by = c("Com_ID","Institution")][, main_institution := main_institution/Total]
+main_institution <- main_institution %>%
+  select(Com_ID,Institution,main_institution) %>%
+  unique() %>%
+  group_by(Com_ID) %>%
+  arrange(desc(main_institution)) %>%
+  slice(1:n)
+
+# keeping the n institutions the most present in coupling communities
+main_country <- unique(Nodes_authors_coupling[, c("ID_Art","Com_ID","Id","Pays")])
+main_country <- main_country[, Total := .N, by = "Com_ID"]
+main_country <- main_country[Pays != "NA", main_country := .N, by = c("Com_ID","Pays")][, main_country := main_country/Total]
+main_country <- main_country %>%
+  select(Com_ID,Pays,main_country) %>%
+  unique() %>%
+  group_by(Com_ID) %>%
+  arrange(desc(main_country)) %>%
+  filter(main_country != "NA") %>%
+  slice(1:n) %>%
+  as.data.table()
+
+main_country <- main_country[, rank := 1:.N, by = list(Com_ID)]
+
+# creating a "rank" column to be merged with the data
+rank <- data.table(rank=1:n)
+rank <- merge(unique(Nodes_authors_coupling$Com_ID), rank)
+colnames(rank)[1] = "Com_ID"
+rank <- rank %>% arrange(Com_ID)
+
+# Merging all the data on coupling communities
+authors_coupling_com <- merge(unique(Nodes_authors_coupling[,c("Com_ID","Size_com")]), rank, by = "Com_ID")
+authors_coupling_com <- cbind(authors_coupling_com,most_cited_nodes[, c("Id","nb_cit_author")],
+                      most_cited_ref[, c("cited_author","Annee","Revue_Abbrege","cited_title","share_cit_ref")], 
+                      main_author[, c("citing_author","main_author")], main_journal[, c("Revue","main_journal")], 
+                      main_institution[,c("Institution","main_institution")])
+authors_coupling_com <- merge(authors_coupling_com, main_country, by = c("Com_ID","rank"), all.x = TRUE)
+authors_coupling_com <- merge(authors_coupling_com, main_discipline, by = c("Com_ID","rank"), all.x = TRUE)
+
+# Projecting the table with all these data
+
+datatable(authors_coupling_com, rownames = TRUE, 
+          options =  list(scrollY = "640px",
+  scrollCollapse = TRUE,
+  scrollX = "400px",
+  paging = FALSE))
+```
+
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+# loading the graph if necessary
+graph_authors_coupling <- readRDS(paste0(graph_data_path,"graph_authors_coupling.rds"))
+
+# Extracting the nodes of the network
+Nodes_authors_coupling <- graph_authors_coupling %>%
+  activate(nodes)%>%
+  select(Id, nb_cit_author,Com_ID, Size_com, color) %>%
+  filter(Size_com > 0.01) %>%
+  as.data.table()
+
+# Merging with the authors table, to have the list of the authors 
+Nodes_authors_coupling <- merge(Nodes_authors_coupling,authors_JEL[,c("ID_Art","Nom","Titre")], by.x = "Id", by.y = "Nom")
+
+Nodes_authors_coupling <- merge(Nodes_authors_coupling,nodes_JEL[between(Annee_Bibliographique,1991,1999) ,c("ID_Art","Annee_Bibliographique")], by = "ID_Art")
+
+# Calculating the tf-idf for the titles in each community
+TF_IDF <- tf_idf(nodes = Nodes_authors_coupling)
+
+TF_IDF$plot
 ```
 
 # Bibliographic Cocitation

@@ -984,16 +984,19 @@ Important_nodes <- unique(Important_nodes)
 ################### 4) Fuctions for word analysis (titles) of networks ################-------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
-tf_idf <- function(graph, title_column = "Titre", com_column = "Com_ID", color_column = "color", number_of_words = 10, n_columns = 4, palette = NULL)
+tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_column = "Com_ID", color_column = "color", number_of_words = 10, n_columns = 4, palette = NULL)
 {
   #' Creating a TF-IDF analysis of the titles of WoS corpus
   #' 
-  #' This function takes as input a tidygraph object with a community attribute, and analyzes
+  #' This function takes as input a tidygraph object or a data frame with nodes, both with a community attribute, and analyzes
   #' the words use in the title of the articles to calculate the words with the highest TF-IDF
   #' value for each community.
   #'  
   #' @param graph
-  #' A tidygraph object.
+  #' A tidygraph object. By default `NULL` in case you prefer to enter a data frame with nodes.
+  #' 
+  #' @param nodes
+  #' A data frame with the nodes of the network, and community and title attributes.
   #' 
   #' @param title_column
   #' The name of the column with the titles of the articles. The function renames the column
@@ -1018,8 +1021,12 @@ tf_idf <- function(graph, title_column = "Titre", com_column = "Com_ID", color_c
   #' the function will generate one from a palette that you can add in the paramaters (NULL by default).
 
 # extracting the nodes
+  if(! is.null(graph)){
 tf_idf <- graph %>% activate(nodes) %>% as.data.table()
-
+  }
+  else{
+    tf_idf <- nodes %>% as.data.table()
+  }
 # changing the names of the column for titles and communities
 colnames(tf_idf)[colnames(tf_idf)==com_column] = "Com_ID"
 colnames(tf_idf)[colnames(tf_idf)==title_column] = "Titre"
