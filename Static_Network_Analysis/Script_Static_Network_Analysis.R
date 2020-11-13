@@ -50,6 +50,7 @@ rm(institutions_info_JEL)
 # passing name column to upper letters
 edges_JEL <- edges_JEL[, Nom := toupper(Nom)]
 authors_JEL <- authors_JEL[, Nom := toupper(Nom)]
+nodes_JEL <- nodes_JEL[, Nom := toupper(Nom)]
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 ################################ PART II: NETWORK ANALYSIS #################################
@@ -62,7 +63,7 @@ authors_JEL <- authors_JEL[, Nom := toupper(Nom)]
 ############################### Building Nodes and Edges for co-citation #######################
 nodes_cocit_JEL_1990s <- edges_JEL[between(Annee_Bibliographique,1991,1999),]
 #nodes_cocit_JEL_1990s <- merge(nodes_cocit_JEL_1990s, nodes_JEL[,c("ItemID_Ref","Titre","Code_Revue")], by = "ItemID_Ref", all.x = TRUE)
-nodes_cocit_JEL_1990s <- unique(nodes_cocit_JEL_1990s[,nb_cit := .N, by = "New_id2"][nb_cit >= 2,c("New_id2","Annee","Nom","Titre","Revue_Abbrege","ESpecialite","nb_cit")])
+nodes_cocit_JEL_1990s <- unique(nodes_cocit_JEL_1990s[,nb_cit := .N, by = "New_id2"][nb_cit >= 5,c("New_id2","Annee","Nom","Titre","Revue_Abbrege","ESpecialite","nb_cit")])
 doublons <- which(duplicated(nodes_cocit_JEL_1990s$New_id2))
 nodes_cocit_JEL_1990s <- nodes_cocit_JEL_1990s[-doublons]
 
@@ -124,7 +125,7 @@ graph_coupling <- tbl_main_components(edges = edges_coupling_JEL_1990s, nodes = 
 ######################### Working on the tidygraph for cocitation and its attributes #################################-------
 
 # Identifying communities with Leiden algorithm                         
-graph_cocit <- leiden_improved(graph_cocit, res_1 = 1, res_2 = 0.5, res_3 = NULL, n_iterations = 500)       
+graph_cocit <- leiden_improved(graph_cocit, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iterations = 500)       
 
 # Giving colors to communities
 graph_cocit <- community_colors(graph_cocit,mypalette)
@@ -132,8 +133,8 @@ graph_cocit <- community_colors(graph_cocit,mypalette)
 # Naming communities
 graph_cocit <-naming_communities(graph_cocit, centrality_measure = "nb_cit", naming = "Label")
 
-# Calculating different centrality measures
-graph_cocit <- centrality(graph_cocit)
+# Calculating different centrality measures if necessary
+#graph_cocit <- centrality(graph_cocit)
 
 # Integration a size variable for implementing non-overlapping function of Force Atlast
 graph_cocit <- graph_cocit %>%
@@ -157,9 +158,9 @@ important_nodes <- top_ordering(graph_cocit, top_n_com = 2, top_n = 10, biggest_
 # Plotting the graph  
 graph_cocit <- graph_cocit %>%
   activate(nodes) %>%
-  filter(nb_cit >= 1)
+  filter(nb_cit >= 5)
 
-# Plotting the graph  
+# Plotting the graph 1 - Complete graph with the biggest communities
 ggraph(graph_cocit, "manual", x = x, y = y) + 
   geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
   scale_edge_width_continuous(range = c(0.1,2)) +
@@ -170,12 +171,12 @@ ggraph(graph_cocit, "manual", x = x, y = y) +
   geom_label_repel(data=important_nodes, aes(x=x, y=y, label = paste0(Nom,Annee), fill = color), size = 4, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
   #scale_size_continuous(range = c(1,4)) +
   theme_void() +
-  ggsave(paste0(picture_path,"graph_cocit.png"), width=40, height=40, units = "cm")
+  ggsave(paste0(picture_path,"graph_cocit.png"), width=30, height=30, units = "cm")
 
 # Identifying the labels of the most important authors
 #important_nodes <- top_ordering(graph_cocit, top_n_com = 1, top_n = 10)
 
-# Plotting the graph  
+# Plotting the graph 2 - Graph with a low Leiden resolution  
 ggraph(graph_cocit, "manual", x = x, y = y) + 
   geom_edge_arc(aes(width = weight), color = "gray", alpha = 0.3, strength = 0.2, show.legend = FALSE) +
   scale_edge_width_continuous(range = c(0.1,2)) +
@@ -200,8 +201,8 @@ graph_coupling <- leiden_improved(graph_coupling, res_1 = 1, res_2 = NULL, res_3
 # Giving colors to communities
 graph_coupling <- community_colors(graph_coupling,mypalette)
 
-# Calculating different centrality measures
-graph_coupling <- centrality(graph_coupling)
+# Calculating different centrality measures if necessary
+# graph_coupling <- centrality(graph_coupling)
 
 # Naming communities
 graph_coupling <-naming_communities(graph_coupling, centrality_measure = "nb_cit", naming = "Label")
@@ -240,122 +241,6 @@ ggraph(graph_coupling, "manual", x = x, y = y) +
   #scale_size_continuous(range = c(1,4)) +
   theme_void() +
   ggsave(paste0(picture_path,"graph_coupling_test.png"), width=30, height=30, units = "cm")
-
-##################################### Basic Statistics of Communities ###############################------
-
-# Extracting the nodes of the network
-Nodes_coupling <- graph_coupling %>%
-  activate(nodes)%>%
-  select(Id, Annee_Bibliographique,Label,nb_cit,Com_ID,Revue,ESpecialite) %>%
-  as.data.table()
-
-# Changing format of ID_Art to merge with other data table
-Nodes_coupling$ID_Art <- as.integer(Nodes_coupling$Id)
-
-# Calculating the size of communities and mean of citation per community (total number of citations of all the nodes on the number of nodes)
-Nodes_coupling <- Nodes_coupling[, size_com := .N, by = "Com_ID"][, mean_cit_com := sum(nb_cit), by = "Com_ID"][, mean_cit_com := mean_cit_com/size_com]
-
-# keeping only communities with at least x% of the nodes
-Nodes_coupling <- Nodes_coupling[, share_com := size_com/length(Nodes_coupling$ID_Art)][share_com >= 0.01,]
-
-# Merging with the authors table, to have the complete list
-references_extended <- merge(Nodes_coupling,authors_JEL[,c("ID_Art","Nom","Titre","Ordre","Institution","Pays")], by = "ID_Art")
-
-# Merging with the reference table
-# We now have the nodes, with community information, plus the references cited by these nodes
-references_extended <- merge(references_extended,edges_JEL[,c("ID_Art","New_id2","Annee","Nom")], by = "ID_Art")
-
-# Renaming columns to avoid confusion
-setnames(references_extended,c("Nom.x","Nom.y"), c("citing_author","cited_author"))
-
-# Strategy: keeping the five highest values for different variables, per community
-# fixing n
-n = 5
-
-# Keeping the n nodes with the highest number of citations in our corpus, per community
-most_cited_nodes <- unique(references_extended[, c("Com_ID","nb_cit","Label","Titre")])
-most_cited_nodes <- most_cited_nodes %>%
-  group_by(Com_ID) %>%
-  arrange(desc(nb_cit)) %>%
-  slice(1:n)
-
-# Keeping the n references the most cited per community
-most_cited_ref <- references_extended[, c("Com_ID","New_id2","cited_author","Annee")]
-most_cited_ref <- most_cited_ref[, share_cit_ref := .N, by = c("Com_ID","New_id2")][, nb_cit_per_com := .N, by = "Com_ID"][, share_cit_ref := share_cit_ref/nb_cit_per_com]
-most_cited_ref <- most_cited_ref %>%
-  select(Com_ID,New_id2,cited_author,Annee,share_cit_ref) %>%
-  unique() %>%
-  group_by(Com_ID) %>%
-  arrange(desc(share_cit_ref)) %>%
-  slice(1:n)
-
-# keeping the n authors the most present in coupling communities
-main_author <- unique(references_extended[, c("ID_Art","Com_ID","citing_author")])
-main_author <- main_author[, main_author := .N, by = c("Com_ID","citing_author")]
-main_author <- main_author %>%
-  select(Com_ID,citing_author,main_author) %>%
-  unique() %>%
-  group_by(Com_ID) %>%
-  arrange(desc(main_author)) %>%
-  slice(1:n)
-
-# keeping the n journals where most nodes were published in coupling communities
-main_journal <- unique(references_extended[, c("ID_Art","Com_ID","Revue","size_com")])
-main_journal <- main_journal[, main_journal := .N, by = c("Com_ID","Revue")][, main_journal:= main_journal/size_com]
-main_journal <- main_journal %>%
-  select(Com_ID,Revue,main_journal) %>%
-  unique() %>%
-  group_by(Com_ID) %>%
-  arrange(desc(main_journal)) %>%
-  slice(1:n)
-
-# keeping the n top disciplines per community
-main_discipline <- unique(references_extended[, c("ID_Art","Com_ID","ESpecialite","size_com")])
-main_discipline <- main_discipline[, main_discipline := .N, by = c("Com_ID","ESpecialite")][, main_discipline := main_discipline/size_com]
-main_discipline <- main_discipline %>%
-  select(Com_ID,ESpecialite,main_discipline) %>%
-  unique() %>%
-  group_by(Com_ID) %>%
-  arrange(desc(main_discipline)) %>%
-  slice(1:n) %>%
-  as.data.table()
-
-main_discipline <- main_discipline[, rank := 1:.N, by = list(Com_ID)]
-
-# keeping the n institutions the most present in coupling communities
-main_institution <- unique(references_extended[, c("ID_Art","Com_ID","citing_author","Institution")])
-main_institution <- main_institution[, Total := .N, by = "Com_ID"]
-main_institution <- main_institution[Institution != "NA", main_institution := .N, by = c("Com_ID","Institution")][, main_institution := main_institution/Total]
-main_institution <- main_institution %>%
-  select(Com_ID,Institution,main_institution) %>%
-  unique() %>%
-  group_by(Com_ID) %>%
-  arrange(desc(main_institution)) %>%
-  slice(1:n)
-
-# keeping the n institutions the most present in coupling communities
-main_country <- unique(references_extended[, c("ID_Art","Com_ID","citing_author","Pays")])
-main_country <- main_country[, Total := .N, by = "Com_ID"]
-main_country <- main_country[Pays != "NA", main_country := .N, by = c("Com_ID","Pays")][, main_country := main_country/Total]
-main_country <- main_country %>%
-  select(Com_ID,Pays,main_country) %>%
-  unique() %>%
-  group_by(Com_ID) %>%
-  arrange(desc(main_country)) %>%
-  slice(1:n)
-
-# creating a "rank" column to be merged with the data
-rank <- data.table(rank=1:n)
-rank <- merge(unique(references_extended$Com_ID), rank)
-colnames(rank)[1] = "Com_ID"
-rank <- rank %>% arrange(Com_ID)
-
-# Merging all the data on coupling communities
-coupling_com <- merge(unique(references_extended[,c("Com_ID","size_com","share_com","mean_cit_com")]), rank, by = "Com_ID")
-coupling_com <- cbind(coupling_com,most_cited_nodes[, c("Label","Titre")],most_cited_ref[, c("cited_author","Annee","share_cit_ref")], 
-                      main_author[, c("citing_author","main_author")], main_journal[, c("Revue","main_journal")], 
-                      main_institution[,c("Institution","main_institution")], main_country[,c("Pays","main_country")])
-coupling_com <- merge(coupling_com, main_discipline, by = c("Com_ID","rank"), all.x = TRUE)
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 ################################# 3) Author Graph from Bibliographic Coupling ##################################------
@@ -444,3 +329,159 @@ ggraph(graph_authors_coupling, "manual", x = x, y = y) +
   #scale_size_continuous(range = c(1,4)) +
   theme_void() +
   ggsave(paste0(picture_path,"graph_authors_coupling.png"), width=30, height=30, units = "cm")
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+################################# 4) Co-Authorship Graph  ##################################------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+################## Building an author bibliographic coupling graph ######################----
+
+# creating the nodes with the number of citation of the nodes in the corpus
+coauthorship_nodes_1990s <- nodes_JEL[between(Annee_Bibliographique,1991,1999),]
+authors_JEL <- authors_JEL[, citing_author := Nom]
+
+coauthorship_nodes_1990s <- merge(coauthorship_nodes_1990s, unique(authors_JEL[,c("ID_Art","citing_author")]), by = "ID_Art")
+
+# building edges
+coauthorship_edges_1990s <- bibliographic_coupling(unique(coauthorship_nodes_1990s[,c("ID_Art","citing_author")]), source = "citing_author", ref = "ID_Art", weight_threshold = 1)
+
+# building nodes
+coauthorship_nodes_1990s <- unique(coauthorship_nodes_1990s[,"citing_author"])
+
+# creating the tidygraph object  
+graph_coauthorship <- tbl_main_components(edges = coauthorship_edges_1990s, nodes = coauthorship_nodes_1990s, node_key = "citing_author", threshold_alert = 0.05, directed = FALSE)
+
+################## Working on the author coupling tidygraph and its attributes ######################----
+
+# Identifying communities with Leiden algorithm                         
+graph_coauthorship <- leiden_improved(graph_coauthorship, res_1 = 0.5, res_2 = NULL, res_3 = NULL, n_iterations = 500)       
+
+# Giving colors to communities
+graph_coauthorship <- community_colors(graph_coauthorship,mypalette)
+
+# Calculating different centrality measures
+graph_coauthorship <- centrality(graph_coauthorship)
+
+# Naming communities
+graph_coauthorship <-naming_communities(graph_coauthorship, centrality_measure = "Strength", naming = "Id")
+
+# Integration a size variable for implementing non-overlapping function of Force Atlas
+graph_coauthorship <- graph_coauthorship %>%
+  activate(nodes) %>%
+  mutate(size=Strength)
+
+# Running Force Atlas layout  
+graph_coauthorship <- force_atlas(graph_coauthorship,seed = 1, ew.influence = 1, kgrav = 1, iter_1 = 6000, iter_2 = 2000, barnes.hut = TRUE, size_min = 50, size_max = 200)
+
+# Saving the graph
+saveRDS(graph_coauthorship, paste0(graph_data_path,"graph_coauthorship.rds"))
+
+############################# Projection of the graph #########################
+
+# loading the graph if necessary
+#graph_coauthorship <- readRDS(paste0(graph_data_path,"graph_coauthorship.rds"))
+
+# Identifying the labels of the most important authors
+important_nodes <- top_ordering(graph_coauthorship, top_n_com = 1, top_n =10, biggest_community = TRUE)
+
+# Plotting the graph  
+
+ggraph(graph_coauthorship, "manual", x = x, y = y) + 
+  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
+  scale_edge_width_continuous(range = c(0.1,3)) +
+  scale_edge_colour_identity() +
+  geom_node_point(aes(x=x, y=y, size = size, fill = color), pch = 21, alpha = 0.8, show.legend = FALSE) +
+  scale_size_continuous(range = c(0.05,12)) +
+  scale_fill_identity() +
+  geom_label_repel(data=important_nodes, aes(x=x, y=y, label = Id, fill = color), size = 4, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
+  #scale_size_continuous(range = c(1,4)) +
+  theme_void() +
+  ggsave(paste0(picture_path,"graph_coauthorship.png"), width=30, height=30, units = "cm")
+
+
+############################## institutions network from co-authorship data #########################
+# creating the nodes with the number of citation of the nodes in the corpus
+
+institutions_nodes_1990s <- nodes_JEL[between(Annee_Bibliographique,1991,1999),]
+
+nb_cit<- edges_JEL[between(Annee_Bibliographique,1991,1999),nb_cit := .N,ItemID_Ref]
+institutions_nodes_1990s <- merge(institutions_nodes_1990s,unique(nb_cit[,c("ItemID_Ref","nb_cit")]), by = "ItemID_Ref", all.x = "TRUE")
+
+rm(nb_cit) # not useful anymore
+
+# replacing NA value by 0 in nb_cit (it means that the nodes will be used in Leiden and Force Atlas, but
+# not displayed in the graph)
+
+institutions_nodes_1990s[is.na(nb_cit),]$nb_cit <- 0
+
+# Merging with authors 
+authors_JEL <- authors_JEL[, citing_author := Nom]
+institutions_nodes_1990s <- merge(institutions_nodes_1990s, unique(authors_JEL), by = "ID_Art")
+institutions_nodes_1990s <- institutions_nodes_1990s[!is.na(Institution)]
+
+# calculating the total number of citations per university
+nb_cit<- unique(institutions_nodes_1990s[, c("ID_Art","nb_cit","Institution")])
+nb_cit<- nb_cit[,nb_cit_univ := sum(nb_cit), Institution]
+institutions_nodes_1990s <- merge(institutions_nodes_1990s,unique(nb_cit[,c("Institution","nb_cit_univ")]), by = "Institution", all.x = "TRUE")
+institutions_nodes_1990s <- institutions_nodes_1990s[nb_cit_univ > 1]
+
+rm(nb_cit) # not useful anymore
+
+# building edges
+institutions_edges_1990s <- bibliographic_coupling(unique(institutions_nodes_1990s[,c("ID_Art","Institution")]), source = "Institution", ref = "ID_Art", weight_threshold = 1)
+
+# building nodes
+
+institutions_nodes_1990s <- unique(institutions_nodes_1990s[,c("Institution","Pays","nb_cit_univ")])
+
+# creating the tidygraph object  
+graph_institutions <- tbl_main_components(edges = institutions_edges_1990s, nodes = institutions_nodes_1990s, node_key = "Institution", threshold_alert = 0.05, directed = FALSE)
+
+################## Working on the author coupling tidygraph and its attributes ######################----
+
+# Identifying communities with Leiden algorithm                         
+graph_institutions <- leiden_improved(graph_institutions, res_1 = 0.5, res_2 = NULL, res_3 = NULL, n_iterations = 500)       
+
+# Giving colors to communities
+graph_institutions <- community_colors(graph_institutions,mypalette)
+
+# Calculating different centrality measures
+#graph_institutions <- centrality(graph_institutions)
+
+# Naming communities
+graph_institutions <-naming_communities(graph_institutions, centrality_measure = "nb_cit_univ", naming = "Id")
+
+# Integration a size variable for implementing non-overlapping function of Force Atlas
+graph_institutions <- graph_institutions %>%
+  activate(nodes) %>%
+  mutate(size=nb_cit_univ)
+
+# Running Force Atlas layout  
+graph_institutions <- force_atlas(graph_institutions,seed = 1, ew.influence = 1, kgrav = 1, iter_1 = 6000, iter_2 = 2000, barnes.hut = TRUE, size_min = 20, size_max = 100)
+
+# Saving the graph
+saveRDS(graph_institutions, paste0(graph_data_path,"graph_institutions.rds"))
+
+############################# Projection of the graph #########################
+
+# loading the graph if necessary
+#graph_institutions <- readRDS(paste0(graph_data_path,"graph_institutions.rds"))
+
+# Identifying the labels of the most important authors
+important_nodes <- top_ordering(graph_institutions, ordering_column ="nb_cit_univ", top_n_com = 2, top_n =15, biggest_community = TRUE)
+
+# Plotting the graph  
+
+ggraph(graph_institutions, "manual", x = x, y = y) + 
+  geom_edge_arc(aes(width = weight, color = color_edges), alpha = 0.3, strength = 0.2, show.legend = FALSE) +
+  scale_edge_width_continuous(range = c(0.1,3)) +
+  scale_edge_colour_identity() +
+  geom_node_point(aes(x=x, y=y, size = size, fill = color), pch = 21, alpha = 0.8, show.legend = FALSE) +
+  scale_size_continuous(range = c(0.1,20)) +
+  scale_fill_identity() +
+  geom_label_repel(data=important_nodes, aes(x=x, y=y, label = Id, fill = color), size = 4, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
+  #scale_size_continuous(range = c(1,4)) +
+  theme_void() +
+  ggsave(paste0(picture_path,"graph_institutions.png"), width=30, height=30, units = "cm")
+
