@@ -460,7 +460,7 @@ centrality <- function(graph){
            Betweeness = centrality_betweenness())
   }
 
-naming_communities <- function(graph, centrality_measure = "Strength",naming = "Label"){
+naming_communities <- function(graph, centrality_measure = "Strength", naming = "Label", Community = "Com_ID"){
   #'Naming communities
   #'
   #' @description A function to give to a community the name of its node with the highest chosen measure.
@@ -478,9 +478,13 @@ naming_communities <- function(graph, centrality_measure = "Strength",naming = "
   #' the community name. For instance, if you choose `Degree`, the function takes the name of the node with the highest 
   #' degree in the community to name the community. By default, takes the column named `Strength`. You can use other measure
   #' than network centrality measures: for instance, if nodes are articles, you can use the number of citations of articles.
+  #' 
   #' @param naming Enter the name of the column you want to be used for naming the community. The function takes the node
   #' with the highest `centrality_measure` chosen, and use the node value in the `naming` column  to title the community.
   #' For instance, if nodes are individuals and if you have a column called `surname`, you can use this column.
+  #' 
+  #' @param Community
+  #' The name of your community column.
   #' 
   #' @details The nodes side of the tidygraph object has to have a column called `Strength`, and 
   #' `label`, the latter being the way we want to call the nodes (for instance, the surname of the 
@@ -494,16 +498,22 @@ naming_communities <- function(graph, centrality_measure = "Strength",naming = "
 
   # Finding the nodes with the highest strength per community and building a df with community numbers
   # and the label of the node with the highest Strength.
-   Community_names <- graph %>%
-     activate(nodes)  %>%
-     rename(Centrality = centrality_measure,
-            Label = naming) %>%
-     as_tibble()  %>%
+  Community_names <- graph_coupling %>%
+    activate(nodes)  %>%
+    as_tibble()
+  
+  # Changing the name of the variable chosen
+  colnames(Community_names)[colnames(Community_names) == naming] = "Label"
+  colnames(Community_names)[colnames(Community_names) == Community] = "Com_ID"
+  colnames(Community_names)[colnames(Community_names) == centrality_measure] = "Centrality"
+  
+  Community_names <- Community_names %>%
     arrange(Com_ID, desc(Centrality)) %>%
     mutate(Community_name = Label) %>%
     select(Community_name, Com_ID) %>%
     group_by(Com_ID) %>%
-    slice(1)
+    slice(1) %>%
+    mutate(Community_name = paste0(Com_ID,"-",Community_name))
   
   # adding the name as an attribute to the nodes.
   graph <- graph %>%
@@ -761,7 +771,7 @@ graph_community <- function(graph, Community_name = "Community_name", nb_compone
     mutate(name = Community_name) %>% 
     select(name) %>% 
     group_by(name) %>%
-    mutate(Size_com = n()) %>%
+    mutate(nb_nodes = n()) %>%
     unique()
   
   # associating the two nodes of each edge with their respective community name
@@ -814,7 +824,7 @@ graph_community <- function(graph, Community_name = "Community_name", nb_compone
     # Integration a size variable for implementing non-overlapping function of Force Atlas
     graph_community <- graph_community %>%
       activate(nodes) %>%
-      mutate(size=Size_com)
+      mutate(size=nb_nodes)
     
     # Running Force Atlas layout  
     graph_community <- force_atlas(graph_community,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 = 6000, iter_2 = 2000, barnes.hut = FALSE, size_min = 50, size_max = 200)
@@ -824,7 +834,7 @@ graph_community <- function(graph, Community_name = "Community_name", nb_compone
 
 # A function to concentrate nodes with a similar attribute in one singular node and build the corresponding graph
 graph_from_attribute <- function(nodes, edges, palette, Attribute_name, nb_components = 1, preparing_graph = TRUE, size_min = 50, size_max = 200){
-  #'Function for building of graph with community as nodes
+  #'Function for building of graph with an attribute as nodes
   #'
   #'This function takes as input a tidygraph object, it switches the names of individual nodes 
   #'by one of their attribute, calculate the number of nodes having this attribute, and 
@@ -926,6 +936,68 @@ graph_from_attribute <- function(nodes, edges, palette, Attribute_name, nb_compo
     graph_community <- force_atlas(graph_community,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 = 6000, iter_2 = 2000, barnes.hut = TRUE, size_min = size_min, size_max = size_max)
   }
   
+}
+
+clustering_communities <- function(graph, label_size = 6){
+  #'Function for building a heatmap of the communities
+  #'
+  #'This function takes as input a tidygraph object with communities as nodes and produce a heatmap of the links
+  #'between communities, and a dendrogram of these communities. 
+  #'
+  #'@param graph
+  #'A tidygraph object with nodes being communities and a column `Size_com` which represent the percentage of 
+  #'total nodes in the community
+  #'
+  #'@param label_size
+  #'The size of the labels displayed in the heatmap plot 
+  #'
+  #'@section Future improvements:
+  #'Find a way to plot only the biggest communities, but by removing the communities before the plotting, not to
+  #'biased the values.
+  #'
+  #'@section Future improvements:
+  #'Using a different method for plotting, by mixing ggplot and ggraph for the dendrogram, to have more options.
+
+  # Extracting edges with only the biggest communities, and integrating the name of communities for source and target of edges
+  edges <- graph %>%
+    activate(edges) %>%
+    mutate(com_name_to = .N()$Id[to], com_name_from = .N()$Id[from]) %>%
+    as.data.table()
+  
+  # making the matrix from the edges
+  matrix <- as.matrix(get.adjacency(graph.data.frame(edges[,c("com_name_to","com_name_from","weight")], directed=FALSE), type = "both", attr = "weight"))
+  
+  # clustering and creation of a dendrogram from the Matrix.
+  dendro <- as.dendrogram(hclust(dist(matrix)))
+  plot_dendro <- ggdendrogram(dendro, rotate = TRUE) # saving the plot of the dendrogram
+  order_dendro <- order.dendrogram(dendro) # extracting the order of nodes 
+  
+  # cleaning the matrix for plotting the heatmap  
+  matrix <- scale(matrix, center = FALSE, scale = colSums(matrix))
+  matrix <- melt(matrix) %>% as.data.table()
+  matrix$value <- matrix$value*100
+  matrix$value <-round(matrix$value, digits = 1)
+  matrix$Var1 = str_wrap(matrix$Var1, width = 10)
+  matrix$Var2 = str_wrap(matrix$Var2, width = 200)
+  
+  # ordering the nodes depending of the order of the dendrogram
+  matrix$Var1 <- factor(x = matrix$Var1,
+                        levels = unique(matrix$Var1)[order_dendro], 
+                        ordered = TRUE)
+  matrix$Var2 <- factor(x = matrix$Var2,
+                        levels = unique(matrix$Var2)[order_dendro], 
+                        ordered = TRUE)
+  
+  # saving the heat map
+  plot_heatmap <- ggplot(matrix, aes(x=Var1, y=Var2, fill=value)) + 
+    geom_tile() +
+    theme(text = element_text(size=14)) +
+    geom_text(aes(x=Var1, y=Var2, label = value), color = "black", size = label_size) +
+    scale_fill_viridis(discrete=FALSE)+
+    ylab("In the cluster...") + xlab("...X% of links goes to") 
+  
+  list_return <- list("heatmap" = plot_heatmap, "dendrogram" = plot_dendro)
+  return (list_return)
 }
 
 # Simple functions for keeping a number n of nodes with highest centrality measures per communities

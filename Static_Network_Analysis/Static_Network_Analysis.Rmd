@@ -21,7 +21,7 @@ knitr::opts_chunk$set(echo = TRUE)
 package_list <-  c("data.table","magrittr","tidyverse", "ggnewscale", "igraph",
                    "tm","quanteda","tidytext","ggraph","tidygraph", "ggrepel", "vite",
                    "reticulate","leiden","reshape2","scales","scico",
-                   "ggforce","directlabels","patchwork","DescTools","DT")
+                   "ggforce","directlabels","patchwork","DescTools","DT","grid","ggdendro")
 for(p in package_list){
   if (p %in% installed.packages()==FALSE){install.packages(p,dependencies = TRUE)}
   library(p,character.only=TRUE)
@@ -80,9 +80,15 @@ authors_JEL <- authors_JEL[, Nom := toupper(Nom)]
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
 ############################### Building Nodes and Edges for co-citation #######################
+# fixing threshold
+nodes_cocit_threshold = 5
+edges_cocit_threshold = 2
+graph_filtering_cocit = 5
+
+# creating nodes
 nodes_cocit_JEL_1990s <- edges_JEL[between(Annee_Bibliographique,1991,1999),]
 #nodes_cocit_JEL_1990s <- merge(nodes_cocit_JEL_1990s, nodes_JEL[,c("ItemID_Ref","Titre","Code_Revue")], by = "ItemID_Ref", all.x = TRUE)
-nodes_cocit_JEL_1990s <- unique(nodes_cocit_JEL_1990s[,nb_cit := .N, by = "New_id2"][nb_cit >= 2,c("New_id2","Annee","Nom","Titre","Revue_Abbrege","ESpecialite","nb_cit")])
+nodes_cocit_JEL_1990s <- unique(nodes_cocit_JEL_1990s[,nb_cit := .N, by = "New_id2"][nb_cit >= nodes_cocit_threshold,c("New_id2","Annee","Nom","Titre","Revue_Abbrege","ESpecialite","nb_cit")])
 doublons <- which(duplicated(nodes_cocit_JEL_1990s$New_id2))
 nodes_cocit_JEL_1990s <- nodes_cocit_JEL_1990s[-doublons]
 
@@ -94,7 +100,7 @@ edges_JEL_1990s <- unique(edges_JEL[New_id2 %in% nodes_cocit_JEL_1990s$New_id2 &
 
 # creation of the edges for the co-citation network
 
-edges_cocit_JEL_1990s <- bibliographic_cocitation(edges_JEL_1990s, source = "ID_Art", ref = "New_id2",weight_threshold = 2)
+edges_cocit_JEL_1990s <- bibliographic_cocitation(edges_JEL_1990s, source = "ID_Art", ref = "New_id2",weight_threshold = edges_cocit_threshold)
 
 # creating the tidygraph object  
 nodes_cocit_JEL_1990s <- nodes_cocit_JEL_1990s[, New_id2:= as.character(New_id2)]
@@ -103,7 +109,13 @@ graph_cocit <- tbl_main_components(edges = edges_cocit_JEL_1990s, nodes = nodes_
 # Optionnal: studying the distribution of nodes in each component of the graph
 #components <- components_distribution(edges = edges_cocit_JEL_1990s, nodes = nodes_cocit_JEL_1990s, node_key = "New_id2")
 
+
 ############################### Building Nodes and Edges for coupling #######################-----------
+
+# fixing threshold
+nodes_coupling_threshold = 1
+edges_coupling_threshold = 2
+graph_filtering_coupling = 1
 
 # creating the nodes with the number of citation of the nodes in the corpus
 nodes_coupling_JEL_1990s <- nodes_JEL[between(Annee_Bibliographique,1991,1999),]
@@ -117,25 +129,41 @@ rm(nb_cit) # not useful anymore
 nodes_coupling_JEL_1990s[is.na(nb_cit),]$nb_cit <- 0
 
 # reducing the number of nodes depending of the number of citations
-nodes_coupling_JEL_1990s <- unique(nodes_coupling_JEL_1990s[nb_cit >= 1,c("ID_Art","Annee_Bibliographique","Nom","Label","Titre","Revue","ESpecialite","nb_cit","ItemID_Ref")])
+nodes_coupling_JEL_1990s <- unique(nodes_coupling_JEL_1990s[nb_cit >= nodes_coupling_threshold,c("ID_Art","Annee_Bibliographique","Nom","Label","Titre","Revue","ESpecialite","nb_cit","ItemID_Ref")])
 
 # building edges
 edges_JEL_1990s_bis <- unique(edges_JEL[ID_Art %in% nodes_coupling_JEL_1990s$ID_Art])
 
 # creation of the edges for the co-citation network
 
-edges_coupling_JEL_1990s <- bibliographic_coupling(edges_JEL_1990s_bis, source = "ID_Art", ref = "New_id2", weight_threshold = 1)
+edges_coupling_JEL_1990s <- bibliographic_coupling(edges_JEL_1990s_bis, source = "ID_Art", ref = "New_id2", weight_threshold = edges_coupling_threshold)
 
 # creating the tidygraph object  
 nodes_coupling_JEL_1990s <- nodes_coupling_JEL_1990s[, ID_Art:= as.character(ID_Art)]
 graph_coupling <- tbl_main_components(edges = edges_coupling_JEL_1990s, nodes = nodes_coupling_JEL_1990s, node_key = "ID_Art", threshold_alert = 0.05, directed = FALSE)
 
+# optionnal: giving spaces:
+
+#rm(edges_coupling_JEL_1990s)
+#rm(nodes_coupling_JEL_1990s)
+# Optionnal: studying the distribution of nodes in each component of the graph
+#components <- components_distribution(edges = edges_coupling_JEL_1990s, nodes = nodes_coupling_JEL_1990s, node_key = "ID_Art")
+
+
 
 ```
+
+To run the Leiden partition algorithm and the Force Atlas algorithm (see below), we sometimes need to reduce the number of nodes and links in our network. We try to set relevant thresholds for our purpose, while keeping the network as big as possible when necessary, in the limits of our calculation capacities.  
+
+For the bibliographic coupling network, first, we have kept all the JEL articles that has been cited at least ```{r} nodes_coupling_threshold```. Second, for tractability, we have kept the links between two JEL articles, only if they share at least ```{r} edges_coupling_threshold``` references.
+
+For the bibliographic co-citation network, first, we focus on the most cited documents by the JEL articles and thus choose to keept only references cited at least ```{r} nodes_cocit_threshold``` times. Second, for tractability, we have kept the links between two references if they are cited together at least ```{r} edges_cocit_threshold``` times.
 
 # Bibliographic Coupling 
 
 ## Projecting the Graph
+
+To draw the bibliographic coupling network, we have displayed only the nodes with at least ```{r} filtering_graph_coupling``` citations.
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
 #NOT RUN BECAUSE TO LONG - JUST INTEGRATE THE PICTURE
@@ -358,7 +386,7 @@ saveRDS(graph_coupling_community, paste0(graph_data_path,"graph_coupling_communi
 ############################# Projection of the graph #########################
 
 # loading the graph if necessary
-#graph_cocit <- readRDS(paste0(graph_data_path,"graph_cocit.rds"))
+#graph_coupling_community <- readRDS(paste0(graph_data_path,"graph_coupling_community.rds"))
 
 # Plotting the graph  
 plot_graph_community <- ggraph(graph_coupling_community, "manual", x = x, y = y) + 
@@ -376,6 +404,19 @@ plot_graph_community <- ggraph(graph_coupling_community, "manual", x = x, y = y)
 ```
 
 ![](/home/aurelien/macro_AA/Static_Network_Analysis/graph_coupling_community.png)
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=FALSE, cache=FALSE}
+# plotting the heatmap with the dendrogram
+heatmap <- clustering_communities(graph_coupling_community)
+
+#png(paste0(picture_path,"heatmap_coupling.png"), width = 1200, height = 1000)
+#grid.newpage()
+#print(heatmap$heatmap, vp = viewport(x = 0.4, y = 0.5, width = 0.75, height = 1.0))
+#print(heatmap$dendrogram, vp = viewport(x = 0.87, y = 0.5, width = 0.2, height = 0.9))
+#dev.off()
+```
+
+![](/home/aurelien/macro_AA/Static_Network_Analysis/heatmap_coupling.png)
 
 ## Studying other attributes
 
@@ -424,41 +465,46 @@ datatable(journal_table, rownames = TRUE,
 
 # Bibliographic coupling per authors
 
+
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
 ################## Building an author bibliographic coupling graph ######################----
 
+nodes_authors_coupling_threshold = 1
+edges_authors_coupling_threshold = 2
+filtering_graph_authors_coupling = 2
+
 # creating the nodes with the number of citation of the nodes in the corpus
-nodes_coupling_JEL_1990s <- nodes_JEL[between(Annee_Bibliographique,1991,1999),]
+#nodes_coupling_JEL_1990s <- nodes_JEL[between(Annee_Bibliographique,1991,1999),]
 
-authors_JEL <- authors_JEL[, citing_author := Nom]
-nodes_coupling_JEL_1990s <- merge(nodes_coupling_JEL_1990s, unique(authors_JEL[,c("ID_Art","citing_author")]), by = "ID_Art")
-nb_cit<- edges_JEL[between(Annee_Bibliographique,1991,1999) & ItemID_Ref != 0][, nb_cit := .N,ItemID_Ref]
-nodes_coupling_JEL_1990s <- merge(unique(nodes_coupling_JEL_1990s),unique(nb_cit[,c("ItemID_Ref","nb_cit")]), by = "ItemID_Ref", all.x = "TRUE")
+#authors_JEL <- authors_JEL[, citing_author := Nom]
+#nodes_coupling_JEL_1990s <- merge(nodes_coupling_JEL_1990s, unique(authors_JEL[,c("ID_Art","citing_author")]), by = "ID_Art")
+#nb_cit<- edges_JEL[between(Annee_Bibliographique,1991,1999) & ItemID_Ref != 0][, nb_cit := .N,ItemID_Ref]
+#nodes_coupling_JEL_1990s <- merge(unique(nodes_coupling_JEL_1990s),unique(nb_cit[,c("ItemID_Ref","nb_cit")]), by = "ItemID_Ref", all.x = "TRUE")
 
-rm(nb_cit) # not useful anymore
+#rm(nb_cit) # not useful anymore
 # replacing NA value by 0 in nb_cit (it means that the nodes will be used in Leiden and Force Atlas, but
 # not displayed in the graph)
 
-nodes_coupling_JEL_1990s[is.na(nb_cit),]$nb_cit <- 0
+#nodes_coupling_JEL_1990s[is.na(nb_cit),]$nb_cit <- 0
 
 
 # choosing the nodes to keep
-nodes_coupling_JEL_1990s <- nodes_coupling_JEL_1990s[nb_cit >= 1]
+#nodes_coupling_JEL_1990s <- nodes_coupling_JEL_1990s[nb_cit >= nodes_authors_coupling_threshold]
   
 # building edges
-edges_JEL_1990s_bis <- unique(edges_JEL[ID_Art %in% nodes_coupling_JEL_1990s$ID_Art])
+#edges_JEL_1990s_bis <- unique(edges_JEL[ID_Art %in% nodes_coupling_JEL_1990s$ID_Art])
 
-authors_edges <- merge(edges_JEL_1990s_bis,unique(nodes_coupling_JEL_1990s[,c("ID_Art","citing_author")]), by = "ID_Art", all.x = TRUE, allow.cartesian = TRUE)
+#authors_edges <- merge(edges_JEL_1990s_bis,unique(nodes_coupling_JEL_1990s[,c("ID_Art","citing_author")]), by = "ID_Art", all.x = TRUE, allow.cartesian = TRUE)
 
-authors_edges <- bibliographic_coupling(authors_edges, "citing_author", "New_id2", weight_threshold = 2)
+#authors_edges <- bibliographic_coupling(authors_edges, "citing_author", "New_id2", weight_threshold = edges_authors_coupling_threshold)
 
 # reducing the number of nodes depending of the number of citations
 
-authors_nodes <- unique(nodes_coupling_JEL_1990s[,c("citing_author","nb_cit")])
-authors_nodes <- unique(authors_nodes[, nb_cit_author := sum(nb_cit), by = "citing_author"][order(-nb_cit_author), c("citing_author","nb_cit_author")])
+#authors_nodes <- unique(nodes_coupling_JEL_1990s[,c("citing_author","nb_cit")])
+#authors_nodes <- unique(authors_nodes[, nb_cit_author := sum(nb_cit), by = "citing_author"][order(-nb_cit_author), c("citing_author","nb_cit_author")])
 
 # creating the tidygraph object  
-graph_authors_coupling <- tbl_main_components(edges = authors_edges, nodes = authors_nodes, node_key = "citing_author", threshold_alert = 0.05, directed = FALSE)
+#graph_authors_coupling <- tbl_main_components(edges = authors_edges, nodes = authors_nodes, node_key = "citing_author", threshold_alert = 0.05, directed = FALSE)
 
 ################## Working on the author coupling tidygraph and its attributes ######################----
 
@@ -510,6 +556,8 @@ graph_authors_coupling <- tbl_main_components(edges = authors_edges, nodes = aut
  # ggsave(paste0(picture_path,"graph_authors_coupling.png"), width=30, height=30, units = "cm")
 ```
 
+To build the authors network from bibliographic coupling data, first, we have kept all the JEL articles that has been cited at least ```{r} nodes_authors_coupling_threshold```. Second, for tractability, we have kept the links between two authors, only if they share at least ```{r} edges_authors_coupling_threshold``` references in all the JEL articles they have published. The graph has been filtered by keeping only the 
+
 ![](/home/aurelien/macro_AA/Static_Network_Analysis/graph_authors_coupling.png)
 
 ## Analyzing relations between coupling communities
@@ -543,6 +591,7 @@ plot_graph_authors_coupling_community <- ggraph(graph_authors_coupling_community
 ```
 
 ![](/home/aurelien/macro_AA/Static_Network_Analysis/graph_authors_coupling_community.png)
+
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
 # loading the graph if necessary
@@ -697,6 +746,109 @@ TF_IDF <- tf_idf(nodes = Nodes_authors_coupling)
 TF_IDF$plot
 ```
 
+## Network of Institution from Bibliographic Coupling
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+################## Building an institution bibliographic coupling graph ######################----
+
+# creating the nodes with the number of citation of the nodes in the corpus
+#institutions_coupling_JEL_1990s <- nodes_JEL[between(Annee_Bibliographique,1991,1999),]
+
+#authors_JEL <- authors_JEL[, citing_author := Nom]
+#institutions_coupling_JEL_1990s <- merge(institutions_coupling_JEL_1990s, unique(authors_JEL[,c("ID_Art","citing_author","Institution","Pays")]), by = "ID_Art")
+
+# Calculating the weighted number of articles per institution
+#institutions_coupling_JEL_1990s <- institutions_coupling_JEL_1990s[, share_authors := .N, by = "ID_Art"][, share_authors := 1/share_authors][, nb_art := sum(share_authors), by = "Institution"]
+#institutions_coupling_JEL_1990s <- institutions_coupling_JEL_1990s[Institution != "NA" & nb_art > 10]
+
+# building edges
+#edges_JEL_1990s_bis <- unique(edges_JEL[ID_Art %in% institutions_coupling_JEL_1990s$ID_Art])
+
+#institutions_edges <- merge(edges_JEL_1990s_bis,unique(institutions_coupling_JEL_1990s[,c("ID_Art","Institution")]), by = "ID_Art", all.x = TRUE, allow.cartesian = TRUE)
+
+#institutions_edges <- bibliographic_coupling(institutions_edges, "Institution", "New_id2", weight_threshold = 10)
+
+# reducing the number of nodes depending of the number of citations
+
+#institutions_nodes <- unique(institutions_coupling_JEL_1990s[order(-nb_art), c("Institution","nb_art","Pays")])
+
+# creating the tidygraph object  
+#graph_institutions_coupling <- tbl_main_components(edges = institutions_edges, nodes = institutions_nodes, node_key = "Institution", threshold_alert = 0.05, directed = FALSE)
+
+
+################## Working on the Institution coupling tidygraph and its attributes ######################----
+
+# Identifying communities with Leiden algorithm                         
+#graph_institutions_coupling <- leiden_improved(graph_institutions_coupling, res_1 = 1, res_2 = NULL, res_3 = NULL, n_iterations = 500)       
+
+# Giving colors to communities
+#graph_institutions_coupling <- community_colors(graph_institutions_coupling,mypalette)
+
+# Calculating different centrality measures
+#graph_authors_coupling <- centrality(graph_authors_coupling)
+
+# Naming communities
+#graph_institutions_coupling <-naming_communities(graph_institutions_coupling, centrality_measure = "nb_cit_univ", naming = "Id")
+
+# Integration a size variable for implementing non-overlapping function of Force Atlast
+#graph_institutions_coupling <- graph_institutions_coupling %>%
+#  activate(nodes) %>%
+#  mutate(size=nb_cit_univ)
+
+# Running Force Atlas layout  
+#graph_institutions_coupling <- force_atlas(graph_institutions_coupling,seed = 1, ew.influence = 2, kgrav = 1, iter_1 = 6000, iter_2 = 2000, barnes.hut = TRUE, size_min = 50, size_max = 200)
+
+# Saving the graph
+#saveRDS(graph_institutions_coupling, paste0(graph_data_path,"graph_institutions_coupling.rds"))
+
+############################# Projection of the graph #########################
+
+# loading the graph if necessary
+#graph_institutions_coupling <- readRDS(paste0(graph_data_path,"graph_institutions_coupling.rds"))
+
+# Identifying the labels of the most important authors
+#important_nodes <- top_ordering(graph_institutions_coupling, top_n_com = 3, top_n = 15, biggest_community = TRUE)
+
+# Plotting the graph  
+
+#ggraph(graph_institutions_coupling, "manual", x = x, y = y) + 
+#  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
+#  scale_edge_width_continuous(range = c(0.1,2)) +
+ # scale_edge_colour_identity() +
+  #geom_node_point(aes(x=x, y=y, size = size, fill = color), pch = 21, alpha = 0.8, show.legend = FALSE) +
+#  scale_size_continuous(range = c(0.1,20)) +
+#  scale_fill_identity() +
+#  geom_label_repel(data=important_nodes, aes(x=x, y=y, label = Id, fill = color), size = 4, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
+  #scale_size_continuous(range = c(1,4)) +
+#  theme_void() +
+#  ggsave(paste0(picture_path,"graph_institutions_coupling.png"), width=25, height=25, units = "cm")
+  
+```
+
+![](/home/aurelien/macro_AA/Static_Network_Analysis/graph_institutions_coupling.png)
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+
+# loading the graph if necessary
+graph_institutions_coupling <- readRDS(paste0(graph_data_path,"graph_institutions_coupling.rds"))
+
+institutions_data <- graph_institutions_coupling %>% 
+  activate(nodes) %>% 
+  as.data.table()
+institutions_data <- institutions_data[, share_pays := .N, by = c("Com_ID","Pays")][, total := .N, by = "Com_ID"][, share_pays := share_pays/total]
+institutions_data <- unique(institutions_data[order(Com_ID,-share_pays),c("Com_ID","Community_name","Pays","share_pays")])
+institutions_data <- institutions_data[, rank:= 1:.N, by = "Com_ID"][rank <= 5]
+
+# Projecting the table with all these data
+
+datatable(institutions_data, rownames = FALSE, 
+          options =  list(scrollY = "400px",
+  scrollCollapse = TRUE,
+  scrollX = "400px",
+  paging = FALSE))
+
+```
+
 # Bibliographic Cocitation
 
 ## Projecting the Graph
@@ -754,6 +906,53 @@ TF_IDF$plot
 
 
 ![](/home/aurelien/macro_AA/Static_Network_Analysis/graph_cocit.png)
+
+## Analyzing the communities of co-citation
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=FALSE, cache=FALSE}
+# loading the graph if necessary
+graph_cocit <- readRDS(paste0(graph_data_path,"graph_cocit.rds"))
+
+# Using the function we have built
+graph_cocit_community <- graph_community(graph_cocit)
+
+# Saving the graph
+saveRDS(graph_cocit_community, paste0(graph_data_path,"graph_cocit_community.rds"))
+
+############################# Projection of the graph #########################
+
+# loading the graph if necessary
+#graph_coupling_community <- readRDS(paste0(graph_data_path,"graph_coupling_community.rds"))
+
+# Plotting the graph  
+plot_graph_community <- ggraph(graph_cocit_community, "manual", x = x, y = y) + 
+  geom_edge_arc(aes(width = weight), color = "Black", alpha = 0.3, strength = 0.2, show.legend = FALSE) +
+  scale_edge_width_continuous(range = c(0.1,10)) +
+  geom_node_point(aes(x=x, y=y, size = size, fill = color), pch = 21, alpha = 0.9, show.legend = FALSE) +
+  scale_size_continuous(range = c(0.5,30)) +
+  scale_fill_identity() +
+  scale_edge_colour_identity() +
+  geom_label_repel(aes(x=x, y=y, label = Id, fill = color), size = 4, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
+  #scale_size_continuous(range = c(1,4)) +
+  theme_void() +
+  ggsave(paste0(picture_path,"graph_cocit_community.png"), width=20, height=20, units = "cm")
+
+```
+
+![](/home/aurelien/macro_AA/Static_Network_Analysis/graph_cocit_community.png)
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=FALSE, cache=FALSE}
+# plotting the heatmap with the dendrogram
+heatmap <- clustering_communities(graph_cocit_community)
+
+#png(paste0(picture_path,"heatmap_coupling.png"), width = 1200, height = 1000)
+#grid.newpage()
+#print(heatmap$heatmap, vp = viewport(x = 0.4, y = 0.5, width = 0.75, height = 1.0))
+#print(heatmap$dendrogram, vp = viewport(x = 0.87, y = 0.5, width = 0.2, height = 0.9))
+#dev.off()
+```
+
+![](/home/aurelien/macro_AA/Static_Network_Analysis/heatmap_cocit.png)
 
 # Co-authorship Network
 
@@ -949,3 +1148,4 @@ datatable(data_institutions, rownames = FALSE,
   paging = FALSE))
 
 ```
+
