@@ -741,7 +741,7 @@ Nodes_authors_coupling <- merge(Nodes_authors_coupling,authors_JEL[,c("ID_Art","
 Nodes_authors_coupling <- merge(Nodes_authors_coupling,nodes_JEL[between(Annee_Bibliographique,1991,1999) ,c("ID_Art","Annee_Bibliographique")], by = "ID_Art")
 
 # Calculating the tf-idf for the titles in each community
-TF_IDF <- tf_idf(nodes = Nodes_authors_coupling)
+TF_IDF <- tf_idf(nodes = Nodes_authors_coupling, n_columns = 3)
 
 TF_IDF$plot
 ```
@@ -954,6 +954,99 @@ heatmap <- clustering_communities(graph_cocit_community)
 
 ![](/home/aurelien/macro_AA/Static_Network_Analysis/heatmap_cocit.png)
 
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+graph_cocit <- readRDS(paste0(graph_data_path,"graph_cocit.rds"))
+
+# Extracting the nodes of the network
+Nodes_cocit <- graph_cocit %>%
+  activate(nodes)%>%
+  select(Com_ID, Size_com, Id, Label, Nom, Titre, nb_cit, Revue_Abbrege, ESpecialite) %>%
+  as.data.table()
+
+# Changing format of ID_Art to merge with other data table
+Nodes_cocit$ID_Art <- as.integer(Nodes_cocit$Id)
+
+# Calculating the size of communities and mean of citation per community (total number of citations of all the nodes on the number of nodes)
+Nodes_cocit <- Nodes_cocit[, nb_nodes := .N, by = "Com_ID"][, mean_cit_com := sum(nb_cit), by = "Com_ID"][, mean_cit_com := mean_cit_com/nb_nodes]
+
+# keeping only communities with at least x% of the nodes
+Nodes_cocit <- Nodes_cocit[Size_com >= 0.01,]
+
+# Strategy: keeping the five highest values for different variables, per community
+# fixing n
+n = 5
+
+# Keeping the n nodes with the highest number of citations in our corpus, per community
+most_cited_nodes <- unique(Nodes_cocit[, c("Com_ID","nb_cit","Label","Titre")])
+most_cited_nodes <- most_cited_nodes %>%
+  group_by(Com_ID) %>%
+  arrange(desc(nb_cit)) %>%
+  slice(1:n) %>%
+  as.data.table()
+
+most_cited_nodes <- most_cited_nodes[, rank := 1:.N, by = list(Com_ID)]
+
+# keeping the n authors the most present in coupling communities
+main_author <- unique(Nodes_cocit[, c("Id","Com_ID","Nom")])
+main_author <- main_author[, main_author := .N, by = c("Com_ID","Nom")]
+main_author <- main_author %>%
+  select(Com_ID,Nom,main_author) %>%
+  unique() %>%
+  group_by(Com_ID) %>%
+  arrange(desc(main_author)) %>%
+  slice(1:n)%>%
+  as.data.table()
+
+main_author <- main_author[, rank := 1:.N, by = list(Com_ID)]
+
+# keeping the n journals where most nodes were published in coupling communities
+main_journal <- unique(Nodes_cocit[, c("Id","Com_ID","Revue_Abbrege","nb_nodes")])
+main_journal <- main_journal[Revue_Abbrege != "NA", main_journal := .N, by = c("Com_ID","Revue_Abbrege")][, main_journal:= main_journal/nb_nodes]
+main_journal <- main_journal %>%
+  select(Com_ID,Revue_Abbrege,main_journal) %>%
+  unique() %>%
+  group_by(Com_ID) %>%
+  arrange(desc(main_journal)) %>%
+  slice(1:n)%>%
+  as.data.table()
+
+main_journal <- main_journal[, rank := 1:.N, by = list(Com_ID)]
+
+# keeping the n top disciplines per community
+main_discipline <- unique(Nodes_cocit[, c("Id","Com_ID","ESpecialite","nb_nodes")])
+main_discipline <- main_discipline[ESpecialite != "NA", main_discipline := .N, by = c("Com_ID","ESpecialite")][, main_discipline := main_discipline/nb_nodes][main_discipline != "NA"]
+main_discipline <- main_discipline %>%
+  select(Com_ID,ESpecialite,main_discipline) %>%
+  unique() %>%
+  group_by(Com_ID) %>%
+  arrange(desc(main_discipline)) %>%
+  slice(1:n) %>%
+  as.data.table()
+
+main_discipline <- main_discipline[, rank := 1:.N, by = list(Com_ID)]
+
+# creating a "rank" column to be merged with the data
+rank <- data.table(rank=1:n)
+rank <- merge(unique(Nodes_cocit$Com_ID), rank)
+colnames(rank)[1] = "Com_ID"
+rank <- rank %>% arrange(Com_ID)
+
+# Merging all the data on coupling communities
+cocit_com <- merge(unique(Nodes_cocit[,c("Com_ID","Size_com","mean_cit_com")]), rank, by = "Com_ID")
+
+cocit_com <- merge(cocit_com,most_cited_nodes[,c("Com_ID","rank","Label","Titre","nb_cit")], by = c("Com_ID","rank"), all.x = TRUE)
+cocit_com <- merge(cocit_com,main_author, by = c("Com_ID","rank"), all.x = TRUE)
+cocit_com <- merge(cocit_com,main_journal, by = c("Com_ID","rank"), all.x = TRUE)
+cocit_com <- merge(cocit_com,main_discipline, by = c("Com_ID","rank"), all.x = TRUE)
+
+# Projecting the table with all the data
+datatable(cocit_com, rownames = TRUE, 
+          options =  list(scrollY = "640px",
+  scrollCollapse = TRUE,
+  scrollX = "400px",
+  paging = FALSE))
+```
+
 # Co-authorship Network
 
 ## Projecting the Graph
@@ -1146,6 +1239,127 @@ datatable(data_institutions, rownames = FALSE,
   scrollCollapse = TRUE,
   scrollX = "400px",
   paging = FALSE))
+
+```
+
+
+# Studying the relations between the different networks
+
+## Linking the coupling and cocitation networks
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+
+############sankey diagram cocit/coupling-------------
+# Loading the cocit and coupling graph if necessary
+graph_cocit <- readRDS(paste0(graph_data_path,"graph_cocit.rds"))
+graph_coupling <- readRDS(paste0(graph_data_path,"graph_coupling.rds"))
+
+# extracting the cocit nodes
+nodes_cocit <- graph_cocit %>%
+activate(nodes) %>%
+  filter(Size_com > 0.01) %>%
+  select(Id, Community_name, Label,color) %>%
+  as.data.table()
+
+# merging the cocit nodes with the papers which cite them
+nodes_cocit$Id <- as.integer(nodes_cocit$Id)
+nodes_cocit <- merge(nodes_cocit, edges_JEL[between(Annee_Bibliographique, 1991,1999) & New_id2 %in% nodes_cocit$Id, c("New_id2","ID_Art")], by.x = "Id", by.y = "New_id2") 
+
+# exctracting the coupling nodes
+nodes_coupling <- graph_coupling %>%
+  activate(nodes) %>%
+  filter(Size_com > 0.01) %>%
+  select(Id, Community_name, Label,color) %>%
+  as.data.table()
+
+# Merging the coupling and cocit data
+nodes_coupling$Id <- as.integer(nodes_coupling$Id)
+sankey_data <- merge(nodes_cocit,nodes_coupling, by.x="ID_Art", by.y = "Id")
+
+# changing the column names and the name of communities
+setnames(sankey_data, c("Id","Community_name.x","Label.x","Community_name.y","Label.y","color.x","color.y"), c("New_id2",
+                                                                                               "Com_ID_cocit","Label_cocit","Com_ID_coupling","Label_coupling","color_cocit","color_coupling"))
+sankey_data$Com_ID_cocit <- paste0("Cct ", sankey_data$Com_ID_cocit)
+sankey_data$Com_ID_coupling <- paste0("Cplg ",sankey_data$Com_ID_coupling)
+sankey_data <- unique(sankey_data[, value:= .(.N), by = c("Com_ID_coupling","Com_ID_cocit")][,c("Com_ID_coupling",
+                                                                                                "Com_ID_cocit","value","color_cocit","color_coupling")])
+#sankey_data <- reshape2::melt(sankey_data)
+sankey_data <- gather_set_data(sankey_data, 1:2)
+
+#ordering x to have the coupling communities on the left
+sankey_data$x <- factor(x = sankey_data$x,
+                      levels = sort(unique(sankey_data$x), decreasing = TRUE), 
+                      ordered = TRUE)
+
+# preparing the two color palettes
+palette_coupling <- unique(sankey_data[order(Com_ID_coupling),c("Com_ID_coupling","color_coupling")])
+palette_cocit <- unique(sankey_data[order(Com_ID_cocit),c("Com_ID_cocit","color_cocit")])
+
+# plotting the graph
+ggplot(sankey_data, aes(x, id = id, split = y, value = value)) +
+  geom_parallel_sets(aes(fill = as.character(Com_ID_cocit)), alpha = 0.5, axis.width = 0.1, show.legend = FALSE) +
+  geom_parallel_sets_axes(aes(fill = y), axis.width = 0.3, show.legend = FALSE) +
+  scale_fill_manual(values = c(palette_coupling$color_coupling,palette_cocit$color_cocit)) +
+  theme_void() +
+  geom_parallel_sets_labels(colour = 'black', fontface = "bold", angle = 0, size = 4)
+
+```
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+
+############sankey diagram cocit/coupling-------------
+# Loading the cocit and coupling graph if necessary
+graph_authors_coupling <- readRDS(paste0(graph_data_path,"graph_authors_coupling.rds"))
+graph_coupling <- readRDS(paste0(graph_data_path,"graph_coupling.rds"))
+
+# extracting the cocit nodes
+nodes_authors <- graph_authors_coupling %>%
+  activate(nodes) %>%
+  filter(Size_com > 0.01) %>%
+  select(Id, Community_name, color) %>%
+  as.data.table()
+
+# merging the cocit nodes with the papers which cite them
+nodes_authors <- merge(nodes_authors, authors_JEL[between(Annee_Bibliographique, 1991,1999) & Nom %in% nodes_authors$Id, c("Nom","ID_Art")], by.x = "Id", by.y = "Nom") 
+
+# exctracting the coupling nodes
+nodes_coupling <- graph_coupling %>%
+  activate(nodes) %>%
+  filter(Size_com > 0.01) %>%
+  select(Id, Community_name, Label,color) %>%
+  as.data.table()
+
+# Merging the coupling and cocit data
+nodes_coupling$Id <- as.integer(nodes_coupling$Id)
+sankey_data <- merge(nodes_authors,nodes_coupling, by.x="ID_Art", by.y = "Id")
+
+# changing the column names and the name of communities
+setnames(sankey_data, c("Id","Community_name.x","Community_name.y","color.x","color.y"), c("Author",
+                                                                                        "Com_ID_author","Com_ID_coupling","color_author","color_coupling"))
+#sankey_data$Com_ID_cocit <- paste0("Cct ", sankey_data$Com_ID_cocit)
+#sankey_data$Com_ID_coupling <- paste0("Cplg ",sankey_data$Com_ID_coupling)
+sankey_data <- unique(sankey_data[, value:= .(.N), by = c("Com_ID_coupling","Com_ID_author")][,c("Com_ID_coupling",
+                                                                                                "Com_ID_author","value","color_author","color_coupling")])
+#sankey_data <- reshape2::melt(sankey_data)
+sankey_data <- gather_set_data(sankey_data, 1:2)
+
+#ordering x to have the coupling communities on the left
+sankey_data$x <- factor(x = sankey_data$x,
+                        levels = sort(unique(sankey_data$x), decreasing = TRUE), 
+                        ordered = TRUE)
+
+# preparing the two color palettes
+palette_coupling <- unique(sankey_data[order(Com_ID_coupling),c("Com_ID_coupling","color_coupling")])
+palette_author <- unique(sankey_data[order(Com_ID_author),c("Com_ID_author","color_author")])
+
+# plotting the graph
+ggplot(sankey_data, aes(x, id = id, split = y, value = value)) +
+  geom_parallel_sets(aes(fill = as.character(Com_ID_author)), alpha = 0.5, axis.width = 0.1, show.legend = FALSE) +
+  geom_parallel_sets_axes(aes(fill = y), axis.width = 0.3, show.legend = FALSE) +
+  scale_fill_manual(values = c(palette_coupling$color_coupling,palette_author$color_author)) +
+  theme_void() +
+  geom_parallel_sets_labels(colour = 'black', fontface = "bold", angle = 0, size = 4)
+
 
 ```
 

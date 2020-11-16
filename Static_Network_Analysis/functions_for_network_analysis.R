@@ -1091,6 +1091,9 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
   #' @param palette
   #' If you don't already have a color attribute for your communities in your tidygraph object,
   #' the function will generate one from a palette that you can add in the paramaters (NULL by default).
+  #' 
+  #' @section Future improvements
+  #' Integrating a way to put the name of the community, if the column exists, rather than the Community ID.
 
 # extracting the nodes
   if(! is.null(graph)){
@@ -1115,12 +1118,17 @@ if(colnames(tf_idf)[colnames(tf_idf)=="color"] != "color"){
 }
 
 # Cleaning the titles
+tf_idf <- tf_idf[Titre!="NULL"]
 tible_tf_idf <- tf_idf[,paste(Titre, collapse = ", "), by= "Com_ID"]
 tible_tf_idf[,V1 := stripWhitespace(V1)]
 tible_tf_idf[,V1 := removePunctuation(V1)]
 tible_tf_idf[,V1 := removeNumbers(V1)]
 tible_tf_idf[,V1 := tolower(V1)]
 tible_tf_idf[,V1 := removeWords(V1, stopwords("english"))]
+
+dictionary <- tible_tf_idf #Dictionnary to find the root of stem word
+dictionary <- dictionary %>% unnest_tokens(word, V1)
+
 tible_tf_idf[,V1 := stemDocument(V1)]
 # tf-idf using quanteda
 tible_tf_idf <- corpus(tible_tf_idf, text_field = "V1")
@@ -1132,7 +1140,11 @@ tible_tf_idf <- tidy(tible_tf_idf) %>% as.data.table()
 tible_tf_idf <-merge(tible_tf_idf, documents_names[,.(doc_id, Com_ID)], by.x = "document", by.y = "doc_id")
 tf_idf_table <- tible_tf_idf[order(-count)][, head(.SD, number_of_words), Com_ID]
 tf_idf_table <- merge(tf_idf_table, unique(tf_idf[,c("Com_ID","color")]), by = "Com_ID", all.x = TRUE)
-tf_idf_plot <- ggplot(tf_idf_table, aes(reorder_within(term, count, color), count, fill = color)) +
+
+tf_idf_table[,unstemmed_word:=stemCompletion(tf_idf_table$term, dictionary$word, type = "prevalent")] # unstem with most common word
+tf_idf_table[unstemmed_word=="",unstemmed_word:=term] # unstem with most common word
+
+tf_idf_plot <- ggplot(tf_idf_table, aes(reorder_within(unstemmed_word, count, color), count, fill = color)) +
   geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
   labs(title = "Highest tf-idf",
        x = "Words", y = "tf-idf") +
