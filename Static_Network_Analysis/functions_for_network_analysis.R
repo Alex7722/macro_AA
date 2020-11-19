@@ -498,7 +498,7 @@ naming_communities <- function(graph, centrality_measure = "Strength", naming = 
 
   # Finding the nodes with the highest strength per community and building a df with community numbers
   # and the label of the node with the highest Strength.
-  Community_names <- graph_coupling %>%
+  Community_names <- graph %>%
     activate(nodes)  %>%
     as_tibble()
   
@@ -717,6 +717,10 @@ top_ordering <- function(graph, ordering_column ="nb_cit" , top_n = 20, top_n_co
   
   # adding the two and removing the doublons
   top_variable_sum <- unique(rbind(top_variable_general, top_variable_com))
+  
+  colnames(top_variable_sum)[colnames(top_variable_general) == "ordering_column"] = ordering_column
+  
+  return(top_variable_sum)
 }
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -938,7 +942,7 @@ graph_from_attribute <- function(nodes, edges, palette, Attribute_name, nb_compo
   
 }
 
-clustering_communities <- function(graph, label_size = 6){
+clustering_communities <- function(graph, label_size = 6, threshold_com = 0.01){
   #'Function for building a heatmap of the communities
   #'
   #'This function takes as input a tidygraph object with communities as nodes and produce a heatmap of the links
@@ -951,6 +955,9 @@ clustering_communities <- function(graph, label_size = 6){
   #'@param label_size
   #'The size of the labels displayed in the heatmap plot 
   #'
+  #'#' @param threshold_com
+  #' The minimun percentage of nodes in the community for the community to be displayed on the plot.
+  #'
   #'@section Future improvements:
   #'Find a way to plot only the biggest communities, but by removing the communities before the plotting, not to
   #'biased the values.
@@ -959,7 +966,7 @@ clustering_communities <- function(graph, label_size = 6){
   #'Using a different method for plotting, by mixing ggplot and ggraph for the dendrogram, to have more options.
 
   # Extracting edges with only the biggest communities, and integrating the name of communities for source and target of edges
-  edges <- graph %>%
+  edges <- graph_coupling_community %>%
     activate(edges) %>%
     mutate(com_name_to = .N()$Id[to], com_name_from = .N()$Id[from]) %>%
     as.data.table()
@@ -972,11 +979,19 @@ clustering_communities <- function(graph, label_size = 6){
   plot_dendro <- ggdendrogram(dendro, rotate = TRUE) # saving the plot of the dendrogram
   order_dendro <- order.dendrogram(dendro) # extracting the order of nodes 
   
+  # keeping only biggest communities
+  nodes <- graph_coupling_community %>%
+    activate(nodes) %>%
+    as.data.table()
+  
+  nodes <- nodes[,total := sum(nb_nodes)][,share_com := nb_nodes/total][share_com > threshold_com,"Id"]
+  
   # cleaning the matrix for plotting the heatmap  
   matrix <- scale(matrix, center = FALSE, scale = colSums(matrix))
   matrix <- melt(matrix) %>% as.data.table()
   matrix$value <- matrix$value*100
   matrix$value <-round(matrix$value, digits = 1)
+  matrix  <- matrix[matrix$Var1 %in% nodes$Id & matrix$Var2 %in% nodes$Id]
   matrix$Var1 = str_wrap(matrix$Var1, width = 10)
   matrix$Var2 = str_wrap(matrix$Var2, width = 200)
   
@@ -1056,7 +1071,9 @@ Important_nodes <- unique(Important_nodes)
 ################### 4) Fuctions for word analysis (titles) of networks ################-------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
-tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_column = "Com_ID", color_column = "color", number_of_words = 10, n_columns = 4, palette = NULL)
+tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_column = "Com_ID", color_column = "color",
+                   com_name_column = "Community_name", com_size_column = "Size_com", treshold_com = 0.01, number_of_words = 10, n_columns = 4, 
+                   palette = NULL, size_title_wrap = 8)
 {
   #' Creating a TF-IDF analysis of the titles of WoS corpus
   #' 
@@ -1081,6 +1098,16 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
   #' @param color_column
   #' The name of the column with the color attribute of the communities. The function renames the column
   #' "color" (default value).
+  #' 
+  #' @param com_name_column
+  #' The name of the column with the name of the communities.
+  #' 
+  #' @param com_size_column
+  #' The name of the column with the share of total nodes in each community.
+  #' 
+  #' @param threshold_com
+  #' The minimun percentage of nodes in the community for the community to be displayed on the plot.
+  #' 
   #' @param number_of_words
   #' How many words you want to display on the final graph.
   #' 
@@ -1092,68 +1119,137 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
   #' If you don't already have a color attribute for your communities in your tidygraph object,
   #' the function will generate one from a palette that you can add in the paramaters (NULL by default).
   #' 
-  #' @section Future improvements
-  #' Integrating a way to put the name of the community, if the column exists, rather than the Community ID.
+  #' @param size_title_wrap
+  #' The size of the community title in the plot.
+
 
 # extracting the nodes
   if(! is.null(graph)){
-tf_idf <- graph %>% activate(nodes) %>% as.data.table()
+    tf_idf_save <- graph %>% activate(nodes) %>% as.data.table()
   }
   else{
-    tf_idf <- nodes %>% as.data.table()
+    tf_idf_save <- nodes %>% as.data.table()
   }
-# changing the names of the column for titles and communities
-colnames(tf_idf)[colnames(tf_idf)==com_column] = "Com_ID"
-colnames(tf_idf)[colnames(tf_idf)==title_column] = "Titre"
-colnames(tf_idf)[colnames(tf_idf)==color_column] = "color"
-
-# adding a color column attribute in case it doesn't exist
-if(colnames(tf_idf)[colnames(tf_idf)=="color"] != "color"){
-  color = data.table(
-    Com_ID = 1:500,
-    color = mypalette)
-  color<-color %>%  mutate(Com_ID = sprintf("%02d", Com_ID)) %>% mutate(Com_ID = as.character(Com_ID))
   
-  tf_idf <- merge(tf_idf,color, by = "Com_ID", all.x = TRUE)
-}
-
-# Cleaning the titles
-tf_idf <- tf_idf[Titre!="NULL"]
-tible_tf_idf <- tf_idf[,paste(Titre, collapse = ", "), by= "Com_ID"]
-tible_tf_idf[,V1 := stripWhitespace(V1)]
-tible_tf_idf[,V1 := removePunctuation(V1)]
-tible_tf_idf[,V1 := removeNumbers(V1)]
-tible_tf_idf[,V1 := tolower(V1)]
-tible_tf_idf[,V1 := removeWords(V1, stopwords("english"))]
-
-dictionary <- tible_tf_idf #Dictionnary to find the root of stem word
-dictionary <- dictionary %>% unnest_tokens(word, V1)
-
-tible_tf_idf[,V1 := stemDocument(V1)]
-# tf-idf using quanteda
-tible_tf_idf <- corpus(tible_tf_idf, text_field = "V1")
-tible_tf_idf <- dfm(tible_tf_idf)
-tible_tf_idf <- dfm_tfidf(tible_tf_idf)
-# Keep column of names
-documents_names <- cbind(docvars(tible_tf_idf), as.data.frame(tible_tf_idf)) %>% as.data.table()
-tible_tf_idf <- tidy(tible_tf_idf) %>% as.data.table()
-tible_tf_idf <-merge(tible_tf_idf, documents_names[,.(doc_id, Com_ID)], by.x = "document", by.y = "doc_id")
-tf_idf_table <- tible_tf_idf[order(-count)][, head(.SD, number_of_words), Com_ID]
-tf_idf_table <- merge(tf_idf_table, unique(tf_idf[,c("Com_ID","color")]), by = "Com_ID", all.x = TRUE)
-
-tf_idf_table[,unstemmed_word:=stemCompletion(tf_idf_table$term, dictionary$word, type = "prevalent")] # unstem with most common word
-tf_idf_table[unstemmed_word=="",unstemmed_word:=term] # unstem with most common word
-
-tf_idf_plot <- ggplot(tf_idf_table, aes(reorder_within(unstemmed_word, count, color), count, fill = color)) +
-  geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
-  labs(title = "Highest tf-idf",
-       x = "Words", y = "tf-idf") +
-  facet_wrap(~Com_ID, ncol = n_columns, scales = "free") +
-  scale_x_reordered() +
-  scale_fill_identity() +
-  coord_flip() 
-list_return <- list("plot" = tf_idf_plot, "list_words" = tf_idf_table)
-return (list_return)
+  # changing the names of the column for titles and communities
+  colnames(tf_idf_save)[colnames(tf_idf_save)==com_column] = "Com_ID"
+  colnames(tf_idf_save)[colnames(tf_idf_save)==title_column] = "Titre"
+  colnames(tf_idf_save)[colnames(tf_idf_save)==color_column] = "color"
+  colnames(tf_idf_save)[colnames(tf_idf_save)==com_name_column] = "Community_name"
+  colnames(tf_idf_save)[colnames(tf_idf_save)==com_size_column] = "Size_com"
+  
+  
+  
+  # adding a color column attribute in case it doesn't exist
+  if(colnames(tf_idf_save)[colnames(tf_idf_save)=="color"] != "color"){
+    color = data.table(
+      Com_ID = 1:500,
+      color = mypalette)
+    color<-color %>%  mutate(Com_ID = sprintf("%02d", Com_ID)) %>% mutate(Com_ID = as.character(Com_ID))
+    
+    tf_idf <- merge(tf_idf_save,color, by = "Com_ID", all.x = TRUE)
+  }
+  
+  tf_idf <- tf_idf_save # we will need tf_idf_save later
+  #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+  #### Unigram ####
+  #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+  # Cleaning the titles
+  
+  tf_idf <- tf_idf[Titre!="NULL"]
+  tf_idf[,Titre := removeWords(Titre, stopwords("english"))]
+  tf_idf[,Titre := stripWhitespace(Titre)]
+  tf_idf[,Titre := removePunctuation(Titre)]
+  tf_idf[,Titre := removeNumbers(Titre)]
+  tf_idf[,Titre := tolower(Titre)]
+  tf_idf[,Titre := removeWords(Titre, stopwords("english"))]
+  tf_idf[,Titre := as.character(Titre)]
+  tible_tf_idf <- tf_idf[,paste(Titre, collapse = " "), by="Com_ID"]
+  tible_tf_idf[,V1 := stripWhitespace(V1)]
+  #Dictionnary to find the root of stem word before stemming
+  dictionary <- tible_tf_idf
+  dictionary <- dictionary %>% unnest_tokens(word, V1)
+  tible_tf_idf[,V1 := stemDocument(V1)]
+  # tf-idf using quanteda
+  tible_tf_idf <- corpus(tible_tf_idf, text_field = "V1")
+  tible_tf_idf <- dfm(tible_tf_idf)
+  tible_tf_idf <- dfm_tfidf(tible_tf_idf)
+  # Keep column of names
+  documents_names <- cbind(docvars(tible_tf_idf), quanteda::convert(tible_tf_idf, to = "data.frame")) %>% as.data.table()
+  tible_tf_idf <- tidy(tible_tf_idf) %>% as.data.table()
+  tf_idf_table <- merge(tible_tf_idf, documents_names[,.(doc_id, Com_ID)], by.x = "document", by.y = "doc_id")
+  tf_idf_table[,unstemmed_word:=stemCompletion(tf_idf_table$term, dictionary$word, type = "prevalent")] # unstem with most common word
+  tf_idf_table[unstemmed_word=="",unstemmed_word:=term] # unstem with most common word
+  tf_idf_table[,term := unstemmed_word]
+  tf_idf_table_uni <- tf_idf_table
+  
+  #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+  #### Bigram ####
+  #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+  #cleaning
+  
+  tf_idf <- tf_idf_save[Titre!="NULL"]
+  tf_idf[,Titre := removeWords(Titre, stopwords("english"))]
+  tf_idf[,Titre := stripWhitespace(Titre)]
+  tf_idf[,Titre := removePunctuation(Titre)]
+  tf_idf[,Titre := removeNumbers(Titre)]
+  tf_idf[,Titre := tolower(Titre)]
+  tf_idf[,Titre := removeWords(Titre, stopwords("english"))]
+  tf_idf[,Titre := as.character(Titre)]
+  # ngraming
+  tf_idf[,Titre := stemDocument(Titre)]
+  tf_idf$Titre <- tokens(tf_idf$Titre, remove_punct = TRUE)
+  tf_idf$Titre <- tokens_ngrams(tf_idf$Titre, n = 2)
+  tible_tf_idf <- tf_idf[,paste(Titre, collapse = " "), by="Com_ID"]
+  tible_tf_idf[,V1 := stripWhitespace(V1)]
+  # tf-idf using quanteda
+  tible_tf_idf <- corpus(tible_tf_idf, text_field = "V1")
+  tible_tf_idf <- dfm(tible_tf_idf)
+  tible_tf_idf <- dfm_tfidf(tible_tf_idf)
+  # Keep column of names
+  documents_names <- cbind(docvars(tible_tf_idf), quanteda::convert(tible_tf_idf, to = "data.frame")) %>% as.data.table()
+  tible_tf_idf <- tidy(tible_tf_idf) %>% as.data.table()
+  tf_idf_table <- merge(tible_tf_idf, documents_names[,.(doc_id, Com_ID)], by.x = "document", by.y = "doc_id")
+  # Unstemming bigram: first term, then second term, them bringing them together
+  tf_idf_table$term <- gsub("_", " ", tf_idf_table$term)
+  tf_idf_table[,term1:=str_extract(tf_idf_table$term, '\\S+')]
+  tf_idf_table[,term2:=str_extract(tf_idf_table$term, '\\S+$')]
+  tf_idf_table[,unstemmed_word1:=stemCompletion(tf_idf_table$term1, dictionary$word, type = "prevalent")] # unstem with most common word
+  tf_idf_table[unstemmed_word1=="",unstemmed_word:=term1]
+  tf_idf_table[,unstemmed_word2:=stemCompletion(tf_idf_table$term2, dictionary$word, type = "prevalent")] # unstem with most common word
+  tf_idf_table[unstemmed_word2=="",unstemmed_word:=term2]
+  tf_idf_table[,term := paste(unstemmed_word1, unstemmed_word2)]
+  tf_idf_table_bi <- tf_idf_table
+  
+  #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+  #### Plot ####
+  #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+  tf_idf_table <- rbind(tf_idf_table_uni, tf_idf_table_bi, fill = TRUE)
+  tf_idf_table <- tf_idf_table[order(-count)][, head(.SD, number_of_words), Com_ID]
+  
+  # Get info about size of communities
+  Size_com <- unique(tf_idf_save[,.(Com_ID, Community_name, Size_com,color)])
+  tf_idf_table <- merge(tf_idf_table, Size_com, by = "Com_ID", all.x = TRUE) # merge
+  
+  # Wrap Name and Reorder according to share_leiden
+  tf_idf_table$Com_wrap <- str_wrap(tf_idf_table$Community_name, width = 10)
+  tf_idf_table <- tf_idf_table[order(-Size_com)] # order by variable
+  tf_idf_table <- tf_idf_table[order(-Size_com)] # order by variable
+  tf_idf_table$Com_wrap <- factor(tf_idf_table$Com_wrap) # make a factor
+  tf_idf_table$Com_wrap <- fct_inorder(tf_idf_table$Com_wrap) # by order of appearance
+  
+  
+  tf_idf_plot <- ggplot(tf_idf_table[Size_com>=treshold_com], aes(reorder_within(term, count, color), count, fill = color)) +
+    geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
+    labs(title = "Highest tf-idf",
+         x = "Words", y = "tf-idf") +
+    facet_wrap(~Com_wrap, ncol = n_columns, scales = "free") +
+    scale_x_reordered() +
+    scale_fill_identity() +
+    theme(strip.text = element_text(size = size_title_wrap)) +
+    coord_flip() 
+  list_return <- list("plot" = tf_idf_plot, "list_words" = tf_idf_table)
+  return (list_return)
 
 }
 
