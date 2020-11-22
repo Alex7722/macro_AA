@@ -619,9 +619,9 @@ force_atlas <- function(graph,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 =
 
   # Adding a size variable for the avoid.overlapping with force atlas
 
-  graph <- graph %>%
-    activate(nodes) %>%
-    mutate(size = ((size - min(size))/(max(size) - min(size)))*(size_max - size_min) + size_min)
+ graph <- graph %>%
+   activate(nodes) %>%
+   mutate(size = ((size - min(size))/(max(size) - min(size)))*(size_max - size_min) + size_min)
   
   # running FA for the first time (without prevent.overlap)
   set.seed(seed)
@@ -721,6 +721,57 @@ top_ordering <- function(graph, ordering_column ="nb_cit" , top_n = 20, top_n_co
   colnames(top_variable_sum)[colnames(top_variable_general) == "ordering_column"] = ordering_column
   
   return(top_variable_sum)
+}
+
+# Simple functions for keeping a number n of nodes with highest citations measures per communities
+label_com <- function(graph, biggest_community = FALSE, community_threshold = 0.01, community_name_column = "Community_name", community_size_column = "Size_com"){
+  #' Displaying the highest cited nodes
+  #' 
+  #' A simple function to calculate the mean of coordinates x and y for each community. These coordinates
+  #' are to be used to plot the name of the community on the graph.
+  #' 
+  #' @param graph
+  #' A tidygraph object.
+  #' 
+  #' @param biggest_community
+  #' If true, you have the possibility to remove the smallest community, depending of the `community_threshold`
+  #' you have set.
+  #' 
+  #' @param community_threshold
+  #' If `biggest_community` is true, the function selects the nodes that belong to communities which represent
+  #' at least x% of the total number of nodes. By default, the parameter is set to 1%.
+  #' 
+  #' @param community_name_column
+  #' Name of the column with the name of the community to be used as label
+  #' 
+  #' @param community_size_column
+  #' Name of the column with the share of nodes in each community. 
+
+  
+  # Top nodes per community for the variable chosen
+  label_com <- graph %>%
+    activate(nodes) %>%
+    as_tibble()
+  
+  # Changing the name of the variable chosen
+  colnames(label_com)[colnames(label_com) == community_name_column] = "Community_name"
+  colnames(label_com)[colnames(label_com) == community_size_column] = "Size_com"
+  
+  # Keeping only the biggest communites if the parameter is TRUE
+  if(biggest_community == TRUE){
+    label_com <- label_com %>%
+      filter(Size_com > community_threshold)
+  }
+  
+  # Keeping the n top nodes per community
+  label_com <- label_com %>%
+    group_by(Community_name) %>% 
+    mutate(x = mean(x), y = mean(y)) %>%
+    select(Community_name,x,y,color) %>%
+    as_tibble() %>%
+    unique()
+  
+  return(label_com)
 }
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -966,7 +1017,7 @@ clustering_communities <- function(graph, label_size = 6, threshold_com = 0.01){
   #'Using a different method for plotting, by mixing ggplot and ggraph for the dendrogram, to have more options.
 
   # Extracting edges with only the biggest communities, and integrating the name of communities for source and target of edges
-  edges <- graph_coupling_community %>%
+  edges <- graph %>%
     activate(edges) %>%
     mutate(com_name_to = .N()$Id[to], com_name_from = .N()$Id[from]) %>%
     as.data.table()
@@ -980,7 +1031,7 @@ clustering_communities <- function(graph, label_size = 6, threshold_com = 0.01){
   order_dendro <- order.dendrogram(dendro) # extracting the order of nodes 
   
   # keeping only biggest communities
-  nodes <- graph_coupling_community %>%
+  nodes <- graph %>%
     activate(nodes) %>%
     as.data.table()
   
