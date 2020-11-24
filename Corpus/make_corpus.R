@@ -93,6 +93,7 @@ from_xml_to_df <- function(x ### x=df of edges
 }
 
 #Macro
+#Macro
 macro1 <- from_xml_to_df("Corpus_Econlit/macro1")
 macro2 <- from_xml_to_df("Corpus_Econlit/macro2")
 macro3 <- from_xml_to_df("Corpus_Econlit/macro3")
@@ -101,9 +102,10 @@ macro5 <- from_xml_to_df("Corpus_Econlit/macro5")
 macro6 <- from_xml_to_df("Corpus_Econlit/macro6")
 macro7 <- from_xml_to_df("Corpus_Econlit/macro7")
 macro8 <- from_xml_to_df("Corpus_Econlit/macro8")
-dt_JEL_Articles <- rbind(macro1, macro2, macro3, macro4, macro5, macro6, macro7, macro8)
-rm(macro1, macro2, macro3, macro4, macro5, macro6, macro7, macro8)
-gc()
+macro9 <- from_xml_to_df("Corpus_Econlit/F3 JEL 1991-2012")
+macro10 <- from_xml_to_df("Corpus_Econlit/F3 JEL 2013-2016")
+dt_JEL_Articles <- rbind(macro1, macro2, macro3, macro4, macro5, macro6, macro7, macro8, macro9, macro10)
+rm(macro1, macro2, macro3, macro4, macro5, macro6, macro7, macro8, macro9, macro10)
 
 old_macro1 <- from_xml_to_df("Corpus_Econlit/Old_JEL_1969-1985")
 old_macro2 <- from_xml_to_df("Corpus_Econlit/Old_JEL_1986-1990")
@@ -185,6 +187,10 @@ gc()
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### PART III: WOS MATCHED CORPUS ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+pswd = 'alex55Truc!1epistemo'
+usr = 'alexandre'
+ESH <- dbConnect(MySQL(), user=usr, password=pswd, dbname='OST_Expanded_SciHum',
+                 host='127.0.0.1')
 
 # all art and all refs
 all_ref <-  dbGetQuery(ESH, paste0("SELECT OST_Expanded_SciHum.References7.New_id2, OST_Expanded_SciHum.References7.ItemID_Ref, OST_Expanded_SciHum.References7.Annee, OST_Expanded_SciHum.References7.Nom, OST_Expanded_SciHum.References7.ID_Art, OST_Expanded_SciHum.References7.Revue_Abbrege FROM OST_Expanded_SciHum.References7 WHERE New_id2 != 0;")) %>%  data.table
