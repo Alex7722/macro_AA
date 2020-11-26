@@ -2,32 +2,13 @@
 ############################## PART I: LOADING PACKAGES, PATH AND DATA ####################################--------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
-##################### Packages ############################################--------------
-
-package_list <-  c("data.table","magrittr","tidyverse", "ggnewscale", "igraph",
-                   "tm","quanteda","tidytext","ggraph","tidygraph", "ggrepel", "vite",
-                   "reticulate","leiden","reshape2","scales","scico",
-                   "ggforce","directlabels","patchwork","DescTools","DT","grid","ggdendro",
-                   "knitr")
-for(p in package_list){
-  if (p %in% installed.packages()==FALSE){install.packages(p,dependencies = TRUE)}
-  library(p,character.only=TRUE)
-}
-
-#py_install("python-igraph")
-#py_install("leidenalg", forge = TRUE)
-
-######################### Paths and data ##########################################------------
-
-data_path <- "/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/"
-graph_data_path <- "/projects/data/macro_AA/Graphs/"
-picture_path <- "/home/aurelien/macro_AA/Static_Network_Analysis/Pictures/"
+##################### Packages, paths, etc. ############################################--------------
 
 source("/home/aurelien/macro_AA/Static_Network_Analysis/functions_for_network_analysis.R")
+source("/home/aurelien/macro_AA/Static_Network_Analysis/Script_paths_and_basic_objects.R")
 
-mypalette <- c("#1969B3","#01A5D8","#DA3E61","#3CB95F","#E0AF0C","#E25920","#6C7FC9","#DE9493","#CD242E","#6F4288","#B2EEF8","#7FF6FD","#FDB8D6","#8BF9A9","#FEF34A","#FEC57D","#DAEFFB","#FEE3E1","#FBB2A7","#EFD7F2","#5CAADA","#37D4F5","#F5779B","#62E186","#FBDA28","#FB8F4A","#A4B9EA","#FAC2C0","#EB6466","#AD87BC","#0B3074","#00517C","#871B2A","#1A6029","#7C4B05","#8A260E","#2E3679","#793F3F","#840F14","#401C56","#003C65","#741A09","#602A2A","#34134A","#114A1B","#27DDD1","#27DD8D","#4ADD27","#D3DD27","#DDA427","#DF2935","#DD27BC","#BA27DD","#3227DD","#2761DD","#27DDD1")
+##################### Loading Data ############################################--------------
 
-# Loading files
 nodes_JEL <- readRDS(paste0(data_path,"JEL_matched_corpus_nodes.rds"))
 nodes_old_JEL <- readRDS(paste0(data_path,"Old_JEL_matched_corpus_nodes.rds"))
 nodes_JEL <- rbind(nodes_JEL,nodes_old_JEL)
@@ -73,11 +54,6 @@ rm(institutions_info_JEL)
 edges_JEL <- edges_JEL[, Nom := toupper(Nom)]
 authors_JEL <- authors_JEL[, Nom := toupper(Nom)]
 nodes_JEL <- nodes_JEL[, Nom := toupper(Nom)]
-
-######################### Fixing the sub-periods and thresholds ##########################################------------
-
-start_date <- c(1970,1977,1984,1991,1997,2003)
-end_date <- c(1976,1983,1990,1996,2002,2008)
 
 # fixing threshold
 Limit_nodes = 20000
@@ -204,7 +180,7 @@ for(i in 1:length(start_date)){
   
   # creating the nodes with the number of citation of the nodes in the corpus
   nodes_coupling_JEL <- nodes_JEL[between(Annee_Bibliographique,start_date[i],end_date[i]),]
-  nb_cit<- edges_JEL[between(Annee_Bibliographique,start_date[i],end_date[i]),nb_cit := .N,ItemID_Ref]
+  nb_cit <- edges_JEL[between(Annee_Bibliographique,start_date[i],end_date[i]) & ItemID_Ref != 0][,nb_cit := .N, by = "ItemID_Ref"]
   nodes_coupling_JEL <- merge(nodes_coupling_JEL,unique(nb_cit[,c("ItemID_Ref","nb_cit")]), by = "ItemID_Ref", all.x = "TRUE")
   
   rm(nb_cit) # not useful anymore
@@ -215,13 +191,13 @@ for(i in 1:length(start_date)){
   
   # reducing the number of nodes depending of the number of citations
   nodes_coupling_JEL <- unique(nodes_coupling_JEL[nb_cit >= nodes_coupling_threshold,c("ID_Art","Annee_Bibliographique","Nom","Label","Titre","Revue","ESpecialite","nb_cit","ItemID_Ref")])
-  unique(nodes_coupling_JEL[order(Label),]$Label)
-  # building edges
+
+    # building edges
   edges_coupling_JEL <- unique(edges_JEL[ID_Art %in% nodes_coupling_JEL$ID_Art])
   
   # creation of the edges for the co-citation network
   
-  edges_coupling_JEL <- bibliographic_coupling(edges_coupling_JEL, source = "ID_Art", ref = "New_id2", weight_threshold = edges_threshold)
+  edges_coupling_JEL <- bibliographic_coupling_alt(edges_coupling_JEL, source = "ID_Art", ref = "New_id2", weight_threshold = edges_threshold)
   
   # Loop to avoid to large networks - Step 1: reducing nodes
   if(length(nodes_coupling_JEL$ID_Art) > Limit_nodes){
@@ -230,7 +206,7 @@ for(i in 1:length(start_date)){
       
       # creating the nodes with the number of citation of the nodes in the corpus
       nodes_coupling_JEL <- nodes_JEL[between(Annee_Bibliographique,start_date[i],end_date[i]),]
-      nb_cit<- edges_JEL[between(Annee_Bibliographique,start_date[i],end_date[i]),nb_cit := .N,ItemID_Ref]
+      nb_cit <- edges_JEL[between(Annee_Bibliographique,start_date[i],end_date[i]) & ItemID_Ref != 0][,nb_cit := .N, by = "ItemID_Ref"]
       nodes_coupling_JEL <- merge(nodes_coupling_JEL,unique(nb_cit[,c("ItemID_Ref","nb_cit")]), by = "ItemID_Ref", all.x = "TRUE")
       
       rm(nb_cit) # not useful anymore
@@ -247,7 +223,7 @@ for(i in 1:length(start_date)){
       
       # creation of the edges for the co-citation network
       
-      edges_coupling_JEL <- bibliographic_coupling(edges_coupling_JEL, source = "ID_Art", ref = "New_id2", weight_threshold = edges_threshold)
+      edges_coupling_JEL <- bibliographic_coupling_alt(edges_coupling_JEL, source = "ID_Art", ref = "New_id2", weight_threshold = edges_threshold)
       
       if(length(nodes_coupling_JEL$ID_Art) < Limit_nodes){
         break
@@ -262,7 +238,7 @@ for(i in 1:length(start_date)){
       
       # creating the nodes with the number of citation of the nodes in the corpus
       nodes_coupling_JEL <- nodes_JEL[between(Annee_Bibliographique,start_date[i],end_date[i]),]
-      nb_cit<- edges_JEL[between(Annee_Bibliographique,start_date[i],end_date[i]),nb_cit := .N,ItemID_Ref]
+      nb_cit <- edges_JEL[between(Annee_Bibliographique,start_date[i],end_date[i]) & ItemID_Ref != 0][,nb_cit := .N, by = "ItemID_Ref"]
       nodes_coupling_JEL <- merge(nodes_coupling_JEL,unique(nb_cit[,c("ItemID_Ref","nb_cit")]), by = "ItemID_Ref", all.x = "TRUE")
       
       rm(nb_cit) # not useful anymore
@@ -279,7 +255,7 @@ for(i in 1:length(start_date)){
       
       # creation of the edges for the co-citation network
       
-      edges_coupling_JEL <- bibliographic_coupling(edges_coupling_JEL, source = "ID_Art", ref = "New_id2", weight_threshold = edges_threshold)
+      edges_coupling_JEL <- bibliographic_coupling_alt(edges_coupling_JEL, source = "ID_Art", ref = "New_id2", weight_threshold = edges_threshold)
       
       if(length(edges_coupling_JEL$from) < Limit_edges){
         break
@@ -307,7 +283,7 @@ for(i in 1:length(start_date)){
 for(i in 1:length(start_date)){
   
   nodes_coupling_threshold = 0
-  edges_threshold = 3
+  edges_threshold = 2
   nb_art_threshold = 2
   
   # creating the nodes with the number of citation of the nodes in the corpus
@@ -339,7 +315,7 @@ for(i in 1:length(start_date)){
   
   authors_edges <- merge(edges_coupling,unique(nodes_coupling[,c("ID_Art","citing_author")]), by = "ID_Art", all.x = TRUE, allow.cartesian = TRUE)
   
-  authors_edges <- bibliographic_coupling(authors_edges, "citing_author", "New_id2", weight_threshold = edges_threshold)
+  authors_edges <- bibliographic_coupling_authors(authors_edges, source = "ID_Art", authors =  "citing_author", ref = "New_id2", weight_threshold = edges_threshold)
   
   # reducing the number of nodes depending of the number of citations
   
@@ -380,7 +356,7 @@ for(i in 1:length(start_date)){
       
       authors_edges <- merge(edges_coupling,unique(nodes_coupling[,c("ID_Art","citing_author")]), by = "ID_Art", all.x = TRUE, allow.cartesian = TRUE)
       
-      authors_edges <- bibliographic_coupling(authors_edges, "citing_author", "New_id2", weight_threshold = edges_threshold)
+      authors_edges <- bibliographic_coupling_authors(authors_edges, source = "ID_Art", authors =  "citing_author", ref = "New_id2", weight_threshold = edges_threshold)
       
       # reducing the number of nodes depending of the number of citations
       
@@ -501,7 +477,7 @@ for(i in 4:length(start_date)){
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-################################# 5) Saving TF-IDF data  ##################################------
+################################# 6) Saving TF-IDF data  ##################################------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
 for(i in 1:length(start_date)){

@@ -2,29 +2,12 @@
 ############################## PART I: LOADING PACKAGES, PATH AND DATA ####################################--------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
-##################### Packages ############################################--------------
-
-package_list <-  c("data.table","readr","magrittr","tidyverse", "ggnewscale", "igraph",
-                   "tm","quanteda","tidytext","ggraph","tidygraph", "ggrepel", "vite",
-                   "reticulate","leiden","reshape2","scales","scico",
-                   "ggforce","directlabels","patchwork","DescTools","grid","ggdendro")
-for(p in package_list){
-  if (p %in% installed.packages()==FALSE){install.packages(p,dependencies = TRUE)}
-  library(p,character.only=TRUE)
-}
-
-#py_install("python-igraph")
-#py_install("leidenalg", forge = TRUE)
-
-######################### Paths and data ##########################################------------
-
-data_path <- "/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/"
-graph_data_path <- "/projects/data/macro_AA/Graphs/"
-picture_path <- "/home/aurelien/macro_AA/Static_Network_Analysis/Pictures/"
+##################### Packages, paths, etc. ############################################--------------
 
 source("/home/aurelien/macro_AA/Static_Network_Analysis/functions_for_network_analysis.R")
+source("/home/aurelien/macro_AA/Static_Network_Analysis/Script_paths_and_basic_objects.R")
 
-mypalette <- c("#1969B3","#01A5D8","#DA3E61","#3CB95F","#E0AF0C","#E25920","#6C7FC9","#DE9493","#CD242E","#6F4288","#B2EEF8","#7FF6FD","#FDB8D6","#8BF9A9","#FEF34A","#FEC57D","#DAEFFB","#FEE3E1","#FBB2A7","#EFD7F2","#5CAADA","#37D4F5","#F5779B","#62E186","#FBDA28","#FB8F4A","#A4B9EA","#FAC2C0","#EB6466","#AD87BC","#0B3074","#00517C","#871B2A","#1A6029","#7C4B05","#8A260E","#2E3679","#793F3F","#840F14","#401C56","#003C65","#741A09","#602A2A","#34134A","#114A1B","#27DDD1","#27DD8D","#4ADD27","#D3DD27","#DDA427","#DF2935","#DD27BC","#BA27DD","#3227DD","#2761DD","#27DDD1")
+##################### Loading Data ############################################--------------
 
 # Loading the title of commmunities and associating them colors
 names_coupling <- fread(paste0(graph_data_path,"names_coupling.csv")) %>% data.table()
@@ -61,7 +44,6 @@ end_date <- c(1976,1983,1990,1996,2002,2008)
 
 ######################### Working on the tidygraph for cocitation and its attributes #################################-------
 for(i in 1:length(start_date)){
-
 graph_cocit <- readRDS(paste0(graph_data_path,"prior_graph_cocit_",start_date[i],"-",end_date[i],".rds"))
 
 # Identifying communities with Leiden algorithm                         
@@ -83,7 +65,7 @@ graph_cocit <- graph_cocit %>%
   mutate(size=nb_cit)
 
 # Running Force Atlas layout  
-graph_cocit <- force_atlas(graph_cocit,seed = 1, ew.influence = 1, kgrav = 1, iter_1 = 8000, iter_2 = 2000, barnes.hut = TRUE, size_min = 50, size_max = 200)
+graph_cocit <- force_atlas(graph_cocit,seed = 1, ew.influence = 1, kgrav = 1, iter_1 = 8000, iter_2 = 800, barnes.hut = TRUE, size_min = 50, size_max = 200)
 
 # Saving the graph
 saveRDS(graph_cocit, paste0(graph_data_path,"graph_cocit_",start_date[i],"-",end_date[i],".rds"))
@@ -112,8 +94,8 @@ for(i in 1:length(start_date)){
   
 }
 
-
 ############################# Projection of the graph #########################-----------
+
 graph_cocit <- readRDS(paste0(graph_data_path,"graph_cocit_",start_date[i],"-",end_date[i],".rds"))
 
 # Identifying the labels of the most important authors
@@ -121,9 +103,9 @@ important_nodes <- top_ordering(graph_cocit, top_n_com = 3, top_n = 20, biggest_
 com_label <- label_com(graph_cocit,biggest_community = TRUE)
 
 # Plotting the graph  
-#graph_cocit <- graph_cocit %>%
- #activate(nodes) %>%
-  #filter(nb_cit >= 6)
+graph_cocit <- graph_cocit %>%
+ activate(nodes) %>%
+  filter(nb_cit >= 8)
 
 
 # Plotting the graph 1 - Complete graph with the biggest communities
@@ -137,8 +119,7 @@ ggraph(graph_cocit, "manual", x = x, y = y) +
   geom_text_repel(data=important_nodes, aes(x=x, y=y, label = Label), size = 2, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
   geom_label_repel(data=com_label, aes(x=x, y=y, label = Community_name, fill = color), size = 5, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
   theme_void() +
-  ggsave(paste0(picture_path,"graph_cocit",start_date[i],"-",end_date[i],".png"), width=30, height=30, units = "cm")
-
+  ggsave(paste0(picture_path,"graph_cocit",start_date[i],"-",end_date[i],".png"), width=35, height=35, units = "cm")
 
 #################################### Graph of community as nodes from cocit ######################################
 
@@ -177,13 +158,15 @@ graph_coupling <- graph_coupling %>%
   activate(nodes) %>%
   mutate(size=nb_cit)
 
+# Saving the graph
+saveRDS(graph_coupling, paste0(graph_data_path,"graph_coupling_",start_date[i],"-",end_date[i],".rds"))
+
 # Running Force Atlas layout  
-graph_coupling <- force_atlas(graph_coupling,seed = 1, ew.influence = 1, kgrav = 1, iter_1 = 6000, iter_2 = 600, barnes.hut = TRUE, size_min = 50, size_max = 200)
+graph_coupling <- force_atlas(graph_coupling,seed = 1, ew.influence = 1, kgrav = 1, iter_1 = 10000, iter_2 = 800, barnes.hut = TRUE, size_min = 50, size_max = 200)
 
 # Saving the graph
 saveRDS(graph_coupling, paste0(graph_data_path,"graph_coupling_",start_date[i],"-",end_date[i],".rds"))
 }
-
 
 ############################### Recoloring Graph depending on the new titles ###############################
 for(i in 1:length(start_date)){
@@ -205,32 +188,33 @@ for(i in 1:length(start_date)){
   saveRDS(graph_coupling, paste0(graph_data_path,"graph_coupling_",start_date[i],"-",end_date[i],".rds"))
   
 }
-i = 6
+i = 4
 ############################# Projection of the graph #########################
+
 # loading the graph if necessary
 graph_coupling <- readRDS(paste0(graph_data_path,"graph_coupling_",start_date[i],"-",end_date[i],".rds"))
 
 # Identifying the labels of the most important authors
-important_nodes <- top_ordering(graph_coupling, top_n_com = 2, top_n = 15, biggest_community = TRUE)
-com_label <- label_com(graph_coupling,biggest_community = TRUE)
+important_nodes <- top_ordering(graph_coupling, top_n_com = 2, top_n = 15, biggest_community = TRUE, community_threshold = 0.02)
+com_label <- label_com(graph_coupling,biggest_community = TRUE, community_threshold = 0.02)
 
 # Plotting the graph  
 
-#graph_coupling <- graph_coupling %>%
-# activate(nodes) %>%
- # filter(nb_cit >= graph_filtering_coupling)
+graph_coupling <- graph_coupling %>%
+activate(nodes) %>%
+ filter(nb_cit >= 1)
 
 ggraph(graph_coupling, "manual", x = x, y = y) + 
   geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
   scale_edge_width_continuous(range = c(0.1,2)) +
   scale_edge_colour_identity() +
   geom_node_point(aes(x=x, y=y, size = size, fill = color), pch = 21, alpha = 0.8, show.legend = FALSE) +
-  scale_size_continuous(range = c(0.1,12)) +
+  scale_size_continuous(range = c(0.2,13)) +
   scale_fill_identity() +
   geom_text_repel(data=important_nodes, aes(x=x, y=y, label = Label), size = 2, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
   geom_label_repel(data=com_label, aes(x=x, y=y, label = Community_name, fill = color), size = 5, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
   theme_void() +
-  ggsave(paste0(picture_path,"graph_coupling_",start_date[i],"-",end_date[i],".png"), width=35, height=35, units = "cm")
+  ggsave(paste0(picture_path,"graph_coupling",start_date[i],"-",end_date[i],".png"), width=35, height=35, units = "cm")
 
 #################################### Graph of community as nodes from coupling ######################################
 
@@ -251,7 +235,6 @@ saveRDS(graph_coupling_community, paste0(graph_data_path,"graph_coupling_communi
 ################## Working on the author coupling tidygraph and its attributes ######################----
 
 for(i in 1:length(start_date)){
-  
 graph_authors_coupling <- readRDS(paste0(graph_data_path,"prior_graph_authors_coupling_",start_date[i],"-",end_date[i],".rds"))
 
 # Identifying communities with Leiden algorithm                         
@@ -271,8 +254,11 @@ graph_authors_coupling <- graph_authors_coupling %>%
   activate(nodes) %>%
   mutate(size=nb_cit_author)
 
+# Saving the graph
+saveRDS(graph_authors_coupling, paste0(graph_data_path,"graph_authors_coupling_",start_date[i],"-",end_date[i],".rds"))
+
 # Running Force Atlas layout  
-graph_authors_coupling <- force_atlas(graph_authors_coupling,seed = 1, ew.influence = 1, kgrav = 1, iter_1 = 7000, iter_2 = 1000, barnes.hut = TRUE, size_min = 50, size_max = 200)
+graph_authors_coupling <- force_atlas(graph_authors_coupling,seed = 1, ew.influence = 1, kgrav = 1, iter_1 = 8000, iter_2 = 800, barnes.hut = TRUE, size_min = 50, size_max = 200)
 
 # Saving the graph
 saveRDS(graph_authors_coupling, paste0(graph_data_path,"graph_authors_coupling_",start_date[i],"-",end_date[i],".rds"))
@@ -310,20 +296,20 @@ important_nodes <- top_ordering(graph_authors_coupling, ordering_column = "nb_ci
 com_label <-  label_com(graph_authors_coupling,biggest_community = TRUE)
 
 # Plotting the graph  
-#graph_authors_coupling <- graph_authors_coupling %>%
-#filter(nb_cit_author >= 2)
+graph_authors_coupling <- graph_authors_coupling %>%
+filter(nb_cit_author >= 1)
 
 ggraph(graph_authors_coupling, "manual", x = x, y = y) + 
   geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
   scale_edge_width_continuous(range = c(0.1,2)) +
   scale_edge_colour_identity() +
   geom_node_point(aes(x=x, y=y, size = size, fill = color), pch = 21, alpha = 0.8, show.legend = FALSE) +
-  scale_size_continuous(range = c(0.1,13)) +
+  scale_size_continuous(range = c(0.4,13)) +
   scale_fill_identity() +
   geom_text_repel(data=important_nodes, aes(x=x, y=y, label = Id), size = 2, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
   geom_label_repel(data=com_label, aes(x=x, y=y, label = Community_name, fill = color), size = 5, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
   theme_void() +
-  ggsave(paste0(picture_path,"graph_authors_coupling_",start_date[i],"-",end_date[i],".png"), width=35, height=35, units = "cm")
+  ggsave(paste0(picture_path,"graph_authors_coupling_",start_date[i],"-",end_date[i],".png"), width=30, height=30, units = "cm")
 
 
 ################## Authors coupling graph with community as nodes ######################----
@@ -360,7 +346,7 @@ graph_institutions_coupling <- community_colors(graph_institutions_coupling,mypa
 # Naming communities
 graph_institutions_coupling <-naming_communities(graph_institutions_coupling, centrality_measure = "nb_art", naming = "Id")
 
-# Integration a size variable for implementing non-overlapping function of Force Atlast
+# Integration a size variable for implementing non-overlapping function of Force Atlas
 graph_institutions_coupling <- graph_institutions_coupling %>%
   activate(nodes) %>%
   mutate(size=nb_art)
@@ -374,7 +360,7 @@ saveRDS(graph_institutions_coupling, paste0(graph_data_path,"graph_institutions_
 
 ############################# Projection of the graph #########################
 
-#i = 6
+i = 6
 # loading the graph if necessary
 graph_institutions_coupling <- readRDS(paste0(graph_data_path,"graph_institutions_coupling_",start_date[i],"-",end_date[i],".rds"))
 
@@ -509,3 +495,5 @@ geom_text_repel(data=important_nodes, aes(x=x, y=y, label = Id), size = 2, fontf
   geom_label_repel(data=com_label, aes(x=x, y=y, label = Community_name, fill = color), size = 4, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
    theme_void() +
  ggsave(paste0(picture_path,"graph_co-authorship_institutions_",start_date[i],"-",end_date[i],".png"), width=20, height=20, units = "cm")  
+
+

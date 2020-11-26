@@ -54,7 +54,7 @@ bibliographic_coupling <- function(dt, source, ref, normalized_weight_only=TRUE,
   dt <- unique(dt)
   
   # remove loop
-  dt <- dt[source!=ref]
+  dt <- dt[id_art!=id_ref]
   
   # Removing references cited only once:
   dt <- dt[,N := .N, by = id_ref][N > 1][, list(id_art,id_ref)]
@@ -106,6 +106,186 @@ bibliographic_coupling <- function(dt, source, ref, normalized_weight_only=TRUE,
     }
   }
 
+}
+
+bibliographic_coupling_alt <- function(dt, source, ref, weight_threshold = 1)
+{
+  #' function for edges of bibliographic coupling
+  #' 
+  #' This function creates the cosine normalized edges of the bibliographic coupling network, from a direct
+  #' citation data frame. It is refined by comparison to our standard function, by taking into account the 
+  #' frequency of citations of a references. In other words, most cited references are less important in the links
+  #' between two articles.
+  #' 
+  #' @param dt
+  #' The table with citing and cited documents.
+  #' 
+  #' @param source
+  #' the column name of the source identifiers, that is the documents that are citing. 
+  #'
+  #' @param ref
+  #'the column name of the references that are cited.
+  #' 
+  #' @param weight_threshold
+  #' Correspond to the value of the non-normalized weights of edges. The function just keeps the edges 
+  #' that have a non-normalized weight superior to the `weight_threshold`.
+
+  
+  # Making sure the table is a datatable
+  dt <- data.table(dt)
+  # Renaming and simplifying 
+  setnames(dt, c(source,ref), c("id_art", "id_ref"))
+  dt <- dt[,list(id_art,id_ref)]
+  setkey(dt,id_ref,id_art)
+  # removing duplicated citations with exactly the same source and target
+  dt <- unique(dt)
+  # remove loop
+  dt <- dt[id_art!=id_ref]
+  # Removing references cited only once:
+  dt <- dt[,N := .N, by = id_ref][N > 1][, list(id_art,id_ref)]
+  # Computing how many items each citing document has (necessary for normalization later)
+  id_nb_ref <-  dt[,list(nb_ref = .N),by=id_art]
+  # Computing how many times each cited document
+  ref_nb_cit <-  dt[,list(nb_cit = .N),by=id_ref]
+  # Computing how many times each cited document
+  nb_doc <-  dt[unique(id_art)][,list(n_document = .N)]
+  # Creating every combinaison of articles per references
+  bib_coup <- dt[,list(Target = rep(id_art[1:(length(id_art)-1)],(length(id_art)-1):1),
+                       Source = rev(id_art)[sequence((length(id_art)-1):1)]),
+                 by= id_ref]
+  # remove loop
+  bib_coup <- bib_coup[Source!=Target]
+  # Inverse Source and Target so that couple of Source/Target are always on the same side
+  bib_coup <- bib_coup[Source > Target, c("Target", "Source") := list(Source, Target)] # exchanging
+  
+  ###### Add columns with info for weighting
+  #Calculating the number of references in common and deleting the links between articles that share less than weight_threshold
+  bib_coup <- bib_coup[,N:= .N,by=list(Target,Source)][N>=weight_threshold] 
+  
+  # nb_doc
+  bib_coup[,nb_doc:=nb_doc]
+  # merge the number of occurence of a ref in a document
+  bib_coup <-  merge(bib_coup, ref_nb_cit, by = "id_ref")
+  # merge the lenght of reference list
+  bib_coup <-  merge(bib_coup, id_nb_ref, by.x = "Target",by.y = "id_art" )
+  setnames(bib_coup,"nb_ref", "nb_ref_Target")
+  bib_coup <-  merge(bib_coup, id_nb_ref, by.x = "Source",by.y = "id_art" )
+  setnames(bib_coup,"nb_ref", "nb_ref_Source")
+  
+  # CS
+  bib_coup[,weight := (sum(log(nb_doc/nb_cit))) / (nb_ref_Target*nb_ref_Source), .(Source,Target)]
+  # Keep only unique couple
+  #bib_coup <- bib_coup[, head(.SD, 1), .(Source,Target)]
+  
+  bib_coup$from <- as.character(bib_coup$Source)
+  bib_coup$to <- as.character(bib_coup$Target)
+  
+  bib_coup <- unique(bib_coup[, c("from","to","weight","Source","Target")])
+  
+  return (bib_coup)
+
+}
+
+bibliographic_coupling_authors <- function(dt, source, ref, authors, weight_threshold = 1)
+{
+  #' function for edges of bibliographic coupling
+  #' 
+  #' This function creates a network of authors from bibliographic coupling. Coupling links are calculated depending
+  #' of the number references two authors share, taking into account the number of time each author cited each of 
+  #' these references, the total number of references cited by each author, and the total number of citations in the 
+  #' whole corpus of each reference. 
+  #' 
+  #' @param dt
+  #' The table with citing and cited documents.
+  #' 
+  #' @param source
+  #' the column name of the source identifiers, that is the documents that are citing. 
+  #'
+  #' @param ref
+  #'the column name of the references that are cited.
+  #'
+  #' @param authors
+  #'the column name of the authors that are citing.
+  #' 
+  #' @param weight_threshold
+  #' Correspond to the value of the non-normalized weights of edges. The function just keeps the edges 
+  #' that have a non-normalized weight superior to the `weight_threshold`.
+  
+  # Making sure the table is a datatable
+  dt <- data.table(authors_edges)
+  
+  # Renaming, calculating number of articles and simplifying 
+  setnames(dt, c(source,authors,ref), c("id_art","authors", "id_ref"))
+  
+  # Computing how many times each cited document
+  nb_doc <-  length(unique(dt[,id_art]))
+  
+  # Computing how many times each document is cited (by id_art, not by author, to avoid double-counting)
+  ref_nb_cit <-  unique(unique(dt[,c("id_art","id_ref")])[,list(nb_cit = .N),by=id_ref])
+  
+  dt <- dt[,list(authors,id_ref)]
+  setkey(dt,id_ref,authors)
+  
+  # calculating the number of ref per-author and the number of time a ref is cited by an author
+  dt <- unique(dt[, nb_ref := .N, by = "authors"][, nb_cit_author := .N, by = c("authors","id_ref")])
+  
+  
+  
+  # removing duplicated citations with exactly the same source and target
+  #dt <- unique(dt)
+  
+  # Removing references cited only once by one author
+  dt <- dt[,nb_cit_alt := .N, by = id_ref][nb_cit_alt > 1]
+  # Computing how many items each citing document has (necessary for normalization later)
+  #id_nb_ref <-  dt[,list(nb_ref = .N),by=authors]
+  
+  # Computing how many times each cited document
+  #ref_nb_cit <-  dt[,list(nb_cit = .N),by=id_ref]
+  
+  
+  # Creating every combinaison of articles per references
+  dt_reduce <- dt[, list(authors,id_ref)]
+  bib_coup <- dt_reduce[,list(Target = rep(authors[1:(length(authors)-1)],(length(authors)-1):1),
+                              Source = rev(authors)[sequence((length(authors)-1):1)]),
+                        by= id_ref]
+  # remove loop
+  bib_coup <- bib_coup[Source!=Target]
+  # Inverse Source and Target so that couple of Source/Target are always on the same side
+  bib_coup <- bib_coup[Source > Target, c("Target", "Source") := list(Source, Target)] # exchanging
+  
+  ###### Add columns with info for weighting
+  #Calculating the number of references in common and deleting the links between articles that share less than weight_threshold
+  bib_coup <- bib_coup[,N:= .N,by=list(Target,Source)][N>=weight_threshold] 
+  
+  # nb_doc
+  bib_coup[,nb_doc:=nb_doc]
+  # merge the number of occurence of a ref in a document
+  bib_coup <-  merge(bib_coup, ref_nb_cit, by = "id_ref")
+  # merge the lenght of reference list
+  bib_coup <-  merge(bib_coup, unique(dt[,c("authors","nb_ref")]), by.x = "Target",by.y = "authors" )
+  setnames(bib_coup,"nb_ref", "nb_ref_Target")
+  bib_coup <-  merge(bib_coup, unique(dt[,c("authors","nb_ref")]), by.x = "Source",by.y = "authors" )
+  setnames(bib_coup,"nb_ref", "nb_ref_Source")
+  
+  # merge the number of times a ref is cited by an author
+  bib_coup <-  merge(bib_coup, unique(dt[,c("authors","id_ref","nb_cit_author")]), by.x = c("Target","id_ref"),by.y = c("authors","id_ref"))
+  setnames(bib_coup,"nb_cit_author", "nb_cit_author_Target")
+  bib_coup <-  merge(bib_coup, unique(dt[,c("authors","id_ref","nb_cit_author")]), by.x = c("Source","id_ref"),by.y = c("authors","id_ref"))
+  setnames(bib_coup,"nb_cit_author", "nb_cit_author_Source")
+  
+  # CS
+  bib_coup[,weight := (sum(min(nb_cit_author_Target,nb_cit_author_Source)*log(nb_doc/nb_cit))) / (nb_ref_Target*nb_ref_Source), .(Source,Target)]
+  
+  # Keep only unique couple
+  #bib_coup <- bib_coup[, head(.SD, 1), .(Source,Target)]
+  
+  bib_coup$from <- as.character(bib_coup$Source)
+  bib_coup$to <- as.character(bib_coup$Target)
+  
+  bib_coup <- unique(bib_coup[, c("from","to","weight","Source","Target")])
+  
+  return (bib_coup)
+  
 }
 
 bibliographic_cocitation <- function(dt, source, ref, normalized_weight_only=TRUE, weight_threshold = 1, output_in_character = TRUE)
