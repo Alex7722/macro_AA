@@ -483,7 +483,7 @@ for(i in 4:length(start_date)){
 for(i in 1:length(start_date)){
   graph_coupling <- readRDS(paste0(graph_data_path,"graph_coupling_",start_date[i],"-",end_date[i],".rds"))
   
-  TF_IDF <- tf_idf(graph = graph_coupling, n_columns = 5)
+  TF_IDF <- tf_idf(graph = graph_coupling)
   
   saveRDS(TF_IDF, paste0(graph_data_path,"tf-idf_coupling_",start_date[i],"-",end_date[i],".rds"))
   
@@ -501,7 +501,7 @@ for(i in 1:length(start_date)){
   Nodes_authors_coupling <- merge(Nodes_authors_coupling,nodes_JEL[between(Annee_Bibliographique,start_date[i],end_date[i]) ,c("ID_Art","Annee_Bibliographique")], by = "ID_Art")
   
   # Calculating the tf-idf for the titles in each community
-  TF_IDF_authors <- tf_idf(nodes = Nodes_authors_coupling, n_columns = 4)
+  TF_IDF_authors <- tf_idf(nodes = Nodes_authors_coupling)
   
   saveRDS(TF_IDF_authors, paste0(graph_data_path,"tf-idf_authors_coupling_",start_date[i],"-",end_date[i],".rds"))
   

@@ -1303,7 +1303,7 @@ Important_nodes <- unique(Important_nodes)
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
 tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_column = "Com_ID", color_column = "color",
-                   com_name_column = "Community_name", com_size_column = "Size_com", treshold_com = 0.01, number_of_words = 10, n_columns = 4, 
+                   com_name_column = "Community_name", com_size_column = "Size_com", treshold_com = 0.01, number_of_words = 12, 
                    palette = NULL, size_title_wrap = 8)
 {
   #' Creating a TF-IDF analysis of the titles of WoS corpus
@@ -1341,10 +1341,6 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
   #' 
   #' @param number_of_words
   #' How many words you want to display on the final graph.
-  #' 
-  #' @param n_columns
-  #' The number of columns you want to have in your graph (that is the argument of the 
-  #' `facet_wrap` function of ggplot2).
   #' 
   #' @param palette
   #' If you don't already have a color attribute for your communities in your tidygraph object,
@@ -1468,8 +1464,22 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
   tf_idf_table <- tf_idf_table[order(-Size_com)] # order by variable
   tf_idf_table$Com_wrap <- factor(tf_idf_table$Com_wrap) # make a factor
   tf_idf_table$Com_wrap <- fct_inorder(tf_idf_table$Com_wrap) # by order of appearance
+
+# fixing the number of columns, depending of the number of communities
+  n_columns = 3
+  if(length(unique(tf_idf_table[Size_com>=treshold_com]$Com_wrap)) > 9){
+    n_columns = 4
+  }
   
+  if(length(unique(tf_idf_table[Size_com>=treshold_com]$Com_wrap)) > 12){
+    n_columns = 5
+  }
   
+  if(length(unique(tf_idf_table[Size_com>=treshold_com]$Com_wrap)) > 15){
+    n_columns = 6
+  }
+  
+  # plotting the graph
   tf_idf_plot <- ggplot(tf_idf_table[Size_com>=treshold_com], aes(reorder_within(term, count, color), count, fill = color)) +
     geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
     labs(title = "Highest tf-idf",
@@ -1479,6 +1489,7 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
     scale_fill_identity() +
     theme(strip.text = element_text(size = size_title_wrap)) +
     coord_flip() 
+  
   list_return <- list("plot" = tf_idf_plot, "list_words" = tf_idf_table)
   return (list_return)
 
