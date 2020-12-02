@@ -188,7 +188,7 @@ for(i in 1:length(start_date)){
   saveRDS(graph_coupling, paste0(graph_data_path,"graph_coupling_",start_date[i],"-",end_date[i],".rds"))
   
 }
-i = 4
+i = 1
 ############################# Projection of the graph #########################
 
 # loading the graph if necessary
@@ -214,7 +214,7 @@ ggraph(graph_coupling, "manual", x = x, y = y) +
   geom_text_repel(data=important_nodes, aes(x=x, y=y, label = Label), size = 2, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
   geom_label_repel(data=com_label, aes(x=x, y=y, label = Community_name, fill = color), size = 5, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
   theme_void() +
-  ggsave(paste0(picture_path,"graph_coupling",start_date[i],"-",end_date[i],".png"), width=35, height=35, units = "cm")
+  ggsave(paste0(picture_path,"graph_coupling_",start_date[i],"-",end_date[i],".png"), width=35, height=35, units = "cm")
 
 #################################### Graph of community as nodes from coupling ######################################
 

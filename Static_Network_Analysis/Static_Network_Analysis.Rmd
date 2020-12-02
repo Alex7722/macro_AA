@@ -92,7 +92,7 @@ For the bibliographic coupling network, first, we have kept all the JEL articles
 
 ```{r}
 
-include_graphics(paste0(picture_path,"graph_coupling_",start_date[i],"-",end_date[i],".png"))
+include_graphics(paste0(picture_path,"graph_coupling",start_date[i],"-",end_date[i],".png"))
 ```
 
 ## Basic Statistics on communities
@@ -142,21 +142,36 @@ most_cited_nodes <- most_cited_nodes %>%
 
 # Keeping the n references the most cited per community
 most_cited_ref <- references_extended[, c("Com_ID","New_id2","cited_author","Annee","Revue_Abbrege","Cited_Title")]
-most_cited_ref <- most_cited_ref[, share_cit_ref := .N, by = c("Com_ID","New_id2")][, nb_cit_per_com := .N, by = "Com_ID"][, share_cit_ref := share_cit_ref/nb_cit_per_com]
+
+# calculating the nb of citations of a ref in the whole corpus and per community, then dividing each of the two values by the total number of refs, and the total number of refs per com, to have the total frequency, and the frequency per com
+most_cited_ref <- most_cited_ref[, nb_cit_ref_com := .N, by = c("Com_ID","New_id2")][, nb_cit_ref := .N, by = "New_id2"][, nb_cit_per_com := .N, by = "Com_ID"][, total_nb_cit := .N][, com_freq := nb_cit_ref_com/nb_cit_per_com][, total_freq := nb_cit_ref/total_nb_cit]
+most_cited_ref <- most_cited_ref[,norm_dev_ref := sqrt(length(unique(references_extended$ID_Art)))*(com_freq - total_freq)/sqrt(total_freq*(1-total_freq))]
 most_cited_ref <- most_cited_ref %>%
-  select(Com_ID,New_id2,cited_author,Annee,Revue_Abbrege,Cited_Title,share_cit_ref) %>%
+  select(Com_ID,New_id2,cited_author,Annee,Revue_Abbrege,Cited_Title,com_freq,norm_dev_ref) %>%
   unique()
 
+  
 doublons <- which(duplicated(most_cited_ref[,c("Com_ID","New_id2")]))
 
 if(length(doublons) != 0){
   most_cited_ref <- most_cited_ref[-doublons]
 }
 
-most_cited_ref <-  most_cited_ref %>%
+abs_most_cited_ref <-  most_cited_ref %>%
+  select(Com_ID,cited_author,Annee,Revue_Abbrege,Cited_Title,com_freq) %>%
   group_by(Com_ID) %>%
-  arrange(desc(share_cit_ref)) %>%
-  slice(1:n)
+  arrange(desc(com_freq)) %>%
+  slice(1:n) %>%
+  as.data.table()
+
+re_most_cited_ref <- most_cited_ref %>%
+  group_by(Com_ID) %>%
+  arrange(desc(norm_dev_ref)) %>%
+  slice(1:n) %>%
+  rename(cited_author_dev = cited_author, Annee_dev = Annee, Revue_Abbrege_dev = Revue_Abbrege, Cited_Title_dev = Cited_Title)%>%
+  as.data.table()
+
+most_cited_ref <-  cbind(abs_most_cited_ref,re_most_cited_ref[,c("cited_author_dev","Annee_dev","Revue_Abbrege_dev","Cited_Title_dev","norm_dev_ref")])
 
 # keeping the n authors the most present in coupling communities
 main_author <- unique(references_extended[, c("ID_Art","Com_ID","citing_author")])
@@ -167,24 +182,28 @@ main_author <- main_author %>%
   group_by(Com_ID) %>%
   arrange(desc(main_author)) %>%
   slice(1:n)
+
 # keeping the n journals where most nodes were published in coupling communities
 main_journal <- unique(Nodes_coupling[, c("ID_Art","Com_ID","Revue")])
-main_journal <- main_journal[, main_journal := .N, by = c("Com_ID","Revue")][, size := .N, by = "Com_ID"][, main_journal:= main_journal/size]
+main_journal <- main_journal[, freq := .N, by = "Revue"][, freq_com := .N, by = c("Com_ID","Revue")][, total := .N][, total_com := .N, by = "Com_ID"][, freq := freq/total][, freq_com := freq_com/total_com]
+main_journal <- main_journal[freq_com > 0.00,norm_dev_journal := sqrt(length(unique(references_extended$ID_Art)))*((freq_com - freq)/sqrt(freq*(1-freq)))]
 main_journal <- main_journal %>%
-  select(Com_ID,Revue,main_journal) %>%
+  select(Com_ID,Revue,freq_com,norm_dev_journal) %>%
   unique() %>%
   group_by(Com_ID) %>%
-  arrange(desc(main_journal)) %>%
-  slice(1:n)
+  arrange(desc(norm_dev_journal)) %>%
+  slice(1:n) %>%
+  rename(main_journal = Revue)
 
 # keeping the n top disciplines per community
 main_discipline <- unique(Nodes_coupling[, c("ID_Art","Com_ID","ESpecialite")])
-main_discipline <- main_discipline[, main_discipline := .N, by = c("Com_ID","ESpecialite")][, size := .N, by = "Com_ID"][, main_discipline := main_discipline/size]
+main_discipline <- main_discipline[, freq := .N, by = "ESpecialite"][, freq_com := .N, by = c("Com_ID","ESpecialite")][, total := .N][, total_com := .N, by = "Com_ID"][, freq := freq/total][, freq_com := freq_com/total_com]
+main_discipline <- main_discipline[,norm_dev_discipline := sqrt(length(unique(references_extended$ID_Art)))*(freq_com - freq)/sqrt(freq*(1-freq))]
 main_discipline <- main_discipline %>%
-  select(Com_ID,ESpecialite,main_discipline) %>%
+  select(Com_ID,ESpecialite,norm_dev_discipline) %>%
   unique() %>%
   group_by(Com_ID) %>%
-  arrange(desc(main_discipline)) %>%
+  arrange(desc(norm_dev_discipline)) %>%
   slice(1:n) %>%
   as.data.table()
 
@@ -192,35 +211,49 @@ main_discipline <- main_discipline[, rank := 1:.N, by = list(Com_ID)]
 
 # keeping the n institutions the most present in coupling communities
 if(i >= 4){
-main_institution <- unique(references_extended[, c("ID_Art","Com_ID","Institution")])
-main_institution <- main_institution[, Total := .N, by = "Com_ID"]
-main_institution <- main_institution[Institution != "NA", main_institution := .N, by = c("Com_ID","Institution")][, main_institution := main_institution/Total]
-main_institution <- main_institution %>%
-  select(Com_ID,Institution,main_institution) %>%
-  unique() %>%
-  group_by(Com_ID) %>%
-  arrange(desc(main_institution)) %>%
-  slice(1:n)%>%
-  as.data.table()
-
-main_institution <- main_institution[, rank := 1:.N, by = list(Com_ID)]
-
+  main_institution <- unique(references_extended[, c("ID_Art","Com_ID","Institution")])
+  main_institution <- main_institution[, total_com := .N, by = "Com_ID"][, total := .N][Institution != "NA"]
+  main_institution <- main_institution[,freq := .N, by = "Institution"][, freq_com := .N, by = c("Com_ID","Institution")][, freq := freq/total][, freq_com := freq_com/total_com]
+  main_institution <- main_institution[freq_com > 0.005, norm_dev_institution := sqrt(length(unique(references_extended[, c("ID_Art","Com_ID","Institution")])$ID_Art))*((freq_com - freq)/sqrt(freq*(1-freq)))]
+  
+  main_institution <- main_institution %>%
+    select(Com_ID,Institution,freq_com,norm_dev_institution) %>%
+    unique()
+  
+  abs_main_institution <-  main_institution %>%
+    select(Com_ID,Institution,freq_com) %>%
+    group_by(Com_ID) %>%
+    arrange(desc(freq_com)) %>%
+    slice(1:n) %>%
+    as.data.table()
+  
+  re_main_institution <- main_institution %>%
+    group_by(Com_ID) %>%
+    arrange(desc(norm_dev_institution)) %>%
+    slice(1:n) %>%
+    rename(Institution_dev = Institution)%>%
+    as.data.table()
+  
+  main_institution <-  cbind(abs_main_institution,re_main_institution[,c("Institution_dev","norm_dev_institution")])
+  
+  main_institution <- main_institution[, rank := 1:.N, by = list(Com_ID)]
 }
 
 # keeping the n institutions the most present in coupling communities
 if(i >= 4){
   main_country <- unique(references_extended[, c("ID_Art","Com_ID","Pays")])
-  main_country <- main_country[, Total := .N, by = "Com_ID"]
-  main_country <- main_country[Pays != "NA", main_country := .N, by = c("Com_ID","Pays")][, main_country := main_country/Total]
+  main_country <- main_country[, total_com := .N, by = "Com_ID"][, total := .N][Pays != "NA"]
+  main_country <- main_country[,freq := .N, by = "Pays"][, freq_com := .N, by = c("Com_ID","Pays")][, freq := freq/total][, freq_com := freq_com/total_com]
+  main_country <- main_country[freq_com > 0.01, norm_dev_pays := sqrt(length(unique(references_extended[, c("ID_Art","Com_ID","Pays")])$ID_Art))*((freq_com - freq)/sqrt(freq*(1-freq)))]
   main_country <- main_country %>%
-    select(Com_ID,Pays,main_country) %>%
+    select(Com_ID,Pays,freq_com,norm_dev_pays) %>%
     unique() %>%
     group_by(Com_ID) %>%
-    arrange(desc(main_country)) %>%
-    filter(main_country != "NA") %>%
+    arrange(desc(norm_dev_pays)) %>%
+    filter(norm_dev_pays != "NA") %>%
     slice(1:n) %>%
     as.data.table()
-  
+
   main_country <- main_country[, rank := 1:.N, by = list(Com_ID)]
 }
 
@@ -233,12 +266,12 @@ rank <- rank %>% arrange(Com_ID)
 # Merging all the data on coupling communities
 coupling_com <- merge(unique(Nodes_coupling[,c("Com_ID","share_com")]), rank, by = "Com_ID")
 coupling_com <- cbind(coupling_com,most_cited_nodes[, c("Label","Titre","nb_cit")],
-                              most_cited_ref[, c("cited_author","Annee","Revue_Abbrege","Cited_Title","share_cit_ref")], 
-                              main_author[, c("citing_author","main_author")], main_journal[, c("Revue","main_journal")])
+                      most_cited_ref[, c("cited_author","Annee","Revue_Abbrege","Cited_Title","com_freq","cited_author_dev","Annee_dev","Revue_Abbrege_dev","Cited_Title_dev","norm_dev_ref")], 
+                      main_author[, c("citing_author","main_author")], main_journal[, c("main_journal","norm_dev_journal")])
 
 if(i >= 4){
   coupling_com <- merge(coupling_com, main_institution, by = c("Com_ID","rank"), all.x = TRUE)
-  coupling_com <- merge(coupling_com, main_country, by = c("Com_ID","rank"), all.x = TRUE)
+  coupling_com <- merge(coupling_com, main_country[,c("Com_ID","rank","Pays","norm_dev_pays")], by = c("Com_ID","rank"), all.x = TRUE)
 }
 
 coupling_com <- merge(coupling_com, main_discipline, by = c("Com_ID","rank"), all.x = TRUE)
@@ -457,10 +490,12 @@ main_author <- main_author[, rank := 1:.N, by = list(Com_ID)]
 
 # Keeping the n references the most cited per community
 most_cited_ref <- Nodes_authors_coupling[, c("Com_ID","New_id2","cited_author","Annee","Revue_Abbrege","cited_title")]
-most_cited_ref <- most_cited_ref[, share_cit_ref := .N, by = c("Com_ID","New_id2")][, nb_cit_per_com := .N, by = "Com_ID"][, share_cit_ref := share_cit_ref/nb_cit_per_com]
+most_cited_ref <- most_cited_ref[, nb_cit_ref_com := .N, by = c("Com_ID","New_id2")][, nb_cit_ref := .N, by = "New_id2"][, nb_cit_per_com := .N, by = "Com_ID"][, total_nb_cit := .N][, com_freq := nb_cit_ref_com/nb_cit_per_com][, total_freq := nb_cit_ref/total_nb_cit]
+most_cited_ref <- most_cited_ref[,norm_dev_ref := sqrt(length(unique(references_extended$ID_Art)))*(com_freq - total_freq)/sqrt(total_freq*(1-total_freq))]
 most_cited_ref <- most_cited_ref %>%
-  select(Com_ID,New_id2,cited_author,Annee,Revue_Abbrege,cited_title,share_cit_ref) %>%
+  select(Com_ID,New_id2,cited_author,Annee,Revue_Abbrege,cited_title,com_freq,norm_dev_ref) %>%
   unique()
+
 
 doublons <- which(duplicated(most_cited_ref[,c("Com_ID","New_id2")]))
 
@@ -468,30 +503,43 @@ if(length(doublons) != 0){
   most_cited_ref <- most_cited_ref[-doublons]
 }
 
-most_cited_ref <-  most_cited_ref %>%
+abs_most_cited_ref <-  most_cited_ref %>%
+  select(Com_ID,cited_author,Annee,Revue_Abbrege,cited_title,com_freq) %>%
   group_by(Com_ID) %>%
-  arrange(desc(share_cit_ref)) %>%
-  slice(1:n)
+  arrange(desc(com_freq)) %>%
+  slice(1:n) %>%
+  as.data.table()
+
+re_most_cited_ref <- most_cited_ref %>%
+  group_by(Com_ID) %>%
+  arrange(desc(norm_dev_ref)) %>%
+  slice(1:n) %>%
+  rename(cited_author_dev = cited_author, Annee_dev = Annee, Revue_Abbrege_dev = Revue_Abbrege, cited_title_dev = cited_title)%>%
+  as.data.table()
+
+most_cited_ref <-  cbind(abs_most_cited_ref,re_most_cited_ref[,c("cited_author_dev","Annee_dev","Revue_Abbrege_dev","cited_title_dev","norm_dev_ref")])
 
 # keeping the n journals where most nodes were published in coupling communities
 main_journal <- unique(Nodes_authors_coupling[, c("ID_Art","Com_ID","Revue")])
-main_journal <- main_journal[, share_journal := .N, by = c("Com_ID","Revue")][, size := .N, by = "Com_ID"][, share_journal:= share_journal/size]
+main_journal <- main_journal[, freq := .N, by = "Revue"][, freq_com := .N, by = c("Com_ID","Revue")][, total := .N][, total_com := .N, by = "Com_ID"][, freq := freq/total][, freq_com := freq_com/total_com]
+main_journal <- main_journal[freq_com > 0.00,norm_dev_journal := sqrt(length(unique(references_extended$ID_Art)))*((freq_com - freq)/sqrt(freq*(1-freq)))]
 main_journal <- main_journal %>%
-  select(Com_ID,Revue,share_journal) %>%
+  select(Com_ID,Revue,freq_com,norm_dev_journal) %>%
   unique() %>%
   group_by(Com_ID) %>%
-  arrange(desc(share_journal)) %>%
+  arrange(desc(norm_dev_journal)) %>%
   slice(1:n) %>%
   rename(main_journal = Revue)
 
 # keeping the n top disciplines per community
 main_discipline <- unique(Nodes_authors_coupling[, c("ID_Art","Com_ID","ESpecialite")])
-main_discipline <- main_discipline[, main_discipline := .N, by = c("Com_ID","ESpecialite")][, size := .N, by = "Com_ID"][, main_discipline := main_discipline/size]
+main_discipline <- main_discipline[, freq := .N, by = "ESpecialite"][, freq_com := .N, by = c("Com_ID","ESpecialite")][, total := .N][, total_com := .N, by = "Com_ID"][, freq := freq/total][, freq_com := freq_com/total_com]
+main_discipline <- main_discipline[,norm_dev_discipline := sqrt(length(unique(references_extended$ID_Art)))*(freq_com - freq)/sqrt(freq*(1-freq))]
 main_discipline <- main_discipline %>%
-  select(Com_ID,ESpecialite,main_discipline) %>%
+  select(Com_ID,ESpecialite,norm_dev_discipline) %>%
   unique() %>%
   group_by(Com_ID) %>%
-  arrange(desc(main_discipline)) %>%
+  arrange(desc(norm_dev_discipline)) %>%
   slice(1:n) %>%
   as.data.table()
 
@@ -499,31 +547,46 @@ main_discipline <- main_discipline[, rank := 1:.N, by = list(Com_ID)]
 
 # keeping the n institutions the most present in coupling communities
 if(i >= 4){
-main_institution <- unique(Nodes_authors_coupling[, c("ID_Art","Com_ID","Id","Institution")])
-main_institution <- main_institution[, Total := .N, by = "Com_ID"]
-main_institution <- main_institution[Institution != "NA", main_institution := .N, by = c("Com_ID","Institution")][, main_institution := main_institution/Total]
-main_institution <- main_institution %>%
-  select(Com_ID,Institution,main_institution) %>%
-  unique() %>%
-  group_by(Com_ID) %>%
-  arrange(desc(main_institution)) %>%
-  slice(1:n) %>%
-  as.data.table()
-
-main_institution <- main_institution[, rank := 1:.N, by = list(Com_ID)]
+  main_institution <- unique(Nodes_authors_coupling[, c("ID_Art","Com_ID","Id","Institution")])
+  main_institution <- main_institution[, total_com := .N, by = "Com_ID"][, total := .N][Institution != "NA"]
+  main_institution <- main_institution[,freq := .N, by = "Institution"][, freq_com := .N, by = c("Com_ID","Institution")][, freq := freq/total][, freq_com := freq_com/total_com]
+  main_institution <- main_institution[freq_com > 0.005, norm_dev_institution := sqrt(length(unique(references_extended[, c("ID_Art","Com_ID","Institution")])$ID_Art))*((freq_com - freq)/sqrt(freq*(1-freq)))]
+  
+  main_institution <- main_institution %>%
+    select(Com_ID,Institution,freq_com,norm_dev_institution) %>%
+    unique()
+  
+  abs_main_institution <-  main_institution %>%
+    select(Com_ID,Institution,freq_com) %>%
+    group_by(Com_ID) %>%
+    arrange(desc(freq_com)) %>%
+    slice(1:n) %>%
+    as.data.table()
+  
+  re_main_institution <- main_institution %>%
+    group_by(Com_ID) %>%
+    arrange(desc(norm_dev_institution)) %>%
+    slice(1:n) %>%
+    rename(Institution_dev = Institution)%>%
+    as.data.table()
+  
+  main_institution <-  cbind(abs_main_institution,re_main_institution[,c("Institution_dev","norm_dev_institution")])
+  
+  main_institution <- main_institution[, rank := 1:.N, by = list(Com_ID)]
 }
 
 # keeping the n institutions the most present in coupling communities
 if(i >= 4){
   main_country <- unique(Nodes_authors_coupling[, c("ID_Art","Com_ID","Id","Pays")])
-  main_country <- main_country[, Total := .N, by = "Com_ID"]
-  main_country <- main_country[Pays != "NA", main_country := .N, by = c("Com_ID","Pays")][, main_country := main_country/Total]
+  main_country <- main_country[, total_com := .N, by = "Com_ID"][, total := .N][Pays != "NA"]
+  main_country <- main_country[,freq := .N, by = "Pays"][, freq_com := .N, by = c("Com_ID","Pays")][, freq := freq/total][, freq_com := freq_com/total_com]
+  main_country <- main_country[freq_com > 0.01, norm_dev_pays := sqrt(length(unique(references_extended[, c("ID_Art","Com_ID","Pays")])$ID_Art))*((freq_com - freq)/sqrt(freq*(1-freq)))]
   main_country <- main_country %>%
-    select(Com_ID,Pays,main_country) %>%
+    select(Com_ID,Pays,freq_com,norm_dev_pays) %>%
     unique() %>%
     group_by(Com_ID) %>%
-    arrange(desc(main_country)) %>%
-    filter(main_country != "NA") %>%
+    arrange(desc(norm_dev_pays)) %>%
+    filter(norm_dev_pays != "NA") %>%
     slice(1:n) %>%
     as.data.table()
   
@@ -541,13 +604,14 @@ authors_coupling_com <- merge(unique(Nodes_authors_coupling[,c("Com_ID","Size_co
 authors_coupling_com <- merge(authors_coupling_com, most_cited_nodes[, c("Com_ID","rank","Id","nb_cit_author")], by = c("Com_ID","rank"), all.x = TRUE)
 
 authors_coupling_com <- cbind(authors_coupling_com,most_cited_articles[, c("citing_title","Revue","nb_cit")],
-                              most_cited_ref[, c("cited_author","Annee","Revue_Abbrege","cited_title","share_cit_ref")], main_journal[, c("main_journal","share_journal")])
+                              most_cited_ref[, c("cited_author","Annee","Revue_Abbrege","cited_title","com_freq","cited_author_dev","Annee_dev","Revue_Abbrege_dev","cited_title_dev","norm_dev_ref")], 
+                              main_journal[, c("main_journal","norm_dev_journal")])
 
 authors_coupling_com <- merge(authors_coupling_com, main_author[, main_author := citing_author][, c("Com_ID","rank","main_author","nb_art")],  by = c("Com_ID","rank"), all.x = TRUE)
 
 if(i >= 4){
   authors_coupling_com <- merge(authors_coupling_com, main_institution, by = c("Com_ID","rank"), all.x = TRUE)
-  authors_coupling_com <- merge(authors_coupling_com, main_country, by = c("Com_ID","rank"), all.x = TRUE)
+  authors_coupling_com <- merge(authors_coupling_com, main_country[,c("Com_ID","rank","Pays","norm_dev_pays")], by = c("Com_ID","rank"), all.x = TRUE)
 }
 
 authors_coupling_com <- merge(authors_coupling_com, main_discipline, by = c("Com_ID","rank"), all.x = TRUE)
