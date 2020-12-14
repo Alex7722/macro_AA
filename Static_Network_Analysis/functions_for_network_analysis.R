@@ -749,7 +749,7 @@ graph <- graph %>%
 
 
 # Force Atlas Function
-force_atlas <- function(graph,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 = 5000, iter_2 = 200, barnes.hut = FALSE, size_min = 10, size_max = 50){
+force_atlas <- function(graph,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 = 5000, iter_2 = 200, barnes.hut = FALSE, change_size = TRUE, size_min = 10, size_max = 50){
   #' Force Atlas 2 algorithm for the graph (without overlap)
   #' 
   #' This function automatized the use of Force Atlas 2 from package `vite`: the FA algorithm is run a first time,
@@ -768,6 +768,7 @@ force_atlas <- function(graph,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 =
   #' overlapping). The algorithm will stop after this many iterations.
   #' @param barnes.hut Package `vite` argument: Whether to use the Barnes-Hut approximation for speeding up the calculations when dealing with large graphs. 
   #' This option is automatically set to true when the graph has more than 2000 nodes.
+  #' @param change_size If `TRUE`, it activates the normalization of the size of nodes for the non-overlapping algorithm.
   #' @param size_min Minimum value for normalization of the size of nodes to enter in the FA algorithm to avoid overlapping. 10 by default, as in 
   #' the original algorithm (see `details`). 
   #' @param size_max Maximum value for normalization of the size of nodes to enter in the FA algorithm to avoid overlapping.
@@ -799,10 +800,11 @@ force_atlas <- function(graph,seed = NULL, ew.influence = 1, kgrav = 1, iter_1 =
 
   # Adding a size variable for the avoid.overlapping with force atlas
 
+  if(change_size == TRUE){
  graph <- graph %>%
    activate(nodes) %>%
    mutate(size = ((size - min(size))/(max(size) - min(size)))*(size_max - size_min) + size_min)
-  
+  }
   # running FA for the first time (without prevent.overlap)
   set.seed(seed)
   fa  <- layout_forceatlas2(graph, ew.influence = ew.influence, kgrav = kgrav, iter = iter_1,
@@ -947,7 +949,7 @@ label_com <- function(graph, biggest_community = FALSE, community_threshold = 0.
   label_com <- label_com %>%
     group_by(Community_name) %>% 
     mutate(x = mean(x), y = mean(y)) %>%
-    select(Community_name,x,y,color) %>%
+    select(Community_name,x,y,color,Size_com) %>%
     as_tibble() %>%
     unique()
   

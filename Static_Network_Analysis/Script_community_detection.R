@@ -10,7 +10,7 @@ source("/home/aurelien/macro_AA/Static_Network_Analysis/Script_paths_and_basic_o
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
 
-resolution_set = c(2.5,2,1.5,1,0.5)
+resolution_set = c(2,1.5,1,0.5)
 for(i in 1:length(start_date)){
   graph_coupling <- readRDS(paste0(graph_data_path,"graph_coupling_",start_date[i],"-",end_date[i],".rds"))
   Leiden_coupling <- graph_coupling %>% activate(nodes) %>% select(Id, Label, Titre, nb_cit, Community_name, Size_com) %>% as.data.table()

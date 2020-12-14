@@ -21,7 +21,7 @@ authors_JEL <- readRDS(paste0(data_path,"JEL_matched_corpus_authors.rds"))
 authors_old_JEL <- readRDS(paste0(data_path,"Old_JEL_matched_corpus_authors.rds"))
 authors_JEL <- rbind(authors_JEL,authors_old_JEL)
 
-institutions_info_JEL <- fread(paste0(data_path,"JEL_matched_corpus_institutions.csv"), quote="") %>% data.table()
+institutions_info_JEL <- fread(paste0(data_path,"Macro_AA_Institutions_Cleaned.csv"), quote="", fill = TRUE) %>% data.table()
 
 ref_info_JEL <- readRDS(paste0(data_path,"JEL_matched_corpus_references_info.rds"))
 ref_info_old_JEL <- readRDS(paste0(data_path,"Old_JEL_matched_corpus_references_info.rds"))
@@ -102,8 +102,8 @@ for(i in 1:length(start_date)){
   
   # creation of the edges for the co-citation network
   
-  edges_cocit_JEL <- bibliographic_cocitation(edges_cocit_JEL, source = "ID_Art", ref = "New_id2",weight_threshold = edges_threshold)
-  
+  edges_cocit_JEL <- bibliographic_coupling_alt(edges_cocit_JEL, source = "New_id2", ref = "ID_Art",weight_threshold = edges_threshold)
+
   # Loop to avoid to large networks - Step 1: reducing nodes
   if(length(nodes_cocit_JEL$New_id2) > Limit_nodes){
     for(j in 1:100){
@@ -123,7 +123,7 @@ for(i in 1:length(start_date)){
       
       # creation of the edges for the co-citation network
       
-      edges_cocit_JEL <- bibliographic_cocitation(edges_cocit_JEL, source = "ID_Art", ref = "New_id2",weight_threshold = edges_threshold)
+      edges_cocit_JEL <- bibliographic_coupling_alt(edges_cocit_JEL, source = "New_id2", ref = "ID_Art",weight_threshold = edges_threshold)
       
       if(length(nodes_cocit_JEL$New_id2) < Limit_nodes){
         break
@@ -149,7 +149,7 @@ for(i in 1:length(start_date)){
       edges_cocit_JEL<- unique(edges_JEL[New_id2 %in% nodes_cocit_JEL$New_id2 & between(Annee_Bibliographique,start_date[i],end_date[i])][, c("ID_Art","New_id2")])
       
       # creation of the edges for the co-citation network
-      edges_cocit_JEL <- bibliographic_cocitation(edges_cocit_JEL, source = "ID_Art", ref = "New_id2",weight_threshold = edges_threshold)
+      edges_cocit_JEL <- bibliographic_coupling_alt(edges_cocit_JEL, source = "New_id2", ref = "ID_Art",weight_threshold = edges_threshold)
       
       if(length(edges_cocit_JEL$from) < Limit_edges){
         break
@@ -383,7 +383,7 @@ for(i in 1:length(start_date)){
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
 
-for(i in 4:length(start_date)){
+for(i in 1:length(start_date)){
   nb_art_threshold = 10
   edges_threshold = 10
   
@@ -446,7 +446,7 @@ for(i in 1:length(start_date)){
 ############################## institutions network from co-authorship data #########################
 # creating the nodes with the number of citation of the nodes in the corpus
 
-for(i in 4:length(start_date)){
+for(i in 1:length(start_date)){
   nb_art_threshold = 10
   edges_threshold = 1
   
@@ -504,5 +504,18 @@ for(i in 1:length(start_date)){
   TF_IDF_authors <- tf_idf(nodes = Nodes_authors_coupling)
   
   saveRDS(TF_IDF_authors, paste0(graph_data_path,"tf-idf_authors_coupling_",start_date[i],"-",end_date[i],".rds"))
+  
+  # Extracting the nodes of the network
+  graph_cocit <- readRDS(paste0(graph_data_path,"graph_cocit_",start_date[i],"-",end_date[i],".rds"))
+  
+  Nodes_cocit <- graph_cocit %>%
+    activate(nodes)%>%
+    select(Id, Titre, nb_cit,Com_ID, Size_com, color, Community_name) %>%
+    as.data.table()
+  
+  # Calculating the tf-idf for the titles in each community
+  TF_IDF_cocit <- tf_idf(nodes = Nodes_cocit)
+  
+  saveRDS(TF_IDF_cocit, paste0(graph_data_path,"tf-idf_cocit_",start_date[i],"-",end_date[i],".rds"))
   
 }

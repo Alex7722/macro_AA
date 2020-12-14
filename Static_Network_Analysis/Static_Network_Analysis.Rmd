@@ -34,7 +34,7 @@ authors_JEL <- readRDS(paste0(data_path,"JEL_matched_corpus_authors.rds"))
 authors_old_JEL <- readRDS(paste0(data_path,"Old_JEL_matched_corpus_authors.rds"))
 authors_JEL <- rbind(authors_JEL,authors_old_JEL)
 
-institutions_info_JEL <- fread(paste0(data_path,"JEL_matched_corpus_institutions.csv"), quote="") %>% data.table()
+institutions_info_JEL <- fread(paste0(data_path,"Macro_AA_Institutions_Cleaned.csv"), quote="", fill = TRUE) %>% data.table()
 
 ref_info_JEL <- readRDS(paste0(data_path,"JEL_matched_corpus_references_info.rds"))
 ref_info_old_JEL <- readRDS(paste0(data_path,"Old_JEL_matched_corpus_references_info.rds"))
@@ -56,7 +56,7 @@ edges_JEL <- merge(edges_JEL,unique(nodes_JEL[,c("ID_Art","Annee_Bibliographique
 # Adding institutions to Articles
 institutions_info_JEL$ID_Art <- as.integer(institutions_info_JEL$ID_Art)
 institutions_info_JEL$Ordre <- as.integer(institutions_info_JEL$Ordre)
-authors_JEL <- merge(authors_JEL,institutions_info_JEL, by = c("ID_Art","Ordre"), all.x = TRUE)
+authors_JEL <- merge(unique(authors_JEL),unique(institutions_info_JEL), by = c("ID_Art","Ordre"), all.x = TRUE)
 
 # removing useless files
 
@@ -92,7 +92,7 @@ For the bibliographic coupling network, first, we have kept all the JEL articles
 
 ```{r}
 
-include_graphics(paste0(picture_path,"graph_coupling",start_date[i],"-",end_date[i],".png"))
+include_graphics(paste0(picture_path,"graph_coupling_",start_date[i],"-",end_date[i],".png"))
 ```
 
 ## Basic Statistics on communities
@@ -210,7 +210,7 @@ main_discipline <- main_discipline %>%
 main_discipline <- main_discipline[, rank := 1:.N, by = list(Com_ID)]
 
 # keeping the n institutions the most present in coupling communities
-if(i >= 4){
+
   main_institution <- unique(references_extended[, c("ID_Art","Com_ID","Institution")])
   main_institution <- main_institution[, total_com := .N, by = "Com_ID"][, total := .N][Institution != "NA"]
   main_institution <- main_institution[,freq := .N, by = "Institution"][, freq_com := .N, by = c("Com_ID","Institution")][, freq := freq/total][, freq_com := freq_com/total_com]
@@ -237,10 +237,10 @@ if(i >= 4){
   main_institution <-  cbind(abs_main_institution,re_main_institution[,c("Institution_dev","norm_dev_institution")])
   
   main_institution <- main_institution[, rank := 1:.N, by = list(Com_ID)]
-}
+
 
 # keeping the n institutions the most present in coupling communities
-if(i >= 4){
+
   main_country <- unique(references_extended[, c("ID_Art","Com_ID","Pays")])
   main_country <- main_country[, total_com := .N, by = "Com_ID"][, total := .N][Pays != "NA"]
   main_country <- main_country[,freq := .N, by = "Pays"][, freq_com := .N, by = c("Com_ID","Pays")][, freq := freq/total][, freq_com := freq_com/total_com]
@@ -255,7 +255,7 @@ if(i >= 4){
     as.data.table()
 
   main_country <- main_country[, rank := 1:.N, by = list(Com_ID)]
-}
+
 
 # creating a "rank" column to be merged with the data
 rank <- data.table(rank=1:n)
@@ -269,10 +269,9 @@ coupling_com <- cbind(coupling_com,most_cited_nodes[, c("Label","Titre","nb_cit"
                       most_cited_ref[, c("cited_author","Annee","Revue_Abbrege","Cited_Title","com_freq","cited_author_dev","Annee_dev","Revue_Abbrege_dev","Cited_Title_dev","norm_dev_ref")], 
                       main_author[, c("citing_author","main_author")], main_journal[, c("main_journal","norm_dev_journal")])
 
-if(i >= 4){
   coupling_com <- merge(coupling_com, main_institution, by = c("Com_ID","rank"), all.x = TRUE)
   coupling_com <- merge(coupling_com, main_country[,c("Com_ID","rank","Pays","norm_dev_pays")], by = c("Com_ID","rank"), all.x = TRUE)
-}
+
 
 coupling_com <- merge(coupling_com, main_discipline, by = c("Com_ID","rank"), all.x = TRUE)
 
@@ -318,7 +317,7 @@ ggraph(graph_coupling_community, "manual", x = x, y = y) +
 ```
 
 
-```{r, fig.height= 10, fig.width=15}
+```{r, fig.height= 12, fig.width=18}
 # plotting the heatmap with the dendrogram
 heatmap <- clustering_communities(graph_coupling_community)
 
@@ -414,7 +413,7 @@ include_graphics(paste0(picture_path,"graph_authors_coupling_community_",start_d
 ```
 
 
-```{r, fig.height= 10, fig.width=15}
+```{r, fig.height= 12, fig.width=18}
 # plotting the heatmap with the dendrogram
 heatmap <- clustering_communities(graph_authors_coupling_community)
 
@@ -546,7 +545,7 @@ main_discipline <- main_discipline %>%
 main_discipline <- main_discipline[, rank := 1:.N, by = list(Com_ID)]
 
 # keeping the n institutions the most present in coupling communities
-if(i >= 4){
+
   main_institution <- unique(Nodes_authors_coupling[, c("ID_Art","Com_ID","Id","Institution")])
   main_institution <- main_institution[, total_com := .N, by = "Com_ID"][, total := .N][Institution != "NA"]
   main_institution <- main_institution[,freq := .N, by = "Institution"][, freq_com := .N, by = c("Com_ID","Institution")][, freq := freq/total][, freq_com := freq_com/total_com]
@@ -573,10 +572,9 @@ if(i >= 4){
   main_institution <-  cbind(abs_main_institution,re_main_institution[,c("Institution_dev","norm_dev_institution")])
   
   main_institution <- main_institution[, rank := 1:.N, by = list(Com_ID)]
-}
+
 
 # keeping the n institutions the most present in coupling communities
-if(i >= 4){
   main_country <- unique(Nodes_authors_coupling[, c("ID_Art","Com_ID","Id","Pays")])
   main_country <- main_country[, total_com := .N, by = "Com_ID"][, total := .N][Pays != "NA"]
   main_country <- main_country[,freq := .N, by = "Pays"][, freq_com := .N, by = c("Com_ID","Pays")][, freq := freq/total][, freq_com := freq_com/total_com]
@@ -591,7 +589,7 @@ if(i >= 4){
     as.data.table()
   
   main_country <- main_country[, rank := 1:.N, by = list(Com_ID)]
-}
+
 
 # creating a "rank" column to be merged with the data
 rank <- data.table(rank=1:n)
@@ -609,10 +607,10 @@ authors_coupling_com <- cbind(authors_coupling_com,most_cited_articles[, c("citi
 
 authors_coupling_com <- merge(authors_coupling_com, main_author[, main_author := citing_author][, c("Com_ID","rank","main_author","nb_art")],  by = c("Com_ID","rank"), all.x = TRUE)
 
-if(i >= 4){
+
   authors_coupling_com <- merge(authors_coupling_com, main_institution, by = c("Com_ID","rank"), all.x = TRUE)
   authors_coupling_com <- merge(authors_coupling_com, main_country[,c("Com_ID","rank","Pays","norm_dev_pays")], by = c("Com_ID","rank"), all.x = TRUE)
-}
+
 
 authors_coupling_com <- merge(authors_coupling_com, main_discipline, by = c("Com_ID","rank"), all.x = TRUE)
 
@@ -636,19 +634,18 @@ TF_IDF_authors$plot
 ## Network of Institution from Bibliographic Coupling
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
-if(i >= 4){
+
   # loading the graph if necessary
 graph_institutions_coupling <- readRDS(paste0(graph_data_path,"graph_institutions_coupling_",start_date[i],"-",end_date[i],".rds"))
 
 include_graphics(paste0(picture_path,"graph_institutions_coupling_",start_date[i],"-",end_date[i],".png"))
-}
-  
+
 ```
 
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
 
-if(i >= 4){
+
 institutions_data <- graph_institutions_coupling %>% 
   activate(nodes) %>% 
   as.data.table()
@@ -663,7 +660,7 @@ datatable(institutions_data, rownames = FALSE,
   scrollCollapse = TRUE,
   scrollX = "400px",
   paging = FALSE))
-}
+
 ```
 
 # Bibliographic Cocitation
@@ -707,6 +704,12 @@ ggraph(graph_cocit_community, "manual", x = x, y = y) +
 
 ```
 
+```{r, fig.width = 17, fig.height = 13}
+
+TF_IDF_cocit <- readRDS(paste0(graph_data_path,"tf-idf_cocit_",start_date[i],"-",end_date[i],".rds"))
+
+TF_IDF_cocit$plot
+```
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
 # plotting the heatmap with the dendrogram
@@ -831,17 +834,15 @@ include_graphics(paste0(picture_path,"graph_coauthorship_",start_date[i],"-",end
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
 
-if(i >= 4){
 graph_institutions <-  readRDS(paste0(graph_data_path,"graph_co-authorship_institutions_",start_date[i],"-",end_date[i],".rds"))
 
 include_graphics(paste0(picture_path,"graph_co-authorship_institutions_",start_date[i],"-",end_date[i],".png"))
-}
+
 ```
 
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
 
-if(i >= 4){
 
 data_institutions <- graph_institutions %>%
   activate(nodes) %>%
@@ -860,7 +861,7 @@ datatable(data_institutions, rownames = FALSE,
   scrollCollapse = TRUE,
   scrollX = "400px",
   paging = FALSE))
-}
+
 ```
 
 
@@ -945,7 +946,7 @@ nodes_authors <- graph_authors_coupling %>%
   as.data.table()
 
 # merging the cocit nodes with the papers which cite them
-nodes_authors <- merge(nodes_authors, authors_JEL[between(Annee_Bibliographique, start_date[i],end_date[i]) & Nom %in% nodes_authors$Id, c("Nom","ID_Art")], by.x = "Id", by.y = "Nom") 
+nodes_authors <- merge(nodes_authors, unique(authors_JEL[between(Annee_Bibliographique, start_date[i],end_date[i]) & Nom %in% nodes_authors$Id, c("Nom","ID_Art")]), by.x = "Id", by.y = "Nom", allow.cartesian = TRUE) 
 
 # exctracting the coupling nodes
 nodes_coupling <- graph_coupling %>%
@@ -956,11 +957,11 @@ nodes_coupling <- graph_coupling %>%
 
 # Merging the coupling and cocit data
 nodes_coupling$Id <- as.integer(nodes_coupling$Id)
-sankey_data <- merge(nodes_authors,nodes_coupling, by.x="ID_Art", by.y = "Id")
+sankey_data <- merge(nodes_authors,nodes_coupling, by.x="ID_Art", by.y = "Id", allow.cartesian = TRUE)
 
 # changing the column names and the name of communities
 setnames(sankey_data, c("Id","Community_name.x","Community_name.y","color.x","color.y"), c("Author",
-                                                                                        "Com_ID_author","Com_ID_coupling","color_author","color_coupling"))
+                                                                                    "Com_ID_author","Com_ID_coupling","color_author","color_coupling"))
 #sankey_data$Com_ID_cocit <- paste0("Cct ", sankey_data$Com_ID_cocit)
 #sankey_data$Com_ID_coupling <- paste0("Cplg ",sankey_data$Com_ID_coupling)
 sankey_data <- unique(sankey_data[, value:= .(.N), by = c("Com_ID_coupling","Com_ID_author")][,c("Com_ID_coupling",
@@ -977,7 +978,7 @@ palette_coupling <- unique(sankey_data[order(Com_ID_coupling),c("Com_ID_coupling
 palette_author <- unique(sankey_data[order(Com_ID_author),c("Com_ID_author","color_author")])
 palette <- rbind(palette_coupling,palette_author, use.names=FALSE)
 setnames(palette, c("Com_ID_coupling","color_coupling"),c("Com_ID","color"))
-sankey_data <- merge(sankey_data,palette, by.x = "y", by.y= "Com_ID")
+sankey_data <- merge(sankey_data,unique(palette), by.x = "y", by.y= "Com_ID")
 
 #ordering x to have the coupling communities on the left
 sankey_data$x <- factor(x = sankey_data$x,
@@ -1002,7 +1003,7 @@ ggplot(sankey_data, aes(x, id = id, split = y, value = value)) +
 
 ```{r, fig.height= 10, fig.width=15}
 Leiden_coupling <- readRDS(paste0(graph_data_path,"Leiden_coupling_",start_date[i],"-",end_date[i],".rds")) %>% as.data.table()
-resolution_set = c(2.5,2,1.5,1,0.5)
+resolution_set = c(2,1.5,1,0.5)
 
 # identifying the most cited nodes per resolution
 
@@ -1019,8 +1020,8 @@ All_com <- data.table()
 n = 8
 
   Leiden_coupling_data <- merge(Leiden_coupling[,c("Id","Label", "Titre", "nb_cit")],All_com, by = "Id")
-  colnames(Leiden_coupling_data)[colnames(Leiden_coupling_data) == "Community_name_2.5"] = "Community_name"
-  colnames(Leiden_coupling_data)[colnames(Leiden_coupling_data) == "Size_com_2.5"] = "Size_com"
+  colnames(Leiden_coupling_data)[colnames(Leiden_coupling_data) == "Community_name_2"] = "Community_name"
+  colnames(Leiden_coupling_data)[colnames(Leiden_coupling_data) == "Size_com_2"] = "Size_com"
   Leiden_coupling_data <- Leiden_coupling_data %>% 
     arrange(desc(Resolution),Community_name,desc(nb_cit)) %>%
     group_by(Resolution,Community_name) %>%
