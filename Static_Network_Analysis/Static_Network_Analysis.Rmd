@@ -10,7 +10,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = TRUE, cache=FALSE, fig.path = "/home/aurelien/macro_AA/Static_Network_Analysis/Pictures/", dev = "png")
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = TRUE, cache=FALSE, dev = "png")
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 ############################## PART I: LOADING PACKAGES, PATH AND DATA ####################################--------------
@@ -18,8 +18,8 @@ knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = TRUE, cache=FALSE
 
 ##################### Packages, paths, etc. ############################################--------------
 
-source("/home/aurelien/macro_AA/Static_Network_Analysis/functions_for_network_analysis.R")
-source("/home/aurelien/macro_AA/Static_Network_Analysis/Script_paths_and_basic_objects.R")
+source(path.expand("~/macro_AA/Static_Network_Analysis/functions_for_network_analysis.R"))
+source(path.expand("~/macro_AA/Static_Network_Analysis/Script_paths_and_basic_objects.R"))
 
 ##################### Loading Data ############################################--------------
 nodes_JEL <- readRDS(paste0(data_path,"JEL_matched_corpus_nodes.rds"))
@@ -72,7 +72,7 @@ nodes_JEL <- nodes_JEL[, Nom := toupper(Nom)]
 start_date <- c(1970,1977,1984,1991,1997,2003)
 end_date <- c(1976,1983,1990,1996,2002,2008)
 
-i = 6 # choosing the period to study
+i = 1 # choosing the period to study
 
 ```
 
@@ -92,7 +92,7 @@ For the bibliographic coupling network, first, we have kept all the JEL articles
 
 ```{r}
 
-include_graphics(paste0(picture_path,"graph_coupling_",start_date[i],"-",end_date[i],".png"))
+include_graphics(path.expand(paste0(picture_path,"graph_coupling_",start_date[i],"-",end_date[i],".png")))
 ```
 
 ## Basic Statistics on communities
@@ -321,13 +321,13 @@ ggraph(graph_coupling_community, "manual", x = x, y = y) +
 # plotting the heatmap with the dendrogram
 heatmap <- clustering_communities(graph_coupling_community)
 
-png(paste0(picture_path,"heatmap_coupling_",start_date[i],"-",end_date[i],".png"), width = 1200, height = 1000)
+png(path.expand(paste0(picture_path,"heatmap_coupling_",start_date[i],"-",end_date[i],".png")), width = 1200, height = 1000)
 grid.newpage()
 print(heatmap$heatmap, vp = viewport(x = 0.4, y = 0.5, width = 0.75, height = 1.0))
 print(heatmap$dendrogram, vp = viewport(x = 0.87, y = 0.5, width = 0.2, height = 0.9))
 dev.off()
 
-include_graphics(paste0(picture_path,"heatmap_coupling_",start_date[i],"-",end_date[i],".png"))
+include_graphics(path.expand(paste0(picture_path,"heatmap_coupling_",start_date[i],"-",end_date[i],".png")))
 ```
 
 
@@ -357,7 +357,7 @@ plot_graph_journal <- ggraph(graph_journal, "manual", x = x, y = y) +
   theme_void() +
   ggsave(paste0(picture_path,"graph_revue_",start_date[i],"-",end_date[i],".png"), width=30, height=30, units = "cm")
 
-include_graphics(paste0(picture_path,"graph_revue_",start_date[i],"-",end_date[i],".png"))
+include_graphics(path.expand(paste0(picture_path,"graph_revue_",start_date[i],"-",end_date[i],".png")))
 ```
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
@@ -387,7 +387,7 @@ To build the authors network from bibliographic coupling data, first, we have ke
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
 
-include_graphics(paste0(picture_path,"graph_authors_coupling_",start_date[i],"-",end_date[i],".png"))
+include_graphics(path.expand(paste0(picture_path,"graph_authors_coupling_",start_date[i],"-",end_date[i],".png")))
 ```
 
 ## Analyzing relations between coupling communities
@@ -409,7 +409,7 @@ plot_graph_authors_coupling_community <- ggraph(graph_authors_coupling_community
   theme_void() +
   ggsave(paste0(picture_path,"graph_authors_coupling_community_",start_date[i],"-",end_date[i],".png"), width=25, height=25, units = "cm")
 
-include_graphics(paste0(picture_path,"graph_authors_coupling_community_",start_date[i],"-",end_date[i],".png"))
+include_graphics(path.expand(paste0(picture_path,"graph_authors_coupling_community_",start_date[i],"-",end_date[i],".png")))
 ```
 
 
@@ -417,13 +417,13 @@ include_graphics(paste0(picture_path,"graph_authors_coupling_community_",start_d
 # plotting the heatmap with the dendrogram
 heatmap <- clustering_communities(graph_authors_coupling_community)
 
-png(paste0(picture_path,"heatmap_authors_coupling_",start_date[i],"-",end_date[i],".png"), width = 1200, height = 1000)
+png(path.expand(paste0(picture_path,"heatmap_authors_coupling_",start_date[i],"-",end_date[i],".png")), width = 1200, height = 1000)
 grid.newpage()
 print(heatmap$heatmap, vp = viewport(x = 0.4, y = 0.5, width = 0.75, height = 1.0))
 print(heatmap$dendrogram, vp = viewport(x = 0.87, y = 0.5, width = 0.2, height = 0.9))
 dev.off()
 
-include_graphics(paste0(picture_path,"heatmap_authors_coupling_",start_date[i],"-",end_date[i],".png"))
+include_graphics(path.expand(paste0(picture_path,"heatmap_authors_coupling_",start_date[i],"-",end_date[i],".png")))
 ```
 
 
@@ -638,7 +638,7 @@ TF_IDF_authors$plot
   # loading the graph if necessary
 graph_institutions_coupling <- readRDS(paste0(graph_data_path,"graph_institutions_coupling_",start_date[i],"-",end_date[i],".rds"))
 
-include_graphics(paste0(picture_path,"graph_institutions_coupling_",start_date[i],"-",end_date[i],".png"))
+include_graphics(path.expand(paste0(picture_path,"graph_institutions_coupling_",start_date[i],"-",end_date[i],".png")))
 
 ```
 
@@ -678,7 +678,7 @@ For the bibliographic cocitation network, first, we have kept all the references
 
 ```{r}
 
-include_graphics(paste0(picture_path,"graph_cocit",start_date[i],"-",end_date[i],".png"))
+include_graphics(path.expand(paste0(picture_path,"graph_cocit",start_date[i],"-",end_date[i],".png")))
 ```
 
 ## Analyzing the communities of co-citation
@@ -715,13 +715,13 @@ TF_IDF_cocit$plot
 # plotting the heatmap with the dendrogram
 heatmap <- clustering_communities(graph_cocit_community)
 
-png(paste0(picture_path,"heatmap_cocit_",start_date[i],"-",end_date[i],".png"), width = 1200, height = 1000)
+png(path.expand(paste0(picture_path,"heatmap_cocit_",start_date[i],"-",end_date[i],".png")), width = 1200, height = 1000)
 grid.newpage()
 print(heatmap$heatmap, vp = viewport(x = 0.4, y = 0.5, width = 0.75, height = 1.0))
 print(heatmap$dendrogram, vp = viewport(x = 0.87, y = 0.5, width = 0.2, height = 0.9))
 dev.off()
 
-include_graphics(paste0(picture_path,"heatmap_cocit_",start_date[i],"-",end_date[i],".png"))
+include_graphics(path.expand(paste0(picture_path,"heatmap_cocit_",start_date[i],"-",end_date[i],".png")))
 ```
 
 
@@ -825,7 +825,7 @@ datatable(cocit_com, rownames = TRUE,
 
 graph_coauthorship <- readRDS(paste0(graph_data_path,"graph_coauthorship_",start_date[i],"-",end_date[i],".rds"))
 
-include_graphics(paste0(picture_path,"graph_coauthorship_",start_date[i],"-",end_date[i],".png"))
+include_graphics(path.expand(paste0(picture_path,"graph_coauthorship_",start_date[i],"-",end_date[i],".png")))
 
 ```
 
@@ -836,13 +836,12 @@ include_graphics(paste0(picture_path,"graph_coauthorship_",start_date[i],"-",end
 
 graph_institutions <-  readRDS(paste0(graph_data_path,"graph_co-authorship_institutions_",start_date[i],"-",end_date[i],".rds"))
 
-include_graphics(paste0(picture_path,"graph_co-authorship_institutions_",start_date[i],"-",end_date[i],".png"))
+include_graphics(path.expand(paste0(picture_path,"graph_co-authorship_institutions_",start_date[i],"-",end_date[i],".png")))
 
 ```
 
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
-
 
 data_institutions <- graph_institutions %>%
   activate(nodes) %>%
@@ -851,6 +850,7 @@ data_institutions <- graph_institutions %>%
   arrange(desc(nb_art)) %>% 
   group_by(Com_ID) %>%
   slice(1:6) %>% 
+  ungroup() %>%
   arrange(Com_ID) %>%
   as.data.table()
 
@@ -1062,7 +1062,7 @@ save <- ggplot(sankey_data,
   theme(legend.position = "none") +
   ggsave(paste0(picture_path,"Sankey_diagram_Leiden_",start_date[i],"-",end_date[i],".png"), width = 40, height = 30, units = "cm")
 
-include_graphics(paste0(picture_path,"Sankey_diagram_Leiden_",start_date[i],"-",end_date[i],".png"))
+include_graphics(path.expand(paste0(picture_path,"Sankey_diagram_Leiden_",start_date[i],"-",end_date[i],".png")))
 
 ```
 

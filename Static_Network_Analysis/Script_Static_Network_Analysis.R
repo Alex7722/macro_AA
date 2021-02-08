@@ -3,8 +3,8 @@
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 ##################### Packages, paths, etc. ############################################--------------
 
-source("/home/aurelien/macro_AA/Static_Network_Analysis/functions_for_network_analysis.R")
-source("/home/aurelien/macro_AA/Static_Network_Analysis/Script_paths_and_basic_objects.R")
+source("~/macro_AA/Static_Network_Analysis/functions_for_network_analysis.R")
+source("~/macro_AA/Static_Network_Analysis/Script_paths_and_basic_objects.R")
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 ################################ PART II: NETWORK ANALYSIS #################################
