@@ -4,16 +4,21 @@
 
 ##################### Packages ############################################--------------
 
-package_list <-  c("data.table","tidyverse", "ggnewscale", "igraph",
+cran_list <-  c("data.table","tidyverse", "ggnewscale", "igraph",
                    "tm","quanteda","tidytext","ggraph","tidygraph", "ggrepel", "vite",
-                   "reticulate","leiden","reshape2","scales","scico",
+                   "reticulate","leidenAlg","reshape2","scales","scico",
                    "ggforce","directlabels","patchwork","DescTools","DT","grid","ggdendro",
                    "ggalluvial","knitr")
-for(p in package_list){
+for(p in cran_list){
   if (p %in% installed.packages()==FALSE){install.packages(p,dependencies = TRUE)}
   library(p,character.only=TRUE)
 }
 
+github_list <-  c("ParkerICI/vite","agoutsmedt/biblionetwork","agoutsmedt/networkflow")
+for(p in github_list){
+  if (gsub(".*/","",p) %in% installed.packages()==FALSE){devtools::install_github(p)}
+  library(gsub(".*/","",p),character.only=TRUE)
+}
 
 #py_install("python-igraph")
 #py_install("leidenalg", forge = TRUE)
