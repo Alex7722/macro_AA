@@ -22,59 +22,116 @@ rm("edges_old_JEL")
 ############################ 1) Bibliographic Coupling #################################-------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
-time_window <- 5
-weight_treshold_value <- 1
-nodes_JEL <- nodes_JEL[order(Annee_Bibliographique)]
+############################# 1.1 Creation the networks ###############################--------
 
-#Edges <- Edges[aut_id==author]
 # Find the time_window
+time_window <- 5
 first_year <- nodes_JEL[order(Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique
 last_year <- (nodes_JEL[order(-Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique - time_window +1) # +1 to get the very last year in the window
-all_years <- 1970:1980
+all_years <- first_year:last_year
+
 # Prepare our list
-tbl_coup_list <- list()
+tbl_coup_list <- list() 
+Limit_edges <- 30000000
+decile = TRUE
+quantile_threshold = 0.85
+
 for (Year in all_years) {
+  message(paste0("Creation of the network for the ",Year,"-",Year+time_window-1," window."))
+  # fixing the initial value of the threshold
+  edges_threshold = 1
+  
+  # creating nodes and edges
   nodes_of_the_year <- nodes_JEL[Annee_Bibliographique>=Year & Annee_Bibliographique<Year+time_window]
   edges_of_the_year <- edges_JEL[ID_Art %in% nodes_of_the_year$ID_Art]
+  
   # size of nodes
   nb_cit <- edges_of_the_year[, .N, ItemID_Ref]
   colnames(nb_cit)[colnames(nb_cit) == "N"] <- "size"
   nodes_of_the_year <- merge(nodes_of_the_year, nb_cit, by.x = "ItemID_Ref", by.y = "ItemID_Ref", all.x = TRUE)
   nodes_of_the_year[is.na(size),size:=0]
+  
   # coupling
   edges_of_the_year <- bibliographic_coupling(edges_of_the_year, "ID_Art", "New_id2", 
-                                              normalized_weight_only = TRUE, weight_threshold = 3, output_in_character = TRUE)
+                                              normalized_weight_only = TRUE, weight_threshold = edges_threshold, output_in_character = TRUE)
+  
+  
+  if(decile == TRUE){
+    edges_prob_threshold <- quantile(edges_of_the_year$weight, prob = quantile_threshold + 0.0025)
+    edges_of_the_year <- edges_of_the_year[weight >= edges_prob_threshold]
+  }
+  
+  # Loop to avoid to large networks - Step 2: reducing edges
+  if(length(edges_of_the_year$from) > Limit_edges){
+    for(k in 1:100){
+      edges_threshold = edges_threshold + 1
+      
+      nodes_of_the_year <- nodes_JEL[Annee_Bibliographique>=Year & Annee_Bibliographique<Year+time_window]
+      edges_of_the_year <- edges_JEL[ID_Art %in% nodes_of_the_year$ID_Art]
+      
+      # size of nodes
+      nb_cit <- edges_of_the_year[, .N, ItemID_Ref]
+      colnames(nb_cit)[colnames(nb_cit) == "N"] <- "size"
+      nodes_of_the_year <- merge(nodes_of_the_year, nb_cit, by.x = "ItemID_Ref", by.y = "ItemID_Ref", all.x = TRUE)
+      nodes_of_the_year[is.na(size),size:=0]
+      
+      # coupling
+      edges_of_the_year <- bibliographic_coupling(edges_of_the_year, "ID_Art", "New_id2", 
+                                                  normalized_weight_only = TRUE, weight_threshold = edges_threshold, output_in_character = TRUE)
+      if(length(edges_of_the_year$from) < Limit_edges){
+        break
+      }
+    }
+  }
+  
+  message(paste0("The final threshold for edges is:",edges_threshold))
   # remove nodes with no edges
   nodes_of_the_year <- nodes_of_the_year[ID_Art %in% edges_of_the_year$from | ID_Art %in% edges_of_the_year$to]
   nodes_of_the_year$ID_Art <- as.character(nodes_of_the_year$ID_Art)
+  edges_of_the_year$threshold = edges_threshold
+  
   # make tbl
   tbl_coup_list[[as.character(Year)]] <- networkflow::tbl_main_component(nodes = nodes_of_the_year, edges = edges_of_the_year, directed = FALSE, node_key = "ID_Art", nb_components = 2)
   
   gc() # cleaning what is not useful anymore
 }
 
+# cleaning now useless objects
 rm(list = c("edges_JEL","nb_cit","edges_of_the_year","nodes_JEL","nodes_of_the_year"))
 
-# finding communities 
-list_graph <- lapply(tbl_coup_list, leiden_improved)
+
+
+############################# 1.2 Finding Communities ###############################--------
+ 
+tbl_coup_list <- lapply(tbl_coup_list, networkflow::leiden_workflow)
 # list_graph <- lapply(list_graph, FUN = community_colors, palette = mypalette)
 
-################ Running force atlas ##################
+# intermediary saving
+saveRDS(tbl_coup_list, paste0(graph_data_path,"list_graph_",first_year,"-",last_year+time_window-1,".rds"))
+
+############################ 1.3 Running force atlas #############################--------
+
+tbl_coup_list <- readRDS(paste0(graph_data_path,"list_graph_",first_year,"-",last_year+time_window-1,".rds"))
 
 list_graph_position <- list()
 
 for (Year in all_years) {
-  if(is.null(list_graph[[paste0(Year-1)]])){
-    list_graph_position[[paste0(Year)]] <- force_atlas(list_graph[[paste0(Year)]], kgrav = 4, change_size = FALSE)
+  message(paste0("Running Force Atlas for the ",Year,"-",Year+time_window-1," window."))
+  if(is.null(tbl_coup_list[[paste0(Year-1)]])){
+    list_graph_position[[paste0(Year)]] <- force_atlas(tbl_coup_list[[paste0(Year)]], kgrav = 4, change_size = FALSE)
   }
-  if(!is.null(list_graph[[paste0(Year-1)]])){
+  if(!is.null(tbl_coup_list[[paste0(Year-1)]])){
     past_position <- list_graph_position[[paste0(Year-1)]] %>% activate(nodes) %>% as.data.table()
-    past_position <- past_position[,.(Id,x,y)]
-    tbl <- list_graph[[paste0(Year)]] %>% activate(nodes) %>% left_join(past_position)
+    past_position <- past_position[,.(ID_Art,x,y)]
+    tbl <- tbl_coup_list[[paste0(Year)]] %>% activate(nodes) %>% left_join(past_position)
     list_graph_position[[paste0(Year)]] <- force_atlas(tbl, kgrav = 4, change_size = FALSE)
   }
+  #saveRDS(tbl_coup_list, paste0(graph_data_path,"coupling_graph_",Year,"-",Year+time_window-1,".rds"))
+  saveRDS(list_graph_position[[paste0(Year)]], paste0(graph_data_path,"coupling_graph_",Year,"-",Year+time_window-1,".rds"))
   gc()
 }
+
+saveRDS(list_graph_position, paste0(graph_data_path,"list_graph_",first_year,"-",last_year+time_window-1,".rds"))
 
 ################################## Integrating Community names (temporary) ############################## 
 # Listing all the graph computed in `static_network_analysis.R`
@@ -115,13 +172,15 @@ for (Year in all_years) {
     mutate(color_com_ID_to = .N()$color[to], color_com_ID_from = .N()$color[from]) %>%
     mutate(color_edges = DescTools::MixColor(color_com_ID_to, color_com_ID_from, amount1 = 0.5))
   
+    # Cleaning progressively
+    gc()
 }
 
-saveRDS(list_graph_position, paste0(graph_data_path,"list_graph.rds"))
+saveRDS(list_graph_position, paste0(graph_data_path,"list_graph_",first_year,"-",last_year+time_window-1,".rds"))
 
 ################# Projecting graphs #################
 
-list_graph_position <- readRDS(paste0(graph_data_path,"list_graph.rds"))
+list_graph_position <- readRDS(paste0(graph_data_path,"list_graph_",first_year,"-",last_year+time_window-1,".rds"))
 
 com_label <- list()
 
@@ -132,11 +191,13 @@ com_label[[paste0(Year)]] <- label_com(list_graph_position[[paste0(Year)]],bigge
 list_ggplot <- list()
 for (Year in all_years) {
   list_ggplot[[as.character(Year)]] <- ggraph(list_graph_position[[paste0(Year)]], "manual", x = x, y = y) +
-    geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
+    geom_edge_link0(aes(color = color_edges, width = weight), alpha = 0.5) +
     geom_node_point(aes(fill = color, size = size), pch=21) +
-    scale_edge_width_continuous(range = c(0.5, 1)) +
+    scale_edge_width_continuous(range = c(0.1, 0.5)) +
+    scale_size_continuous(range = c(0.1,3)) +
     theme_void() +
-    geom_label_repel(data=com_label[[paste0(Year)]], aes(x=x, y=y, label = Community_name, fill = color, size = Size_com*2), fontface="bold", alpha = 0.9, point.padding=NA, show.legend = FALSE) +
+   # new_scale("size") +
+    geom_label_repel(data=com_label[[paste0(Year)]], aes(x=x, y=y, label = Community_name, fill = color), size = 0.5, fontface="bold", alpha = 0.9, point.padding=NA, show.legend = FALSE) +
     theme(legend.position = "none") +
     scale_fill_identity() +
     scale_edge_colour_identity() +
@@ -144,7 +205,22 @@ for (Year in all_years) {
   # ggsave("Networks/coup_2000.png", width=30, height=20, units = "cm")
 }
 
-do.call(grid.arrange, list_ggplot)
+
+benchmark <- do.call(grid.arrange, list_ggplot[c(1,5,9,13,17,22)])
+ggsave(paste0(picture_path,"benchmark_edge_threshold_3.png"), benchmark, width = 30, height = 30, unit = "cm")
+
+ggsave(plot=g, paste0("Graphs/",author,"_networks.png"), width=30, height=40, units = "cm")
+
+library(ggpubr)
+for(i in c(1,9,18,27,35)){
+g <- ggarrange(plotlist=list_ggplot[i:(i+7)], common.legend = TRUE, legend="none")
+ggsave(plot=g, paste0(picture_path,"Graph_",i), width=30, height=40, units = "cm")
+gc()
+}
+
+list_graph_position[i:(i+7)]
 
 
-              
+# saving in pdf on multiple pages:
+#ml <- marrangeGrob(list_ggplot, nrow=2, ncol=2)
+#ggsave(paste0(picture_path,"multipage.pdf"), ml, width = 30, height = 24, unit = "cm")
