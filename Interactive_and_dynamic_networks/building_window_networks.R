@@ -6,29 +6,11 @@
 source("~/macro_AA/Static_Network_Analysis/functions_for_network_analysis.R")
 source("~/macro_AA/Interactive_and_dynamic_networks/Script_paths_and_basic_objects.R")
 
-##################### Loading Data ############################################--------------
-
-nodes_JEL <- readRDS(paste0(data_path,"JEL_matched_corpus_nodes.rds"))
-nodes_old_JEL <- readRDS(paste0(data_path,"Old_JEL_matched_corpus_nodes.rds"))
-nodes_JEL <- rbind(nodes_JEL,nodes_old_JEL)
-rm("nodes_old_JEL")
-
-edges_JEL <- readRDS(paste0(data_path,"JEL_matched_corpus_edges.rds"))
-edges_old_JEL <- readRDS(paste0(data_path,"Old_JEL_matched_corpus_edges.rds"))
-edges_JEL <- rbind(edges_JEL,edges_old_JEL)
-rm("edges_old_JEL")
-
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 ############################ 1) Bibliographic Coupling #################################-------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
 ############################# 1.1 Creation the networks ###############################--------
-
-# Find the time_window
-time_window <- 5
-first_year <- nodes_JEL[order(Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique
-last_year <- (nodes_JEL[order(-Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique - time_window +1) # +1 to get the very last year in the window
-all_years <- first_year:last_year
 
 # Prepare our list
 tbl_coup_list <- list() 
@@ -133,7 +115,8 @@ for (Year in all_years) {
 
 saveRDS(list_graph_position, paste0(graph_data_path,"list_graph_",first_year,"-",last_year+time_window-1,".rds"))
 
-################################## Integrating Community names (temporary) ############################## 
+
+################################## 1.4 Integrating Community names (temporary) ##############################----------
 # Listing all the graph computed in `static_network_analysis.R`
 all_nodes <- data.table("Id" = c(), "Annee_Bibliographique" = c(), "Titre" = c(), "Label" = c(), "color" = c(), "Community_name" = c())
 for(i in 1:length(start_date)){
@@ -178,7 +161,7 @@ for (Year in all_years) {
 
 saveRDS(list_graph_position, paste0(graph_data_path,"list_graph_",first_year,"-",last_year+time_window-1,".rds"))
 
-################# Projecting graphs #################
+################################## 1.5 Projecting graphs ################################----------------
 
 list_graph_position <- readRDS(paste0(graph_data_path,"list_graph_",first_year,"-",last_year+time_window-1,".rds"))
 
@@ -224,3 +207,28 @@ list_graph_position[i:(i+7)]
 # saving in pdf on multiple pages:
 #ml <- marrangeGrob(list_ggplot, nrow=2, ncol=2)
 #ggsave(paste0(picture_path,"multipage.pdf"), ml, width = 30, height = 24, unit = "cm")
+
+
+################################# 2) Transforming in long format ##############################
+
+# loading the data
+list_graph_position <- readRDS(paste0(graph_data_path,"list_graph_",first_year,"-",last_year+time_window-1,".rds"))
+
+# creating a table with the data for nodes and edges for each window
+
+nodes_lf <- lapply(list_graph_position, function(tbl)(tbl %>% activate(nodes) %>% as.data.table))
+nodes_lf <- lapply(nodes_lf, function(dt)(dt[,.(ID_Art,x,y,size,Com_ID,color)]))
+nodes_lf <- rbindlist(nodes_lf, idcol = "window")
+nodes_lf <- nodes_lf[,window := paste0(window,"-",as.integer(window) + 4)][order(ID_Art,window)]
+
+edges_lf <- lapply(list_graph_position, function(tbl)(tbl %>% activate(edges) %>% as.data.table))
+edges_lf <- lapply(edges_lf, function(dt)(dt[,.(Source,Target,weight,Com_ID,color_edges)]))
+edges_lf <- rbindlist(edges_lf, idcol = "window")
+edges_lf <- edges_lf[,window := paste0(window,"-",as.integer(window) + 4)]
+
+nodes_info <- nodes_JEL[ID_Art %in% unique(nodes_lf$ID_Art)][, c("ID_Art","Titre","Annee_Bibliographique","Nom","Label","Revue","ESpecialite")]
+
+write_csv(nodes_lf,paste0(platform_data,"nodes_lf.csv"))
+write_csv(edges_lf,paste0(platform_data,"edges_lf.csv"))
+write_csv(nodes_info,paste0(platform_data,"nodes_info.csv"))
+
