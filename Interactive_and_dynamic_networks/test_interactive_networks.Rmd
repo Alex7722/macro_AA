@@ -68,3 +68,33 @@ div(
 )
 
 ```
+
+
+```{r}
+graph_coupling <- list_graph_position[[1]] %>%
+  activate(nodes) #%>%
+ # filter(nb_cit >= Threshold)
+
+nodes <- graph_coupling %>%
+  activate(nodes) %>%
+  as_tibble() %>%
+  rename(id = ID_Art, label = Label) %>%
+  select(id,Annee_Bibliographique,Nom,label,Titre,Revue,size,color,Community_name,size) 
+
+edges <- graph_coupling %>%
+  activate(edges) %>%
+  as_tibble() %>%
+  rename(source = Source, target = Target, size = weight, color = color_edges) %>%
+  mutate(id = paste0(source,"-",target))
+
+sigmajs() %>% # initialise
+      sg_nodes(nodes, id, label, size, color) %>% # add nodes
+      sg_edges(edges, id, size, source, target) %>% # add edges
+      sg_settings(drawLabels = FALSE, drawEdgeLabels = FALSE, 
+                 defaultEdgeType = "curve", minNodeSize = 0.01, maxNodeSize = 10, 
+                  minEdgeSize = 0.05, maxEdgeSize = 0.2, labelSize = "proportional",
+                 borderSize = 0.5) %>% 
+      sg_force() %>%
+      sg_force_stop(delay = 200000)
+```
+
