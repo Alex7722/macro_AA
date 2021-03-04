@@ -6,11 +6,9 @@
 
 cran_list <- c(
   "data.table", "magrittr", "ggnewscale", "igraph",
-  "tm", "quanteda", "tidytext", "ggraph", "tidygraph", "ggrepel",
-  "reticulate", "leidenAlg", "reshape2", "scales", "scico",
-  "ggforce", "directlabels", "patchwork", "DescTools", "DT", "grid", "ggdendro",
-  "ggalluvial", "sigmajs", "knitr", "dplyr", "htmltools", "crosstalk",
-  "gridExtra","readr","stringi"
+  "tidytext", "ggraph", "tidygraph", "ggrepel", "leidenAlg", "reshape2", "scales", 
+  "ggforce", "directlabels", "patchwork", "DescTools", "DT", "grid", "scico",
+  "ggalluvial", "knitr", "dplyr","gridExtra","readr","stringi"
 )
 for (p in cran_list) {
   if (p %in% installed.packages() == FALSE) {
@@ -34,7 +32,7 @@ for (p in github_list) {
 
 data_path <- "/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/"
 graph_data_path <- "/projects/data/macro_AA/Graphs/"
-picture_path <- "~/macro_AA/Interactive_and_dynamic_networks/Pictures/"
+picture_path <- "~/macro_AA/dynamic_networks/Pictures/"
 platform_data <- "/projects/data/macro_AA/platform_data/"
 
 mypalette <- c("#1969B3", "#01A5D8", "#DA3E61", "#3CB95F", "#E0AF0C", "#E25920", "#6C7FC9", "#DE9493", "#CD242E", "#6F4288", "#B2EEF8", "#7FF6FD", "#FDB8D6", "#8BF9A9", "#FEF34A", "#FEC57D", "#DAEFFB", "#FEE3E1", "#FBB2A7", "#EFD7F2", "#5CAADA", "#37D4F5", "#F5779B", "#62E186", "#FBDA28", "#FB8F4A", "#A4B9EA", "#FAC2C0", "#EB6466", "#AD87BC", "#0B3074", "#00517C", "#871B2A", "#1A6029", "#7C4B05", "#8A260E", "#2E3679", "#793F3F", "#840F14", "#401C56", "#003C65", "#741A09", "#602A2A", "#34134A", "#114A1B", "#27DDD1", "#27DD8D", "#4ADD27", "#D3DD27", "#DDA427", "#DF2935", "#DD27BC", "#BA27DD", "#3227DD", "#2761DD", "#27DDD1")
