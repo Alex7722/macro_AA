@@ -3,7 +3,7 @@
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 ##################### Packages, paths, etc. ############################################--------------
 
-source("~/macro_AA/Static_Network_Analysis/functions_for_network_analysis.R")
+source("~/macro_AA/functions/functions_for_network_analysis.R")
 source("~/macro_AA/Static_Network_Analysis/Script_paths_and_basic_objects.R")
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
