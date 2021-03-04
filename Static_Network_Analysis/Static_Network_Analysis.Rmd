@@ -18,7 +18,7 @@ knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = TRUE, cache=FALSE
 
 ##################### Packages, paths, etc. ############################################--------------
 
-source(path.expand("~/macro_AA/Static_Network_Analysis/functions_for_network_analysis.R"))
+source(path.expand("~/macro_AA/functions/functions_for_network_analysis.R"))
 source(path.expand("~/macro_AA/Static_Network_Analysis/Script_paths_and_basic_objects.R"))
 
 ##################### Loading Data ############################################--------------
