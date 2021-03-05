@@ -1,0 +1,100 @@
+---
+title: "Test_interactive_networks"
+output: html_document
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+############################## PART I: LOADING PACKAGES, PATH AND DATA ####################################--------------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+##################### Packages, paths, etc. ############################################--------------
+
+source("~/macro_AA/functions/functions_for_network_analysis.R")
+source("~/macro_AA/Interactive_networks/Script_paths_and_basic_objects.R")
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+############################ 1) Bibliographic Coupling #################################-------
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+i = 1
+Threshold = 0
+graph_coupling <- readRDS(paste0(graph_data_path,"graph_coupling_",start_date[i],"-",end_date[i],".rds"))
+
+graph_coupling <- graph_coupling %>%
+  activate(nodes) %>%
+  filter(nb_cit >= Threshold)
+
+nodes <- graph_coupling %>%
+  activate(nodes) %>%
+  as_tibble() %>%
+  rename(id = Id, label = Label) %>%
+  select(id,Annee_Bibliographique,Nom,label,Titre,Revue,nb_cit,color,Community_name,size,x,y) 
+
+edges <- graph_coupling %>%
+  activate(edges) %>%
+  as_tibble() %>%
+  rename(source = Source, target = Target, size = weight, color = color_edges) %>%
+  mutate(id = paste0(source,"-",target))
+
+#nodes <- as.data.frame(nodes)
+
+# pass node ids as keys
+sd <- SharedData$new(nodes, key = nodes$id)
+```
+
+```{r drawing network}
+
+div(
+  filter_slider("nb_cit", "Citations", sd, column=~nb_cit, step=1, width=250),
+  class = "raw",
+  div(
+    class = "raw-md-6",
+    sigmajs() %>% # initialise
+      sg_nodes(sd, id, label, size, color, x, y) %>% # add nodes
+      sg_edges(edges, id, size, source, target) %>% # add edges
+      sg_settings(drawLabels = TRUE, drawEdgeLabels = FALSE, 
+                 defaultEdgeType = "curve", minNodeSize = 0.01, maxNodeSize = 10, 
+                  minEdgeSize = 0.05, maxEdgeSize = 0.2, labelSize = "proportional",
+                 borderSize = 0.5)
+      #sg_neighbors()
+  ),
+  div(
+    class = "raw-md-6",
+     datatable(sd, extensions="Scroller", style="bootstrap", class="compact", width="100%",
+    filter = "top", options=list(deferRender=TRUE, scrollY=300, scroller=TRUE))
+  )
+)
+
+```
+
+
+```{r}
+graph_coupling <- list_graph_position[[1]] %>%
+  activate(nodes) #%>%
+ # filter(nb_cit >= Threshold)
+
+nodes <- graph_coupling %>%
+  activate(nodes) %>%
+  as_tibble() %>%
+  rename(id = ID_Art, label = Label) %>%
+  select(id,Annee_Bibliographique,Nom,label,Titre,Revue,size,color,Community_name,size) 
+
+edges <- graph_coupling %>%
+  activate(edges) %>%
+  as_tibble() %>%
+  rename(source = Source, target = Target, size = weight, color = color_edges) %>%
+  mutate(id = paste0(source,"-",target))
+
+sigmajs() %>% # initialise
+      sg_nodes(nodes, id, label, size, color) %>% # add nodes
+      sg_edges(edges, id, size, source, target) %>% # add edges
+      sg_settings(drawLabels = FALSE, drawEdgeLabels = FALSE, 
+                 defaultEdgeType = "curve", minNodeSize = 0.01, maxNodeSize = 10, 
+                  minEdgeSize = 0.05, maxEdgeSize = 0.2, labelSize = "proportional",
+                 borderSize = 0.5) %>% 
+      sg_force() %>%
+      sg_force_stop(delay = 200000)
+```
+
