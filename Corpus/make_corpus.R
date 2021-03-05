@@ -264,7 +264,6 @@ saveRDS(JEL_matched_corpus_references, file = "Corpus_Econlit_Matched_WoS/JEL_ma
 
 
 
-
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### PART IV: EXTENDING THE CORPUS ####
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -790,3 +789,36 @@ rm(all_art)
 gc()
 
 saveRDS(JEL_matched_corpus_references, file = "Corpus_Extended/Old_corpus_extended_refs.rds")
+
+
+
+
+
+
+
+
+
+
+#### * ####
+#### **************************** ####
+#### ***** all_id_art ***** ####
+#### **************************** ####
+#### * ####
+
+
+
+ID_Art1 <- readRDS("Corpus_Econlit_Matched_WoS/JEL_matched_corpus_nodes.rds")
+ID_Art2 <- readRDS("Corpus_Econlit_Matched_WoS/JEL_matched_corpus_references_info.rds")
+
+ID_Art3 <- readRDS("Corpus_Econlit_Matched_WoS/Old_JEL_matched_corpus_nodes.rds")
+ID_Art4 <- readRDS("Corpus_Econlit_Matched_WoS/Old_JEL_matched_corpus_references_info.rds")
+
+ID_Art5 <- readRDS("Corpus_Extended/corpus_extended_nodes.rds")
+ID_Art6 <- readRDS("Corpus_Extended/corpus_extended_refs.rds")
+
+ID_Art7 <- readRDS("Corpus_Extended/Old_corpus_extended_nodes.rds")
+ID_Art8 <- readRDS("Corpus_Extended/Old_corpus_extended_refs.rds")
+
+all_ID_Art <- rbind(ID_Art1, ID_Art2, ID_Art3, ID_Art4, ID_Art5, ID_Art6, ID_Art7, ID_Art8, fill=TRUE)
+write.csv(all_ID_Art[,.N,ID_Art][order(N)], file = "all_ID_Art.csv", row.names=FALSE)
+
