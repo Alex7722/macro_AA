@@ -6,16 +6,23 @@
 
 package_list <- c(
   "data.table", "magrittr", "tidyverse", "ggnewscale", "igraph",
-  "tm", "quanteda", "tidytext", "ggraph", "tidygraph", "ggrepel", "vite",
-  "reticulate", "leiden", "reshape2", "scales", "scico",
-  "ggforce", "directlabels", "patchwork", "DescTools", "DT", "grid", "ggdendro",
-  "ggalluvial", "knitr", "readtext"
-)
+  "quanteda", "tidytext", "ggraph", "tidygraph", "ggrepel",
+  "leidenAlg", "reshape2", "scales","RMySQL",
+  "ggforce", "directlabels", "patchwork", "DescTools", "DT", 
+  "grid", "ggdendro", "knitr", "readtext", "pander","RColorBrewer")
 for (p in package_list) {
   if (p %in% installed.packages() == FALSE) {
     install.packages(p, dependencies = TRUE)
   }
   library(p, character.only = TRUE)
+}
+
+github_list <- c("ParkerICI/vite", "agoutsmedt/biblionetwork", "agoutsmedt/networkflow")
+for (p in github_list) {
+  if (gsub(".*/", "", p) %in% installed.packages() == FALSE) {
+    devtools::install_github(p)
+  }
+  library(gsub(".*/", "", p), character.only = TRUE)
 }
 
 # py_install("python-igraph")
