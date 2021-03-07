@@ -1,22 +1,24 @@
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-############################## PART I: LOADING PACKAGES, PATH AND DATA ####################################--------------
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-##################### Packages, paths, etc. ############################################--------------
+#' ---
+#' title: "Something fascinating"
+#' author: "Jenny Bryan"
+#' date: "`r format(Sys.Date())`"
+#' output: github_document
+#' ---
+#' 
+#' ## Introduction
+#' 
+#' This script aims at creating the networks for different time windows.
+#' 
+#' ## PART I: LOADING PACKAGES, PATH AND DATA
 
 source("~/macro_AA/functions/functions_for_network_analysis.R")
 source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
 
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-############################## PART II: BUILDING THE NETWORKS ####################################--------------
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#' ## PART II: BUILDING THE NETWORKS 
 
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-############################ 1) Bibliographic Coupling #################################-------
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#' ### Creation the networks
 
-############################# 1.1 Creation the networks ###############################--------
-
-# Prepare our list
+#' We prepare our list
 tbl_coup_list <- list()
 Limit_edges <- 400000
 decile <- FALSE
@@ -88,9 +90,10 @@ for (Year in all_years) {
 # cleaning now useless objects
 rm(list = c("edges_JEL", "nb_cit", "edges_of_the_year", "nodes_JEL", "nodes_of_the_year"))
 
+#' ### Finding Communities
 
-
-############################# 1.2 Finding Communities ###############################--------
+#' We use the leiden_workflow function of the networkflow package (it uses the 
+#' leidenAlg package).
 
 tbl_coup_list <- lapply(tbl_coup_list, leiden_workflow)
 # list_graph <- lapply(list_graph, FUN = community_colors, palette = mypalette)
@@ -98,7 +101,7 @@ tbl_coup_list <- lapply(tbl_coup_list, leiden_workflow)
 # intermediary saving
 saveRDS(tbl_coup_list, paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
 
-############################ 1.3 Running force atlas #############################--------
+#' ### Running force atlas 
 
 tbl_coup_list <- readRDS(paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
 
@@ -172,9 +175,11 @@ for (Year in all_years) {
 
 saveRDS(list_graph_position, paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
 
-#########################################################################################
-################################## 1.5 Projecting graphs ################################----------------
-########################### Not necessary for the platform ###############################
+
+#' ### Projecting graphs
+
+#' This step is not necessary for producting the data for the online platform.
+#' If you want to run this part, set `run` to "TRUE".
 
 run = FALSE
 
