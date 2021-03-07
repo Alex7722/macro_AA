@@ -1,40 +1,37 @@
-#' ---
-#' title: "Script for building the networks for moving time window"
-#' author: "Aurélien Goutsmedt and Alexandre Truc"
-#' date: "`r format(Sys.Date())`"
-#' output: github_document
-#' ---
-#' 
-#' ## Introduction
-#' 
-#' This script aims at creating the networks for different time windows. We want one-year moving time 
-#' windows on the whole period (1969-2016) and we need functions automating the creation
-#' of the 44 windows. This script creates the networks, finds communities, integrates the name 
-#' of communities, calculates coordinates and saves the nodes and edges data in a long format,
-#' used for producing the platform.
-#' 
-#' ## PART I: LOADING PACKAGES, PATH AND DATA
+Script for building the networks for moving time window
+================
+Aurélien Goutsmedt and Alexandre Truc
+2021-03-07
 
-#+ r setup, include = FALSE
-knitr::opts_chunk$set(eval = FALSE)
+## Introduction
 
-#' We first load all the functions created in the functions script. 
-#' We also have a separated script with all the packages needed for the scripts
-#' in the `dynamic_networks` directory, as well as all the paths (for saving
-#' pictures for instance). This separated script also loads our data 
-#' and color palettes.
+This script aims at creating the networks for different time windows. We
+want one-year moving time windows on the whole period (1969-2016) and we
+need functions automating the creation of the 44 windows. This script
+creates the networks, finds communities, integrates the name of
+communities, calculates coordinates and saves the nodes and edges data
+in a long format, used for producing the platform.
 
-#+ r source
+## PART I: LOADING PACKAGES, PATH AND DATA
+
+We first load all the functions created in the functions script. We also
+have a separated script with all the packages needed for the scripts in
+the `dynamic_networks` directory, as well as all the paths (for saving
+pictures for instance). This separated script also loads our data and
+color palettes.
+
+``` r
 source("~/macro_AA/functions/functions_for_network_analysis.R")
 source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
+```
 
-#' ## PART II: BUILDING THE NETWORKS 
+## PART II: BUILDING THE NETWORKS
 
-#' ### Creation the networks
+### Creation the networks
 
-#' We prepare our list
+We prepare our list
 
-#+ r list
+``` r
 tbl_coup_list <- list()
 Limit_edges <- 400000
 decile <- FALSE
@@ -105,21 +102,24 @@ for (Year in all_years) {
 
 # cleaning now useless objects
 rm(list = c("edges_JEL", "nb_cit", "edges_of_the_year", "nodes_JEL", "nodes_of_the_year"))
+```
 
-#' ### Finding Communities
+### Finding Communities
 
-#' We use the leiden_workflow function of the networkflow package (it uses the 
-#' leidenAlg package).
+We use the leiden\_workflow function of the networkflow package (it uses
+the leidenAlg package).
 
-#+ r communities
+``` r
 tbl_coup_list <- lapply(tbl_coup_list, leiden_workflow)
 # list_graph <- lapply(list_graph, FUN = community_colors, palette = mypalette)
 
 # intermediary saving
 saveRDS(tbl_coup_list, paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
+```
 
-#' ### Running force atlas 
+### Running force atlas
 
+``` r
 tbl_coup_list <- readRDS(paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
 
 list_graph_position <- list()
@@ -145,11 +145,11 @@ for (Year in all_years) {
 }
 
 saveRDS(list_graph_position, paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
+```
 
+### Integrating Community names (temporary)
 
-#' ### Integrating Community names (temporary)
-
-#+ r names
+``` r
 # Listing all the graph computed in `static_network_analysis.R`
 all_nodes <- data.table("Id" = c(), "Annee_Bibliographique" = c(), "Titre" = c(), "Label" = c(), "color" = c(), "Community_name" = c())
 for (i in 1:length(start_date)) {
@@ -193,14 +193,14 @@ for (Year in all_years) {
 }
 
 saveRDS(list_graph_position, paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
+```
 
+### Projecting graphs
 
-#' ### Projecting graphs
+This step is not necessary for producting the data for the online
+platform. If you want to run this part, set `run` to “TRUE”.
 
-#' This step is not necessary for producting the data for the online platform.
-#' If you want to run this part, set `run` to "TRUE".
-
-#+ r graph
+``` r
 run = FALSE
 
 if(run == TRUE){
@@ -242,12 +242,13 @@ for (i in c(1, 9, 18, 27, 35)) {
   gc()
 }
 }
+```
 
-#' ## PART II: EXTRACTING NETWORKS DATA FOR THE PLATFORM
+## PART II: EXTRACTING NETWORKS DATA FOR THE PLATFORM
 
-#' ### Transforming in long format 
+### Transforming in long format
 
-#+ r platform
+``` r
 # loading the data
 list_graph_position <- readRDS(paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
 
@@ -268,3 +269,4 @@ nodes_info <- nodes_JEL[ID_Art %in% unique(nodes_lf$ID_Art)][, c("ID_Art", "Titr
 write_csv(nodes_lf, paste0(platform_data, "nodes_lf.csv"))
 write_csv(edges_lf, paste0(platform_data, "edges_lf.csv"))
 write_csv(nodes_info, paste0(platform_data, "nodes_info.csv"))
+```
