@@ -1600,7 +1600,7 @@ dynamic_biblio_coupling <- function(corpus,
 
 tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_column = "Com_ID", color_column = "color",
                    com_name_column = "Community_name", com_size_column = "Size_com", treshold_com = 0.01, number_of_words = 12,
-                   palette = NULL, size_title_wrap = 8) {
+                   palette = NULL, size_title_wrap = 8, unstemming = TRUE) {
   #' Creating a TF-IDF analysis of the titles of WoS corpus
   #'
   #' This function takes as input a tidygraph object or a data frame with nodes, both with a community attribute, and analyzes
@@ -1643,7 +1643,9 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
   #'
   #' @param size_title_wrap
   #' The size of the community title in the plot.
-
+  #' 
+  #' @param unstemming
+  #' Chose whether you want to unstem or not the words
 
   # extracting the nodes
   if (!is.null(graph)) {
@@ -1695,7 +1697,7 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
   tible_tf_idf[, V1 := stripWhitespace(V1)]
   # Dictionnary to find the root of stem word before stemming
   dictionary <- tible_tf_idf
-  dictionary <- dictionary %>% unnest_tokens(word, V1)
+  dictionary <- dictionary %>% unnest_tokens(word, V1) %>% as.data.table()
   tible_tf_idf[, V1 := stemDocument(V1)]
   # tf-idf using quanteda
   tible_tf_idf <- corpus(tible_tf_idf, text_field = "V1")
@@ -1705,11 +1707,20 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
   documents_names <- cbind(docvars(tible_tf_idf), quanteda::convert(tible_tf_idf, to = "data.frame")) %>% as.data.table()
   tible_tf_idf <- tidy(tible_tf_idf) %>% as.data.table()
   tf_idf_table <- merge(tible_tf_idf, documents_names[, .(doc_id, Com_ID)], by.x = "document", by.y = "doc_id")
-  tf_idf_table[, unstemmed_word := stemCompletion(tf_idf_table$term, dictionary$word, type = "prevalent")] # unstem with most common word
-  tf_idf_table[unstemmed_word == "", unstemmed_word := term] # unstem with most common word
+  
+  if(unstemming==TRUE){
+    tf_idf_table[,unstemmed_word:=stemCompletion(tf_idf_table$term, dictionary$word, type = "prevalent")] # unstem with most common word
+    tf_idf_table[unstemmed_word=="",unstemmed_word:=term] # unstem with most common word
+  }
+  if(unstemming==FALSE){
+    tf_idf_table[,unstemmed_word:=term]
+  }
+
   tf_idf_table[, term := unstemmed_word]
   tf_idf_table_uni <- tf_idf_table
 
+  
+  
   # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
   #### Bigram ####
   # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -1741,10 +1752,18 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
   tf_idf_table$term <- gsub("_", " ", tf_idf_table$term)
   tf_idf_table[, term1 := str_extract(tf_idf_table$term, "\\S+")]
   tf_idf_table[, term2 := str_extract(tf_idf_table$term, "\\S+$")]
-  tf_idf_table[, unstemmed_word1 := stemCompletion(tf_idf_table$term1, dictionary$word, type = "prevalent")] # unstem with most common word
-  tf_idf_table[unstemmed_word1 == "", unstemmed_word := term1]
-  tf_idf_table[, unstemmed_word2 := stemCompletion(tf_idf_table$term2, dictionary$word, type = "prevalent")] # unstem with most common word
-  tf_idf_table[unstemmed_word2 == "", unstemmed_word := term2]
+  
+  if(unstemming==TRUE){
+    tf_idf_table[,unstemmed_word1:=stemCompletion(tf_idf_table$term1, dictionary$word, type = "prevalent")] # unstem with most common word
+    tf_idf_table[unstemmed_word1=="",unstemmed_word:=term1]
+    tf_idf_table[,unstemmed_word2:=stemCompletion(tf_idf_table$term2, dictionary$word, type = "prevalent")] # unstem with most common word
+    tf_idf_table[unstemmed_word2=="",unstemmed_word:=term2]
+  }
+  if(unstemming==FALSE){
+    tf_idf_table[,unstemmed_word1:=term1]
+    tf_idf_table[,unstemmed_word2:=term2]
+  }
+
   tf_idf_table[, term := paste(unstemmed_word1, unstemmed_word2)]
   tf_idf_table_bi <- tf_idf_table
 
