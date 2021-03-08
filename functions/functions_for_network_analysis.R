@@ -1325,9 +1325,277 @@ important_nodes <- function(graph, top_n = 3) {
 # ideally an aggregation of the top_centrality_com function for different centrality measure
 
 
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+################### 4) Dynamic networks: building the different lists ################-------
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+# Building the networks for each window---------
+
+dynamic_biblio_coupling <- function(corpus, 
+                                    direct_citation_dt, 
+                                    source = "ID_Art",
+                                    source_as_ref = "ItemID_Ref",
+                                    ref = "New_id2", 
+                                    time_variable = "Annee_Bibliographique",
+                                    coupling_method = c("coupling_angle","coupling_strength","coupling_similarity"),
+                                    time_window_length = 5,
+                                    time_window_move = 0,
+                                    weight_treshold = 1,
+                                    nodes_threshold = 0,
+                                    controlling_nodes = FALSE,
+                                    controlling_edges = FALSE,
+                                    nodes_limit = 10000,
+                                    edges_limit = 300000,
+                                    distribution_pruning = FALSE,
+                                    quantile_threshold = 1,
+                                    quantile_move = 0){  
+  #' Creating a List of Tidygraph Graph for Different Time Windows
+  #' 
+  #' @description 
+  #' This function creates a list of tbl graph from a corpus and its references in a direct
+  #' citation data frame (the list of the references cited by each document) of the corpus.
+  #' You can set different types of time windows, use different types of coupling methods,
+  #' as well as to choose different methods to reduce the number of nodes and edges if you
+  #' want to avoid creating too large networks. 
+  #' 
+  #' @param corpus
+  #' The corpus with all your citing documents. This data frame will be used as the `nodes`
+  #' to put in your network. 
+  #' 
+  #' @param direct_citation_dt
+  #' The list of all the citations of references by the documents of `corpus`. That is the
+  #' data frame that will be used to find the edges list and calculate the weights.
+  #'
+  #' @param source
+  #' The column name of the identifier of citing articles in the `direct_citation_dt`. 
+  #' That is the identifier that  will be use in the `biblio_coupling()` or the 
+  #' `coupling_strength()` functions as the `source` parameter to do the coupling.
+  #'
+  #' @param source_as_ref
+  #' The column name of the second identifier of citing artices. It is used when you have 
+  #' to merge the `corpus` and `direct_citation_dt` through cited documents (not citing).
+  #' It is used, for instance, when you want to calculate the number of times an article 
+  #' in your `corpus` is cited as a reference in the `direct_citation_dt`. It could be the 
+  #' same as the `ref` parameter. In other words, that is an identifier of the references
+  #' (in the `direct_citation_dt`) that are also in the `corpus`.   
+  #' 
+  #' @param ref 
+  #' The column name of the identifier of cited references. That is the column is in the
+  #' `biblio_coupling()` or `coupling_strength()` function as the `ref` parameter to do
+  #' the coupling. 
+  #' 
+  #' @time_variable
+  #' Variable that identify the year of publication
+  #' 
+  #' @time_window
+  #' How much time should be covered by the network
+  #' 
+  #' @weight_treshold_value
+  #' Treshold value for coupling (see function)
+  if(!coupling_method %in% c("coupling_angle","coupling_strength","coupling_similarity")) 
+    stop('You did not choose a proper method for coupling computation. You have to choose between:\n - coupling_angle\n - coupling_strength\n - coupling_similarity')
+  
+  
+  nodes <- as.data.table(corpus)
+  nodes <- nodes[, `:=` (source = as.character(get(source)), 
+                         time_variable = as.character(get(time_variable)),
+                         source_as_ref = as.character(get(source_as_ref)))]
+  
+  
+  direct_citation_dt <- as.data.table(direct_citation_dt)
+  direct_citation_dt <- direct_citation_dt[,`:=` (source = as.character(get(source)),
+                                                  ref = as.character(get(ref)),
+                                                  source_as_ref = as.character(get(source_as_ref)))]
+  direct_citation_dt <- direct_citation_dt[ref!="NULL"]
+  
+  ######################### Dynamics networks **********************
+  #nodes <- nodes[order(time_variable)]
+  
+  # Find the time_window
+  first_year <- as.integer(min(nodes$time_variable))
+  last_year <- (as.integer(max(nodes$time_variable)) - time_window_length +1) # +1 to get the very last year in the window
+  all_years <- first_year:last_year
+  
+  # Prepare our list
+  tbl_list <- list()
+  
+  for (Year in all_years) {
+    
+    # fixing the initial value of the threshold
+    edges_threshold <- weight_treshold
+    threshold_2 <- nodes_threshold
+    
+    if(Year > first_year){
+      quantile_threshold <- (quantile_threshold - quantile_move)
+      quantile <- quantile_threshold
+    } else {
+      quantile <- quantile_threshold
+    }
+    
+    message(paste0("- Creation of the network for the ", Year, "-", Year + time_window - 1, " window."))
+    nodes_of_the_year <- nodes[time_variable >= (Year + time_window_move) & 
+                                 time_variable < (Year + time_window_move + time_window)] # < for time_window being the number of years, note the value of the addition
+    edges_of_the_year <- direct_citation_dt[source %in% nodes_of_the_year$source]
+    # size of nodes
+    nb_cit <- edges_of_the_year[, .N, source_as_ref]
+    colnames(nb_cit)[colnames(nb_cit) == "N"] <- "nb_cit"
+    # Tricky things here: you need the to take the identifier which is both in direct citation dataframe and in corpus.
+    # That is the `source_as_ref` parameter in the function. In WoS, that is "ItemID_Ref". 
+    # But we are using the "New_id2" variable in our database to do the coupling, this is 
+    # why we have the `ref` variable.
+    nodes_of_the_year <- merge(nodes_of_the_year, nb_cit, by = "source_as_ref", all.x = TRUE)
+    nodes_of_the_year[is.na(nb_cit),nb_cit:=0]
+    
+    # coupling
+    if(coupling_method == "coupling_angle" ){
+      message(paste("The method use for bibliometric coupling is the coupling angle method. The edge threshold is:",edges_threshold))
+      edges <- biblionetwork::biblio_coupling(dt = edges_of_the_year, 
+                                              source = source, 
+                                              ref = ref, 
+                                              weight_threshold = edges_threshold, 
+                                              output_in_character = TRUE)
+    }else{
+      if(coupling_method == "coupling_strength" ){
+        message(paste("The method use for bibliometric coupling is the coupling strength method.The edge threshold is:",edges_threshold))
+        edges <- biblionetwork::coupling_strength(dt = edges_of_the_year, 
+                                                  source = source, 
+                                                  ref = ref,  
+                                                  weight_threshold = edges_threshold, 
+                                                  output_in_character = TRUE)
+      }else{
+        message(paste("The method use for bibliometric coupling is the coupling similarity method.The edge threshold is:",edges_threshold))
+        edges <- biblionetwork::coupling_similarity(dt = edges_of_the_year, 
+                                                    source = source, 
+                                                    ref = ref,  
+                                                    weight_threshold = edges_threshold, 
+                                                    output_in_character = TRUE) 
+      }
+    }
+    
+    if (distribution_pruning == TRUE) {
+      message(paste("Pruning edges by distribution criterium. We are keeping the ",quantile*100," percent of edges with the highest weight value."))
+      edges_prob_threshold <- quantile(edges$weight, prob = (1 - quantile))
+      edges <- edges[weight >= edges_prob_threshold]
+    }
+    
+    # loop for reducing the number of edges
+    if (controlling_edges == TRUE){
+      if (length(edges$from) > edges_limit) {
+        for (k in 1:100) {
+          message(paste("There are ", length(edges$from)," edges in the network. Superior to the ",edges_limit," edges limit."))
+          
+          if(distribution_pruning == FALSE){
+            edges_threshold <- edges_threshold + 1
+          } else {
+            quantile <- quantile - 0.02
+          }
+          
+          # coupling
+          if(coupling_method == "coupling_angle" ){
+            message(paste("Round ",k,": The method use for bibliometric coupling is the coupling angle method. The edge threshold is:",edges_threshold))
+            edges <- biblionetwork::biblio_coupling(dt = edges_of_the_year, 
+                                                    source = source, 
+                                                    ref = ref, 
+                                                    weight_threshold = edges_threshold, 
+                                                    output_in_character = TRUE)
+          }else{
+            if(coupling_method == "coupling_strength" ){
+              message(paste("Round ",k,": The method use for bibliometric coupling is the coupling strength method. The edge threshold is:",edges_threshold))
+              edges <- biblionetwork::coupling_strength(dt = edges_of_the_year, 
+                                                        source = source, 
+                                                        ref = ref,  
+                                                        weight_threshold = edges_threshold, 
+                                                        output_in_character = TRUE)
+            }else{
+              message(paste("Round ",k,": The method use for bibliometric coupling is the coupling similarity method. The edge threshold is:",edges_threshold))
+              edges <- biblionetwork::coupling_similarity(dt = edges_of_the_year, 
+                                                          source = source, 
+                                                          ref = ref,  
+                                                          weight_threshold = edges_threshold, 
+                                                          output_in_character = TRUE) 
+            }
+          }
+          
+          if (distribution_pruning == TRUE) {
+            message(paste("Round ",k,": Pruning edges by distribution criterium to reduce the number of edges:\nWe are keeping the ",quantile*100," percent of edges with the highest weight value."))
+            edges_prob_threshold <- quantile(edges$weight, prob = (1 - quantile))
+            edges <- edges[weight >= edges_prob_threshold]
+          }
+          if (length(edges$from) < edges_limit) {
+            message(paste("Round ",k,": Eventually, we have kept ",quantile*100," percent of edges with the highest weight value."))
+            break
+          }
+        }
+      }
+    }
+    
+    # remove nodes with no edges
+    nodes_of_the_year <- nodes_of_the_year[ID_Art %in% edges$from | ID_Art %in% edges$to]
+    
+    # Loop to avoid to large networks - Step 2: reducing nodes
+    if (controlling_nodes == TRUE){
+      if (length(nodes_of_the_year$source) > nodes_limit) {
+        for (j in 1:100) {
+          message(paste("There are ", length(nodes_of_the_year$source)," nodes in the network. Superior to the ",nodes_limit," nodes limit."))
+          threshold_2 <- threshold_2 + 1
+          # creating nodes
+          nodes_of_the_year <- nodes_of_the_year[nb_cit >= threshold_2]
+          edges_of_the_year <- direct_citation_dt[source %in% nodes_of_the_year$source]
+          
+          # coupling
+          if(coupling_method == "coupling_angle" ){
+            message(paste("Round ",j,": The method use for bibliometric coupling is the coupling angle method. The nodes threshold is:",threshold_2))
+            edges <- biblionetwork::biblio_coupling(dt = edges_of_the_year, 
+                                                    source = source, 
+                                                    ref = ref, 
+                                                    weight_threshold = edges_threshold, 
+                                                    output_in_character = TRUE)
+          }else{
+            if(coupling_method == "coupling_strength" ){
+              message(paste("Round ",j,": The method use for bibliometric coupling is the coupling strength method. The nodes threshold is:",threshold_2))
+              edges <- biblionetwork::coupling_strength(dt = edges_of_the_year, 
+                                                        source = source, 
+                                                        ref = ref,  
+                                                        weight_threshold = edges_threshold, 
+                                                        output_in_character = TRUE)
+            }else{
+              message(paste("Round ",j,": The method use for bibliometric coupling is the coupling similarity method. The nodes threshold is:",threshold_2))
+              edges <- biblionetwork::coupling_similarity(dt = edges_of_the_year, 
+                                                          source = source, 
+                                                          ref = ref,  
+                                                          weight_threshold = edges_threshold, 
+                                                          output_in_character = TRUE) 
+            }
+          }
+          if (distribution_pruning == TRUE) {
+            message(paste("Round ",j,": Keeping the same distribution criteria for edges:\nWe are keeping the ",quantile*100," percent of edges with the highest weight value."))
+            edges_prob_threshold <- quantile(edges$weight, prob = (1 - quantile))
+            edges <- edges[weight >= edges_prob_threshold]
+          }
+          if (length(nodes_of_the_year$source) < nodes_limit) {
+            break
+          }
+        }
+      }
+      # remove nodes with no edges
+      nodes_of_the_year <- nodes_of_the_year[source %in% edges$from | source %in% edges$to]
+    }
+    
+    # giving threshold
+    message(paste0("The final threshold for edges is:", edges_threshold))
+    edges$threshold <- edges_threshold
+    message(paste0("The final threshold for nodes is:", threshold_2))
+    nodes_of_the_year$threshold <- threshold_2
+    
+    # make tbl
+    tbl_list[[as.character(Year)]] <- tbl_graph(nodes = nodes_of_the_year, edges = edges, directed = FALSE, node_key = source)
+  }
+  
+  return (tbl_list)
+}
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-################### 4) Fuctions for word analysis (titles) of networks ################-------
+################### 5) Functions for word analysis (titles) of networks ################-------
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
 tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_column = "Com_ID", color_column = "color",

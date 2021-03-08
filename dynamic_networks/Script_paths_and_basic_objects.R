@@ -5,7 +5,7 @@
 ##################### Packages ############################################--------------
 
 cran_list <- c(
-  "data.table", "magrittr", "ggnewscale", "igraph",
+  "data.table", "magrittr", "ggnewscale", "igraph","quanteda",
   "tidytext", "ggraph", "tidygraph", "ggrepel", "leidenAlg", "reshape2", "scales", 
   "ggforce", "directlabels", "patchwork", "DescTools", "DT", "grid", "scico",
   "ggalluvial", "knitr", "dplyr","gridExtra","readr","stringi"
