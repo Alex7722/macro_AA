@@ -1,20 +1,35 @@
-#' ---
-#' title: "Script for building the networks for moving time window"
-#' author: "Aurélien Goutsmedt and Alexandre Truc"
-#' date: "`r format(Sys.Date())`"
-#' output: 
-#'   github_document:
-#'     toc: true
-#'     number_sections: true
-#' ---
+Script for building the networks for moving time window
+================
+Aurélien Goutsmedt and Alexandre Truc
+2021-03-09
 
+  - [1 Building graphs - Basics](#building-graphs---basics)
+  - [2 Building Graphs - Secondary and to be
+    improved](#building-graphs---secondary-and-to-be-improved)
+  - [3 Dynamic networks: building the different
+    lists](#dynamic-networks-building-the-different-lists)
+      - [3.1 `dynamic_biblio_coupling()`](#dynamic_biblio_coupling)
+  - [4 Functions for word analysis (titles) of
+    networks](#functions-for-word-analysis-titles-of-networks)
+      - [4.1 `tf_idf()`](#tf_idf)
+
+``` r
 # Loading a package to be able to write documentation to function in a way similar to Python
 # For any function with comments delineated by "#'", you can run docstring(name_of_function) to get the standard help page.
 if ("docstring" %in% installed.packages() == FALSE) {
   install.packages("docstring", dependencies = TRUE)
 }
 library(docstring)
+```
 
+    ## 
+    ## Attaching package: 'docstring'
+
+    ## The following object is masked from 'package:utils':
+    ## 
+    ##     ?
+
+``` r
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 ################## PART I: GENERAL FUNCTIONS FOR NETWORK ANALYSIS #######################-----
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -119,10 +134,9 @@ bibliographic_coupling <- function(dt, source, ref, normalized_weight_only = TRU
     }
   }
 }
+```
 
-
-
-#+ r
+``` r
 bibliographic_coupling_alt <- function(dt, source, ref, weight_threshold = 1) {
   #' function for edges of bibliographic coupling
   #'
@@ -407,10 +421,11 @@ bibliographic_cocitation <- function(dt, source, ref, normalized_weight_only = T
   #    return (bib_cocit[, c("from","to","weight","nb_shared_references")])
   #  }
 }
+```
 
+# 1 Building graphs - Basics
 
-#' # Building graphs - Basics
-
+``` r
 tbl_main_components <- function(edges, nodes, directed = FALSE, node_key = NULL, nb_components = 1, threshold_alert = 0.05) {
   #' Main component tidygraph from edges and nodes
   #'
@@ -989,13 +1004,16 @@ label_com <- function(graph, biggest_community = FALSE, community_threshold = 0.
 
   return(label_com)
 }
+```
 
-#' # Building Graphs - Secondary and to be improved
+# 2 Building Graphs - Secondary and to be improved
 
-#' This function takes as input a tidygraph object, it switches the names of individual nodes
-#' by the name of their community, calculate the number of nodes in the community, and
-#' transforms the whole community as a unique node.
-#' 
+This function takes as input a tidygraph object, it switches the names
+of individual nodes by the name of their community, calculate the number
+of nodes in the community, and transforms the whole community as a
+unique node.
+
+``` r
 graph_community <- function(graph, Community_name = "Community_name", nb_components = 1, preparing_graph = TRUE) {
   #' Function for building of graph with community as nodes
   #'
@@ -1091,7 +1109,6 @@ graph_community <- function(graph, Community_name = "Community_name", nb_compone
     graph_community <- graph_community %>%
       activate(nodes) %>%
       left_join(color_community, by = c("Id" = "Community_name"))
-
 
     # Integration a size variable for implementing non-overlapping function of Force Atlas
     graph_community <- graph_community %>%
@@ -1336,19 +1353,20 @@ important_nodes <- function(graph, top_n = 3) {
   Important_nodes <- unique(Important_nodes)
 }
 # ideally an aggregation of the top_centrality_com function for different centrality measure
+```
 
+# 3 Dynamic networks: building the different lists
 
+## 3.1 `dynamic_biblio_coupling()`
 
-#' # Dynamic networks: building the different lists
+This function creates a list of tbl graph from a corpus and its
+references in a direct citation data frame (the list of the references
+cited by each document) of the corpus. You can set different types of
+time windows, use different types of coupling methods, as well as to
+choose different methods to reduce the number of nodes and edges if you
+want to avoid creating too large networks.
 
-
-#' ## `dynamic_biblio_coupling()`
-
-#' This function creates a list of tbl graph from a corpus and its references in a direct
-#' citation data frame (the list of the references cited by each document) of the corpus.
-#' You can set different types of time windows, use different types of coupling methods,
-#' as well as to choose different methods to reduce the number of nodes and edges if you
-#' want to avoid creating too large networks. 
+``` r
 dynamic_biblio_coupling <- function(corpus, 
                                     direct_citation_dt, 
                                     source = "ID_Art",
@@ -1611,17 +1629,18 @@ dynamic_biblio_coupling <- function(corpus,
   
   return (tbl_list)
 }
+```
 
-#' # Functions for word analysis (titles) of networks 
+# 4 Functions for word analysis (titles) of networks
 
-#' ## `tf_idf()`
-#' 
-#' 
-#' This function takes as input a tidygraph object or a data frame with nodes, both with a community attribute, and analyzes
-#' the words use in the title of the articles to calculate the words with the highest TF-IDF
-#' value for each community.
-#' 
+## 4.1 `tf_idf()`
 
+This function takes as input a tidygraph object or a data frame with
+nodes, both with a community attribute, and analyzes the words use in
+the title of the articles to calculate the words with the highest TF-IDF
+value for each community.
+
+``` r
 tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_column = "Com_ID", color_column = "color",
                    com_name_column = "Community_name", com_size_column = "Size_com", treshold_com = 0.01, number_of_words = 12,
                    palette = NULL, size_title_wrap = 8, unstemming = TRUE) {
@@ -1838,4 +1857,4 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
   list_return <- list("plot" = tf_idf_plot, "list_words" = tf_idf_table)
   return(list_return)
 }
-
+```
