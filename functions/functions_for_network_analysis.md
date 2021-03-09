@@ -1,43 +1,62 @@
-Script for building the networks for moving time window
+List of the functions built for network analysis
 ================
 Aurélien Goutsmedt and Alexandre Truc
 2021-03-09
 
-  - [1 Building graphs - Basics](#building-graphs---basics)
-  - [2 Building Graphs - Secondary and to be
+  - [1 What is this script for?](#what-is-this-script-for)
+  - [2 GENERAL FUNCTIONS FOR NETWORK
+    ANALYSIS](#general-functions-for-network-analysis)
+      - [2.1 `bibliographic_coupling()`](#bibliographic_coupling)
+      - [2.2
+        `bibliographic_coupling_alt()`](#bibliographic_coupling_alt)
+      - [2.3
+        `bibliographic_coupling_authors()`](#bibliographic_coupling_authors)
+      - [2.4 `bibliographic_cocitation()`](#bibliographic_cocitation)
+  - [3 Building graphs - Basics](#building-graphs---basics)
+      - [3.1 `tbl_main_components()`](#tbl_main_components)
+  - [4 Building Graphs - Secondary and to be
     improved](#building-graphs---secondary-and-to-be-improved)
-  - [3 Dynamic networks: building the different
+  - [5 Dynamic networks: building the different
     lists](#dynamic-networks-building-the-different-lists)
-      - [3.1 `dynamic_biblio_coupling()`](#dynamic_biblio_coupling)
-  - [4 Functions for word analysis (titles) of
+      - [5.1 `dynamic_biblio_coupling()`](#dynamic_biblio_coupling)
+  - [6 Functions for word analysis (titles) of
     networks](#functions-for-word-analysis-titles-of-networks)
-      - [4.1 `tf_idf()`](#tf_idf)
+      - [6.1 `tf_idf()`](#tf_idf)
+
+# 1 What is this script for?
+
+This script lists all the functions built for network analysis for the
+project. The functions are documenting in a way to be later implemented
+in packages or at least for generating a help page (see below).
+
+We first load the
+[docstring](https://cran.r-project.org/web/packages/docstring/vignettes/docstring_intro.html)
+package to be able to write documentation in a roxygen2 style. You can
+then run docstring(name\_of\_function) to get the standard help page.
 
 ``` r
-# Loading a package to be able to write documentation to function in a way similar to Python
-# For any function with comments delineated by "#'", you can run docstring(name_of_function) to get the standard help page.
 if ("docstring" %in% installed.packages() == FALSE) {
   install.packages("docstring", dependencies = TRUE)
 }
 library(docstring)
 ```
 
-    ## 
-    ## Attaching package: 'docstring'
+# 2 GENERAL FUNCTIONS FOR NETWORK ANALYSIS
 
-    ## The following object is masked from 'package:utils':
-    ## 
-    ##     ?
+The functions in this section are uniquely used in the
+[Static\_Network\_Analysis](/Static_Network_Analysis) directory to build
+networks for different sub-periods, but are not used any more as they
+have been integrated and improved in the
+[biblionetwork](https://agoutsmedt.github.io/biblionetwork/index.html)
+package.
+
+## 2.1 `bibliographic_coupling()`
+
+This function could now be replace by
+[biblio\_coupling()](https://agoutsmedt.github.io/biblionetwork/reference/biblio_coupling.html)
+in the biblionetwork package.
 
 ``` r
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-################## PART I: GENERAL FUNCTIONS FOR NETWORK ANALYSIS #######################-----
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-######################## 1) Building Nodes and Edges ########################------
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-
 bibliographic_coupling <- function(dt, source, ref, normalized_weight_only = TRUE, weight_threshold = 1, output_in_character = TRUE) {
   #' function for edges of bibliographic coupling
   #'
@@ -136,6 +155,12 @@ bibliographic_coupling <- function(dt, source, ref, normalized_weight_only = TRU
 }
 ```
 
+## 2.2 `bibliographic_coupling_alt()`
+
+This function could now be replace by
+[coupling\_strength()](https://agoutsmedt.github.io/biblionetwork/reference/coupling_strength.html)
+in the biblionetwork package.
+
 ``` r
 bibliographic_coupling_alt <- function(dt, source, ref, weight_threshold = 1) {
   #' function for edges of bibliographic coupling
@@ -215,7 +240,15 @@ bibliographic_coupling_alt <- function(dt, source, ref, weight_threshold = 1) {
 
   return(bib_coup)
 }
+```
 
+## 2.3 `bibliographic_coupling_authors()`
+
+This function could now be replace by
+[coupling\_entity()](https://agoutsmedt.github.io/biblionetwork/reference/coupling_entity.html)
+in the biblionetwork package.
+
+``` r
 bibliographic_coupling_authors <- function(dt, source, ref, authors, weight_threshold = 1) {
   #' function for edges of bibliographic coupling
   #'
@@ -318,7 +351,15 @@ bibliographic_coupling_authors <- function(dt, source, ref, authors, weight_thre
 
   return(bib_coup)
 }
+```
 
+## 2.4 `bibliographic_cocitation()`
+
+This function could now be replace by
+[biblio\_cocitation()](https://agoutsmedt.github.io/biblionetwork/reference/biblio_cocitation.html)
+in the biblionetwork package.
+
+``` r
 bibliographic_cocitation <- function(dt, source, ref, normalized_weight_only = TRUE, weight_threshold = 1, output_in_character = TRUE) {
   #' function for creating the edges of bibliographic cocitation
   #'
@@ -423,7 +464,17 @@ bibliographic_cocitation <- function(dt, source, ref, normalized_weight_only = T
 }
 ```
 
-# 1 Building graphs - Basics
+# 3 Building graphs - Basics
+
+Some of the functions here are not necessary anymore as they have been
+implemented and improved in the
+[networkflow](https://github.com/agoutsmedt/networkflow) package.
+
+## 3.1 `tbl_main_components()`
+
+See now the
+[`tbl_main_component`](https://github.com/agoutsmedt/networkflow/blob/master/R/tbl_main_component.R)
+function in networkflow package.
 
 ``` r
 tbl_main_components <- function(edges, nodes, directed = FALSE, node_key = NULL, nb_components = 1, threshold_alert = 0.05) {
@@ -1006,7 +1057,7 @@ label_com <- function(graph, biggest_community = FALSE, community_threshold = 0.
 }
 ```
 
-# 2 Building Graphs - Secondary and to be improved
+# 4 Building Graphs - Secondary and to be improved
 
 This function takes as input a tidygraph object, it switches the names
 of individual nodes by the name of their community, calculate the number
@@ -1355,9 +1406,9 @@ important_nodes <- function(graph, top_n = 3) {
 # ideally an aggregation of the top_centrality_com function for different centrality measure
 ```
 
-# 3 Dynamic networks: building the different lists
+# 5 Dynamic networks: building the different lists
 
-## 3.1 `dynamic_biblio_coupling()`
+## 5.1 `dynamic_biblio_coupling()`
 
 This function creates a list of tbl graph from a corpus and its
 references in a direct citation data frame (the list of the references
@@ -1631,9 +1682,9 @@ dynamic_biblio_coupling <- function(corpus,
 }
 ```
 
-# 4 Functions for word analysis (titles) of networks
+# 6 Functions for word analysis (titles) of networks
 
-## 4.1 `tf_idf()`
+## 6.1 `tf_idf()`
 
 This function takes as input a tidygraph object or a data frame with
 nodes, both with a community attribute, and analyzes the words use in

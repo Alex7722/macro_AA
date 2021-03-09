@@ -1,32 +1,42 @@
-#' ---
-#' title: "Script for building the networks for different sub-periods"
-#' author: "Aurélien Goutsmedt and Alexandre Truc"
-#' date: "`r format(Sys.Date())`"
-#' output: 
-#'   github_document:
-#'     toc: true
-#'     number_sections: true
-#' ---
+Script for building the networks for different sub-periods
+================
+Aurélien Goutsmedt and Alexandre Truc
+2021-03-09
 
-#+ r setup, include = FALSE
-knitr::opts_chunk$set(eval = FALSE)
+  - [1 What is this script for?](#what-is-this-script-for)
+  - [2 LOADING PACKAGES, PATH AND DATA](#loading-packages-path-and-data)
+      - [2.1 External scripts](#external-scripts)
+      - [2.2 Loading Data](#loading-data)
+  - [3 Bibliographic Cocitation](#bibliographic-cocitation)
+  - [4 Bibliographic Coupling](#bibliographic-coupling)
+  - [5 Bibliographic Coupling with
+    Authors](#bibliographic-coupling-with-authors)
+  - [6 Institutions network from
+    Coupling](#institutions-network-from-coupling)
+  - [7 Co-authorship](#co-authorship)
 
-#' # What is this script for?
-#' 
-#' In this script, we build different networks (cocitation, coupling, coupling with authors, co-authorship, _etc._)
-#' for different subperiods. Subperiods are fixed in another [script](/Static_Network_Analysis/Script_paths_and_basic_objects.R) loaded at the beginning
-#' (see the `start_date` and `end_date` objects). All the networks created are saved as `prior_` network and then loaded in
-#' the following [script](/Static_Network_Analysis/2_Script_Static_Network_Analysis.R).
-#' 
-#' # LOADING PACKAGES, PATH AND DATA
-#' 
-#' ## External scripts
+# 1 What is this script for?
 
+In this script, we build different networks (cocitation, coupling,
+coupling with authors, co-authorship, *etc.*) for different subperiods.
+Subperiods are fixed in another
+[script](/Script_paths_and_basic_objects.R) loaded at the beginning (see
+the `start_date` and `end_date` objects). All the networks created are
+saved as `prior_` network and then loaded in the following
+[script](/2_Script_Static_Network_Analysis.R).
+
+# 2 LOADING PACKAGES, PATH AND DATA
+
+## 2.1 External scripts
+
+``` r
 source("~/macro_AA/functions/functions_for_network_analysis.R")
 source("~/macro_AA/Static_Network_Analysis/Script_paths_and_basic_objects.R")
+```
 
-#' ## Loading Data
+## 2.2 Loading Data
 
+``` r
 nodes_JEL <- readRDS(paste0(data_path, "JEL_matched_corpus_nodes.rds"))
 nodes_old_JEL <- readRDS(paste0(data_path, "Old_JEL_matched_corpus_nodes.rds"))
 nodes_JEL <- rbind(nodes_JEL, nodes_old_JEL)
@@ -76,10 +86,11 @@ nodes_JEL <- nodes_JEL[, Nom := toupper(Nom)]
 # fixing threshold
 Limit_nodes <- 20000
 Limit_edges <- 300000
+```
 
+# 3 Bibliographic Cocitation
 
-#' # Bibliographic Cocitation
-
+``` r
 ############################### Building Nodes and Edges for co-citation #######################
 for (i in 1:length(start_date)) {
   percent_nodes_threshold <- 0.05
@@ -183,10 +194,11 @@ for (i in 1:length(start_date)) {
 
   saveRDS(graph_cocit, paste0(graph_data_path, "prior_graph_cocit_", start_date[i], "-", end_date[i], ".rds"))
 }
+```
 
+# 4 Bibliographic Coupling
 
-#' # Bibliographic Coupling
-
+``` r
 ############################### Building Nodes and Edges for coupling #######################-----------
 
 for (i in 1:length(start_date)) {
@@ -287,9 +299,11 @@ for (i in 1:length(start_date)) {
 
   saveRDS(graph_coupling, paste0(graph_data_path, "prior_graph_coupling_", start_date[i], "-", end_date[i], ".rds"))
 }
+```
 
-#' # Bibliographic Coupling with Authors
+# 5 Bibliographic Coupling with Authors
 
+``` r
 ################## Building an author bibliographic coupling graph ######################----
 
 for (i in 1:length(start_date)) {
@@ -344,7 +358,6 @@ for (i in 1:length(start_date)) {
       authors_JEL <- authors_JEL[, citing_author := Nom]
       nodes_coupling <- merge(nodes_coupling, unique(authors_JEL[, c("ID_Art", "citing_author")]), by = "ID_Art")
 
-
       # calculating the number of articles
       nodes_coupling <- nodes_coupling[, nb_art := .N, by = "citing_author"][nb_art >= nb_art_threshold]
 
@@ -357,7 +370,6 @@ for (i in 1:length(start_date)) {
       # not displayed in the graph)
 
       nodes_coupling[is.na(nb_cit), ]$nb_cit <- 0
-
 
       # choosing the nodes to keep
       nodes_coupling <- nodes_coupling[nb_cit >= nodes_coupling_threshold]
@@ -388,10 +400,11 @@ for (i in 1:length(start_date)) {
 
   saveRDS(graph_authors_coupling, paste0(graph_data_path, "prior_graph_authors_coupling_", start_date[i], "-", end_date[i], ".rds"))
 }
+```
 
-#' # Institutions network from Coupling
+# 6 Institutions network from Coupling
 
-
+``` r
 for (i in 1:length(start_date)) {
   nb_art_threshold <- 10
   edges_threshold <- 10
@@ -425,9 +438,11 @@ for (i in 1:length(start_date)) {
 
   saveRDS(graph_institutions_coupling, paste0(graph_data_path, "prior_graph_institutions_coupling_", start_date[i], "-", end_date[i], ".rds"))
 }
+```
 
-#' # Co-authorship
+# 7 Co-authorship
 
+``` r
 ################## Building a co-authorship graph ######################----
 
 for (i in 1:length(start_date)) {
@@ -481,3 +496,4 @@ for (i in 1:length(start_date)) {
 
   saveRDS(graph_institutions, paste0(graph_data_path, "prior_graph_co-authorship_institutions_", start_date[i], "-", end_date[i], ".rds"))
 }
+```
