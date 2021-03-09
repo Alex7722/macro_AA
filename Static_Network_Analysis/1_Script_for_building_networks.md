@@ -20,10 +20,11 @@ Aurélien Goutsmedt and Alexandre Truc
 In this script, we build different networks (cocitation, coupling,
 coupling with authors, co-authorship, *etc.*) for different subperiods.
 Subperiods are fixed in another
-[script](/Script_paths_and_basic_objects.R) loaded at the beginning (see
-the `start_date` and `end_date` objects). All the networks created are
-saved as `prior_` network and then loaded in the following
-[script](/2_Script_Static_Network_Analysis.R).
+[script](/Static_Network_Analysis/Script_paths_and_basic_objects.R)
+loaded at the beginning (see the `start_date` and `end_date` objects).
+All the networks created are saved as `prior_` network and then loaded
+in the following
+[script](/Static_Network_Analysis/2_Script_Static_Network_Analysis.R).
 
 # 2 LOADING PACKAGES, PATH AND DATA
 
