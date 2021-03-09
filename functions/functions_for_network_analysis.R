@@ -1,5 +1,5 @@
 #' ---
-#' title: "Script for building the networks for moving time window"
+#' title: "List of the functions built for network analysis"
 #' author: "Aurélien Goutsmedt and Alexandre Truc"
 #' date: "`r format(Sys.Date())`"
 #' output: 
@@ -8,20 +8,33 @@
 #'     number_sections: true
 #' ---
 
-# Loading a package to be able to write documentation to function in a way similar to Python
-# For any function with comments delineated by "#'", you can run docstring(name_of_function) to get the standard help page.
+#+ r setup, include = FALSE
+knitr::opts_chunk$set(eval = FALSE)
+
+#' # What is this script for?
+#' 
+#' This script lists all the functions built for network analysis for the project. The functions are documenting in a way to be
+#' later implemented in packages or at least for generating a help page (see below).
+#' 
+#' We first load the [docstring](https://cran.r-project.org/web/packages/docstring/vignettes/docstring_intro.html) package
+#' to be able to write documentation in a roxygen2 style. You can then run docstring(name_of_function) to get the standard help page.
+
 if ("docstring" %in% installed.packages() == FALSE) {
   install.packages("docstring", dependencies = TRUE)
 }
 library(docstring)
 
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-################## PART I: GENERAL FUNCTIONS FOR NETWORK ANALYSIS #######################-----
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-######################## 1) Building Nodes and Edges ########################------
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#' # GENERAL FUNCTIONS FOR NETWORK ANALYSIS
+#' 
+#' The functions in this section are uniquely used in the [Static_Network_Analysis](/Static_Network_Analysis) directory 
+#' to build networks for different sub-periods, but are not used any more as they have been integrated and improved in
+#' the [biblionetwork](https://agoutsmedt.github.io/biblionetwork/index.html) package.
+#' 
+#' ## `bibliographic_coupling()` 
+#' 
+#' This function could now be replaced by [biblio_coupling()](https://agoutsmedt.github.io/biblionetwork/reference/biblio_coupling.html) 
+#' in the biblionetwork package.
 
 bibliographic_coupling <- function(dt, source, ref, normalized_weight_only = TRUE, weight_threshold = 1, output_in_character = TRUE) {
   #' function for edges of bibliographic coupling
@@ -122,7 +135,11 @@ bibliographic_coupling <- function(dt, source, ref, normalized_weight_only = TRU
 
 
 
-#+ r
+#' ## `bibliographic_coupling_alt()`
+#'
+#' This function could now be replaced by [coupling_strength()](https://agoutsmedt.github.io/biblionetwork/reference/coupling_strength.html) 
+#' in the biblionetwork package.
+#' 
 bibliographic_coupling_alt <- function(dt, source, ref, weight_threshold = 1) {
   #' function for edges of bibliographic coupling
   #'
@@ -202,6 +219,10 @@ bibliographic_coupling_alt <- function(dt, source, ref, weight_threshold = 1) {
   return(bib_coup)
 }
 
+#' ## `bibliographic_coupling_authors()`
+#' 
+#' This function could now be replaced by [coupling_entity()](https://agoutsmedt.github.io/biblionetwork/reference/coupling_entity.html) 
+#' in the biblionetwork package.
 bibliographic_coupling_authors <- function(dt, source, ref, authors, weight_threshold = 1) {
   #' function for edges of bibliographic coupling
   #'
@@ -305,6 +326,11 @@ bibliographic_coupling_authors <- function(dt, source, ref, authors, weight_thre
   return(bib_coup)
 }
 
+#' ## `bibliographic_cocitation()` 
+#' 
+#'
+#' This function could now be replaced by [biblio_cocitation()](https://agoutsmedt.github.io/biblionetwork/reference/biblio_cocitation.html) 
+#' in the biblionetwork package.
 bibliographic_cocitation <- function(dt, source, ref, normalized_weight_only = TRUE, weight_threshold = 1, output_in_character = TRUE) {
   #' function for creating the edges of bibliographic cocitation
   #'
@@ -410,6 +436,14 @@ bibliographic_cocitation <- function(dt, source, ref, normalized_weight_only = T
 
 
 #' # Building graphs - Basics
+#' 
+#' Some of the functions here are not necessary anymore as they have been implemented and improved 
+#' in the [networkflow](https://github.com/agoutsmedt/networkflow) package. 
+#' 
+#' ## `tbl_main_components()`
+#' 
+#' See now the [`tbl_main_component()`](https://github.com/agoutsmedt/networkflow/blob/master/R/tbl_main_component.R)
+#'  function in networkflow package.
 
 tbl_main_components <- function(edges, nodes, directed = FALSE, node_key = NULL, nb_components = 1, threshold_alert = 0.05) {
   #' Main component tidygraph from edges and nodes
