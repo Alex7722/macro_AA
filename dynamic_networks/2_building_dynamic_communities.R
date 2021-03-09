@@ -15,7 +15,7 @@ source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
 ############################## 1) Make a List of tbl - coupling ##########################-----------------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 # loading the files 
-list_graph <- readRDS(paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
+list_graph <- readRDS(paste0(graph_data_path, "list_graph_", 1969, "-", 2011, ".rds"))
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -155,7 +155,7 @@ intertemporal_naming_function <- function(tbl_list = tbl_list,
   return (intertemporal_naming)
 }
 
-intertemporal_naming <- intertemporal_naming_function(tbl_list = list_graph, community_column = "Com_ID", individual_ids = "ID_Art")
+intertemporal_naming <- intertemporal_naming_function(tbl_list = list_graph, community_column = "Com_ID", individual_ids = "ID_Art", threshold_similarity = 0.60)
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### Compute values for alluv ####
@@ -198,15 +198,20 @@ alluv_dt <- make_into_alluv_dt(intertemporal_networks = intertemporal_naming)
 
 alluv_dt$new_Id_com   <- as.factor(alluv_dt$new_Id_com)
 alluv_dt$new_Id_com <- fct_reorder(alluv_dt$new_Id_com, alluv_dt$share_leiden_total,min, .desc = FALSE)
+#alluv_dt$new_Id_com <- fct_reorder(alluv_dt$new_Id_com, alluv_dt$n_years,min, .desc = FALSE)
+
 ######################### Colors **********************
-#color <- brewer.pal(8, name = "Dark2")
-#color2 <- brewer.pal(12, name = "Paired")
-#color3 <- brewer.pal(12, name = "Set3")
-#color_final <- append(color, color2)
-#color_final <- append(color_final, color3)
+color <- brewer.pal(8, name = "Dark2")
+color2 <- brewer.pal(12, name = "Paired")
+color3 <- brewer.pal(12, name = "Set3")
+scico <- scico(20, palette = "tokyo")
+color_final <- append(color, color2)
+color_final <- append(color_final, color3)
+color_final <- append(color_final, scico)
+mypalette <- append(color_final, mypalette)
 unique_ids_color <- data.table(
-  Leiden1 = as.character(alluv_dt[n_years>2 & share_leiden>=0.05,.N,new_Id_com]$new_Id_com), 
-  color = mypalette[c(1:alluv_dt[n_years>2 & share_leiden>=0.05,.N,new_Id_com][,.N])])
+  Leiden1 = as.character(alluv_dt[n_years>0 & share_leiden>=0.05,.N,new_Id_com]$new_Id_com), 
+  color = mypalette[c(1:alluv_dt[n_years>0 & share_leiden>=0.05,.N,new_Id_com][,.N])])
 alluv_dt<-merge(alluv_dt, unique_ids_color[,.(Leiden1,color)], by="Leiden1",all.x = TRUE)
 alluv_dt[is.na(color)==TRUE,color:="grey"]
 
@@ -217,8 +222,9 @@ label[,Label:=new_Id_com]
 
 alluv_dt<-merge(alluv_dt,label[,.(new_Id_com,Window,Label)], by = c("new_Id_com","Window"), all.x = TRUE) 
 
+
 ggplot(alluv_dt, aes(x = Window, y=share, stratum = new_Id_com, alluvium = ID_Art, fill = color, label = new_Id_com)) +
-  scale_fill_identity("Disciplines", labels = alluv$new_Id_com.x, breaks = alluv$color, guide = "legend") +
+  scale_fill_identity("Disciplines", guide = "legend") +
   geom_flow() +
   geom_stratum(alpha =1, size=1/10) +
   theme(legend.position = "none") +
@@ -227,11 +233,27 @@ ggplot(alluv_dt, aes(x = Window, y=share, stratum = new_Id_com, alluvium = ID_Ar
   ggsave(paste0(picture_path,"alluvial.png"), width = 40, height = 30, units = "cm")
 
 ################## search for tf-idf ############################
-alluv_dt<- alluv_dt[, Com_ID := new_Id_com]
-tf_idf_results <- tf_idf(tbl_graph(alluv_dt), unique_ids_color, 15, 4, treshold_com = 0.05, size_title_wrap=10)
-tf_idf_results 
+alluv_dt <- alluv_dt[, Com_ID := new_Id_com]
+alluv_dt <- alluv_dt[, share_max := max(share_leiden), by = "Com_ID"]
+tf_idf_results <- tf_idf(nodes = alluv_dt[color != "grey"],
+                         com_name_column = "new_Id_com",
+                         number_of_words = 15, 
+                         treshold_com = 0.05,
+                         com_size_column = "share_max",
+                         size_title_wrap=10,
+                         unstemming = FALSE)
+tf_idf_results$plot + ggsave(paste0(picture_path,"tf-idf.png"), width = 55, height = 55, units = "cm")
 
 saveRDS(tf_idf_results, paste0(graph_data_path, "tf_idf_alluvial", first_year, "-", last_year + time_window - 1, ".rds"))
+
+# adding a more simple label for naming communities later
+ID_bis <- unique(alluv_dt[color != "grey"][order(Window,-n_years), "Com_ID"])
+ID_bis <- ID_bis[, ID_bis:= 1:.N]
+alluv_dt <- merge(alluv_dt, ID_bis, by = "Com_ID")
+
+# saving the entire dt and just the community identifiers in csv
+write_csv2(unique(alluv_dt[,c("ID_bis","Com_ID")]), "community_list_1969-2015.csv")
+saveRDS(alluv_dt, paste0(graph_data_path, "alluv_dt_", first_year, "-", last_year + time_window - 1, ".rds"))
 
 ######################### Label **********************
 alluv_dt<-alluv_dt[, c("Label"):=NULL]
