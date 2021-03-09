@@ -1,0 +1,218 @@
+---
+title: "List of communities and their main features"
+output: 
+  html_document:
+    theme: readable
+    toc: true
+    number_sections: true
+    toc_float: true
+    toc_depth: 2
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+ if ("knitr" %in% installed.packages() == FALSE) {
+    install.packages(knitr, dependencies = TRUE)
+  }
+library(knitr)
+ if ("kableExtra" %in% installed.packages() == FALSE) {
+    install.packages(kableExtra, dependencies = TRUE)
+  }
+library(kableExtra)
+```
+
+```{r loading files}
+source("~/macro_AA/functions/functions_for_network_analysis.R")
+source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
+
+authors_JEL <- readRDS(paste0(data_path, "JEL_matched_corpus_authors.rds"))
+authors_old_JEL <- readRDS(paste0(data_path, "Old_JEL_matched_corpus_authors.rds"))
+authors_JEL <- rbind(authors_JEL, authors_old_JEL)
+
+#institutions_info_JEL <- fread(paste0(data_path, "Macro_AA_Institutions_Cleaned.csv"), quote = "", fill = TRUE) %>% data.table()
+
+ref_info_JEL <- readRDS(paste0(data_path, "JEL_matched_corpus_references_info.rds"))
+ref_info_old_JEL <- readRDS(paste0(data_path, "Old_JEL_matched_corpus_references_info.rds"))
+ref_info_JEL <- unique(rbind(ref_info_JEL, ref_info_old_JEL))
+
+# keepint only refs with a title and a ESpecialite, then removing doublons
+ref_info_JEL <- unique(ref_info_JEL[Titre != "NA" & ESpecialite != "NA", c("New_id2", "Titre", "ESpecialite")])
+doublons <- which(duplicated(ref_info_JEL$New_id2))
+
+if (length(doublons) != 0) {
+  ref_info_JEL <- ref_info_JEL[-doublons]
+}
+
+# Adding info to references
+edges_JEL <- merge(unique(edges_JEL), unique(ref_info_JEL[Titre != "NA" & ESpecialite != "NA", c("New_id2", "Titre", "ESpecialite")]), by = "New_id2", all.x = TRUE)
+edges_JEL <- merge(edges_JEL, unique(nodes_JEL[, c("ID_Art", "Annee_Bibliographique")]), by = "ID_Art", all.x = TRUE)
+
+# removing useless files
+
+rm(list = c("ref_info_JEL","ref_info_old_JEL","authors_old_JEL"))
+
+
+# loading alluvial data
+tf_idf_alluvial <- readRDS(paste0(graph_data_path, "tf_idf_alluvial", first_year, "-", last_year + time_window - 1, ".rds"))
+alluv_dt <- readRDS(paste0(graph_data_path, "alluv_dt_", first_year, "-", last_year + time_window - 1, ".rds"))
+alluv_dt <- alluv_dt[color != "grey"]
+alluv_dt <- merge(alluv_dt, nodes_JEL[,c("ID_Art","ItemID_Ref")], by = "ID_Art")
+
+
+```
+
+# Explanation of the process for naming communities
+
+The following document gathers different data we have produced to help you labeling the different communities identified.
+
+What is our method? We have extracted all the articles with a macro JEL code.^[Before 1991, we have used the [correspondence grid](https://www.jstor.org/stable/2727351?seq=1) between old and new categories built by the _Journal of Economic Literature_.] The first JEL are in 1969, and we stop our analysis in 2015, mainly because reaching post-2015 articles involve to go through another database and it is a supplementary work we don't want to go through for now. We have built bibliometric coupling networks (how many references two articles share in common) for moving five-year windows: 1969-1973, 1970-1974,1971-1975, _etc..._, until 2011-2015. For each five-year network, we use the [Leiden algorithm](https://www.nature.com/articles/s41598-019-41695-z) to detect communities/clusters within the network. The algorithm groups together nodes that have many links in common, and few links with nodes outside of the community. 
+
+In a second step, we have compared communities between networks. For instance, for the 1969-1973 and 1970-1974, we take all the articles published between 1970 and 1973 (i.e. those which are in both networks) and we look at which communities they belong. If one community (A) of 1969-1973 have a high share of its nodes in a community (B) of 1970-1974, and if a large share of the nodes of this community B comes from the same community A of 1969-1973, we consider that A and B are the same community. We have run this identification on the whole period.
+
+We have communities that just stay for five years, and some that persist for decades. Here is a visualization of the different communities (those which represent more than 5% of the nodes at least in one network) over time with their automatically generated labels. 
+
+```{r alluvial_plot}
+
+include_graphics(path.expand(paste0(picture_path,"alluvial.png")))
+
+```
+
+We think it is important to give names to community to better analyse our results and have more interesting visualizations, but we don't want to name these communities automatically (for instance by taking the most identifying word of the community). We want a "qualitative" assessment of what each community represents. That is what the following information should help to do.
+
+# List of the main macroeconomics communities on the 1969-2015 period
+
+You will find below basic information on each community to help you to name them.
+
+Two names has to be given to the communities:
+- A "meta-name", which could be the same for different communities and which represent a meta-category to which the community belongs. It could be: Econometrics, Macro Policy, International Macroeconomics, Business Cycles...
+- A  sub-name for the community (that will be complemented by the "meta-name"), which is unique. Examples are: Phillips Curve and Rational Expectations (with the meta-name, it would give: "Business Cycles - Phillips Curve and Rational Expectations"), Exchange Rate Forecasting, Disequilibrium Theory, OLG Models...
+
+I have already created a list of meta-names. The meta-names are more or less inspired by the JEL categories for macroeconomics. You are more than welcome to disagree with this list of meta-names and to think it does not properly allow to give names to the communities, and thus to suggest deletion, addition or replacement (see below how to express your disagreement). I also have a list of sub-names that I used in a former categorization. It could inspire you but you are not tied to use them. 
+
+Using the information gathered below on each community, you will be able to give names for each community. You will do this separately from the others, not to be influenced. At the end, I will compare the results and choose the more suitable categorisation.
+
+> **How to fill the google.sheets table?**
+>
+>
+> You will find two sheets in the table:
+>
+>
+>   - a first sheet with a first list of meta-names and sub-names that I have created. If you think the meta-names should be changed, please comments the problematic meta-names or add new ones (justifying your choice in the `comments` column). In `Aurelien's comments` you can find some justification for having chosen such or such meta-names. 
+>   - a second sheet with the list of the communities with its first ID, called `Com_ID` (the same as in the graph above) and a `ID_bis` used to identify them below. Please give a `meta-name` and a `sub-name` to each community. If you are hesitating, you can give a `meta-name-2` and a `sub-name-2`. Don't hesitate to add `comments` if you are not sure at all, if you have suggestions, if you want to justify your choice, _etc._.
+> 
+> You can find here your respective google sheet to name communities (don't look at others'):
+>
+>   - Béatrice
+>   - Francesco
+>   - Matthieu
+>   - Pedro
+>   - Romain
+
+In what follows, you will find information for each community about:
+
+- The first year of the first five-year window the community appears for the first time and the last year of the last window before it disappears;
+- The number of nodes in the community, what it represents in the whole corpus, and what the community represents in the five-year window it is the largest in proportion;
+- The five authors that have published the highest number of articles in the community;
+- The five journals that have published the highest number of articles in the community;
+- The articles of the community that were the most cited by all the articles of the corpus in the same period as the community existence. If a community remains from 1978 to 1991, we look at the number of citations of each article within the community, by articles of the whole corpus published between 1978-1991. It will tend to favor the oldest articles in the community, but that is not a problem for naming the communities.
+- The references (articles, books, book chapters...) that are the most cited by the articles of the community.
+- The terms (in the articles titles) that "identify" the most the communities. We use the [Term-Frequency/Inverse-Document-Frequency](https://en.wikipedia.org/wiki/Tf%E2%80%93idf) measure. The Term-Frequency part simply looks at the number of time a term is used (above the total number of words used by the community), whereas the Inverse-Document-Frequency calculates in how many communities a term appear. The higher the number of communities it appear, the lower the IDF. In other words, a term has a high TF-IDF value if it is used a lot in a community, but not used in many other communities.
+
+
+```{r,results = "asis"}
+for (com in unique(alluv_dt[order(ID_bis)]$Com_ID)) {
+  ####################### Preparing the data to put in the template
+  
+  # restricting alluv_dt to the community at stake
+  alluv_com  <- alluv_dt[Com_ID == com]
+  # extracting the first year and last year of the community
+  window <- as.integer(c(min(unique(alluv_com$Window)), as.integer(max(unique(alluv_com$Window))) + (time_window - 1)))
+
+  # number of citations of citing articles and references
+  nb_cit <- edges_JEL[ID_Art %in% nodes_JEL[between(Annee_Bibliographique, window[1],window[2])]$ID_Art][,nb_cit := .N, by = "ItemID_Ref"] # this is the most cited nodes in the period
+  refs_alluv <- edges_JEL[ID_Art %in% alluv_com$ID_Art][,nb_cit := .N, by = "New_id2"][, c("New_id2","Nom","Annee","Revue_Abbrege","Titre","nb_cit")] # this is the most cited ref by the nodes of the community
+  alluv_com <- merge(alluv_com, unique(nb_cit[,c("ItemID_Ref","nb_cit")]), by = "ItemID_Ref", all.x = TRUE)
+  alluv_com <- merge(alluv_com, nodes_JEL[,c("ID_Art","Annee_Bibliographique","Nom","Revue")], by = "ID_Art", all.x = TRUE)
+  authors_alluv <- merge(alluv_com[,c("ID_Art","Com_ID")], authors_JEL[,c("ID_Art","Nom","Ordre")], by = "ID_Art")
+  
+# cleaning useless files  
+rm("nb_cit")
+
+# Keeping the n nodes with the highest number of citations in our corpus, per community
+most_cited_nodes <- unique(alluv_com[, c("Nom","Annee_Bibliographique","Titre","nb_cit")])
+most_cited_nodes <- most_cited_nodes %>%
+  arrange(desc(nb_cit)) %>%
+  slice(1:10)
+
+# Most cited reference in the community
+doublons <- which(duplicated(refs_alluv[,c("New_id2")]))
+
+if(length(doublons) != 0){
+  refs_alluv <- refs_alluv[-doublons]
+}
+
+most_cited_ref <-  refs_alluv %>%
+  select(-New_id2) %>% 
+  unique() %>% 
+  arrange(desc(nb_cit)) %>%
+  slice(1:15) 
+
+# keeping the n authors the most present in coupling communities
+authors_alluv <- authors_alluv[, nb_art := .N, by = "Nom"]
+main_author <- authors_alluv %>%
+  select(Nom,nb_art) %>% 
+  unique() %>%
+  arrange(desc(nb_art)) %>%
+  slice(1:5)
+
+# keeping the n more important journals
+main_journals <- unique(alluv_com[, c("ID_Art","Revue")])
+main_journals <- main_journals[, nb_art := .N, by = "Revue"]
+main_journals <- main_journals %>%
+  select(Revue,nb_art) %>% 
+  unique() %>% 
+  arrange(desc(nb_art)) %>%
+  slice(1:5)
+
+################ Beginning of the template ######################
+  cat(sprintf("  \n## Community %s (`%s`) \n\n", unique(alluv_com[Com_ID == com]$ID_bis),com))
+  cat(paste0("  \nThe community exists from ", window[1]," to ", window[2],". \n"))
+  cat(paste0("  \nThe community gathers ",length(unique(alluv_com$ID_Art))," articles. It represents ", round(unique(alluv_com$share_leiden_total)*100,2), "% of the whole corpus. In the five-year window when its share in the network is the bigggest, it represents ", round(unique(alluv_com$share_max)*100,2), "% of the corresponding five-year network. \n"))
+  cat(paste0("  \nThe five most prolific authors in this community are ",paste0(main_author$Nom," (",main_author$nb_art,")", collapse = ", "),". \n"))
+  cat(paste0("  \nThe five journals with the highest number of articles in this community are ",paste0(main_journals$Revue," (",main_journals$nb_art,")", collapse = ", "),". \n"))
+
+  
+  cat(sprintf("  \n### Most cited articles of the community %s \n\n", unique(alluv_com[Com_ID == com]$ID_bis)))
+  cat(paste0("In the next table, you have the ten most cited articles of the community by articles of the whole corpus published between ", window[1]," and ", window[2],". \n\n"))
+  
+  print(kbl(most_cited_nodes,
+            col.names = c("First Author","Year","Title","Citations")) %>% 
+  kable_styling(bootstrap_options = c("striped","condensed")))
+  
+  cat(sprintf("  \n### Most cited references by the community %s \n\n", unique(alluv_com[Com_ID == com]$ID_bis)))
+  cat(paste0("In the next table, you have the fifteen most cited references by the articles of the community. \n\n"))
+  
+  print(kbl(most_cited_ref,
+            col.names = c("First Author","Year","Book title or journal (abbrv.)","Title","Citations")) %>% 
+        kable_styling(bootstrap_options = c("striped","condensed")))
+  
+  cat(sprintf("  \n### Terms with the highest TF-IDF value in community %s \n\n", unique(alluv_com[Com_ID == com]$ID_bis)))
+  cat(paste0("  \nWe have extracted all the terms (unigram and bigram, that is one word and two words in the title of all the community articles. We display here the 15 terms which indentifies the most this particular community, in comparison to the other communities."))
+plot(ggplot(tf_idf_alluvial$list_words[Com_ID == com], aes(reorder_within(term, count, color), count, fill = color)) +
+    geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
+    labs(
+      title = "Highest tf-idf",
+      x = "Words", y = "tf-idf"
+    ) +
+    scale_fill_identity() +
+    scale_x_reordered() +
+    coord_flip() +
+    theme_minimal())
+
+ # print(kable(head(alluv_dt[Com_ID == com],5)))
+  
+  cat("  \n")
+}
+```
+
