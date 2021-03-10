@@ -1,30 +1,31 @@
-#' ---
-#' title: "Script for finding persisting communities"
-#' author: "Aurélien Goutsmedt and Alexandre Truc"
-#' date: "`r format(Sys.Date())`"
-#' output: github_document
-#' ---
-#' 
-#' ## Introduction
-#' 
-#' This  takes as an input the list of networks saved in the previous 
-#' [script](/dynamic_networks/1_building_dynamic_networks.md) The script implements a procedure 
-#' to find communities that are persisting over time. 
-#' Basically, for each community in two close networks (for instance 1973-1977 and 1974-1978), it looks how many nodes 
-#' existing in both networks (that is articles published between 1974 and 1977) are in each community. If a community A 
-#' from 1973-1977 has a high percentage of nodes going in community B from 1974-1978, and if a large proportion of nodes 
-#' in community B comes from A, thus we consider A and B as the same community. The procedure is implemented for the whole
-#' period and we save the data.frame with all the nodes for each period and the community they belong to for each window.
-#' 
-#' We also project the composition of each network and the flows between communities in the whole period.
-#' 
-#' > WARNING: This script still needs a lot of cleaning
+Script for finding persisting communities
+================
+Aurélien Goutsmedt and Alexandre Truc
+2021-03-10
 
-#+ r setup, include = FALSE
-knitr::opts_chunk$set(eval = FALSE)
+## Introduction
 
-#' ## LOADING PACKAGES, PATH AND DATA
+This takes as an input the list of networks saved in the previous
+[script](/dynamic_networks/1_building_dynamic_networks.md) The script
+implements a procedure to find communities that are persisting over
+time. Basically, for each community in two close networks (for instance
+1973-1977 and 1974-1978), it looks how many nodes existing in both
+networks (that is articles published between 1974 and 1977) are in each
+community. If a community A from 1973-1977 has a high percentage of
+nodes going in community B from 1974-1978, and if a large proportion of
+nodes in community B comes from A, thus we consider A and B as the same
+community. The procedure is implemented for the whole period and we save
+the data.frame with all the nodes for each period and the community they
+belong to for each window.
 
+We also project the composition of each network and the flows between
+communities in the whole period.
+
+> WARNING: This script still needs a lot of cleaning
+
+## LOADING PACKAGES, PATH AND DATA
+
+``` r
 source("~/macro_AA/functions/functions_for_network_analysis.R")
 source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
 
@@ -276,4 +277,4 @@ alluv_dt <- merge(alluv_dt, ID_bis, by = "Com_ID")
 # saving the entire dt and just the community identifiers in csv
 write_csv2(unique(alluv_dt[,c("ID_bis","Com_ID")]), "community_list_1969-2015.csv")
 saveRDS(alluv_dt, paste0(graph_data_path, "alluv_dt_", first_year, "-", last_year + time_window - 1, ".rds"))
-
+```
