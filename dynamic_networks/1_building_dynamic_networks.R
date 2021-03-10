@@ -13,7 +13,10 @@
 #' of communities, calculates coordinates and saves the nodes and edges data in a long format,
 #' used for producing the platform.
 #' 
-#' ## PART I: LOADING PACKAGES, PATH AND DATA
+#' 
+#' > WARNING: This script still needs a lot of cleaning
+#' 
+#' ## LOADING PACKAGES, PATH AND DATA
 
 #+ r setup, include = FALSE
 knitr::opts_chunk$set(eval = FALSE)

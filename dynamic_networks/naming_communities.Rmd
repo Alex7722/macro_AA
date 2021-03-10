@@ -58,8 +58,6 @@ tf_idf_alluvial <- readRDS(paste0(graph_data_path, "tf_idf_alluvial", first_year
 alluv_dt <- readRDS(paste0(graph_data_path, "alluv_dt_", first_year, "-", last_year + time_window - 1, ".rds"))
 alluv_dt <- alluv_dt[color != "grey"]
 alluv_dt <- merge(alluv_dt, nodes_JEL[,c("ID_Art","ItemID_Ref")], by = "ID_Art")
-
-
 ```
 
 # Explanation of the process for naming communities
@@ -72,7 +70,7 @@ In a second step, we have compared communities between networks. For instance, f
 
 We have communities that just stay for five years, and some that persist for decades. Here is a visualization of the different communities (those which represent more than 5% of the nodes at least in one network) over time with their automatically generated labels. 
 
-```{r alluvial_plot}
+```{r alluvial_plot, eval=TRUE}
 
 include_graphics(path.expand(paste0(picture_path,"alluvial.png")))
 
@@ -120,7 +118,7 @@ In what follows, you will find information for each community about:
 - The terms (in the articles titles) that "identify" the most the communities. We use the [Term-Frequency/Inverse-Document-Frequency](https://en.wikipedia.org/wiki/Tf%E2%80%93idf) measure. The Term-Frequency part simply looks at the number of time a term is used (above the total number of words used by the community), whereas the Inverse-Document-Frequency calculates in how many communities a term appear. The higher the number of communities it appear, the lower the IDF. In other words, a term has a high TF-IDF value if it is used a lot in a community, but not used in many other communities.
 
 
-```{r,results = "asis"}
+```{r,results = "asis", eval=TRUE}
 for (com in unique(alluv_dt[order(ID_bis)]$Com_ID)) {
   ####################### Preparing the data to put in the template
   

@@ -8,7 +8,7 @@ cran_list <- c(
   "data.table", "magrittr", "ggnewscale", "igraph","quanteda","forcats",
   "tidytext", "ggraph", "tidygraph", "ggrepel", "leidenAlg", "reshape2", "scales", 
   "ggforce", "directlabels", "patchwork", "DescTools", "DT", "grid", "scico",
-  "ggalluvial", "knitr", "dplyr","gridExtra","readr","stringi","tm","stringr",
+  "ggalluvial", "dplyr","gridExtra","readr","stringi","tm","stringr",
   "RColorBrewer"
 )
 for (p in cran_list) {

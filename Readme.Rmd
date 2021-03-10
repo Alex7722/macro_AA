@@ -2,6 +2,7 @@
 title: "Presentation of the Mapping Macroeconomics Project"
 author: Aurélien Goutsmedt and Alexandre Truc
 output: github_document
+bibliography: Bibliography.bib
 ---
 
 ```{r setup, include=FALSE}
@@ -47,4 +48,4 @@ This file gathers some tests with interactive networks. Not really useful for ou
 
 Here are all the scripts and docs used by Aurélien and Alexandre for their paper on the _European Economic Review_.
 
-
+## References
