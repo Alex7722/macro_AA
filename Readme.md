@@ -35,11 +35,12 @@ historians’ capacity to grasp the overall picture of the time.
 We agree with those who consider that developing collective quantitative
 tools could help historians to confront this challenge. The issues and
 uses of quantitative tools in history of economics have been the topic
-of many discussions in our field—see for instance @backhouse1998,
-@claveau2016 and the *Journal of Economic Methodology* special issue in
-2018, in particular @edwards2018a and @cherrier2018a—, but the technical
-barrier posed by the methods remains an obstacle for many historians.
-The challenges and opportunities that a quantitative history brings are
+of many discussions in our field—see for instance Backhouse (1998),
+Claveau and Gingras (2016) and the *Journal of Economic Methodology*
+special issue in 2018, in particular Edwards, Giraud, and Schinckus
+(2018) and Cherrier and Svorenčík (2018)—, but the technical barrier
+posed by the methods remains an obstacle for many historians. The
+challenges and opportunities that a quantitative history brings are
 particularly useful to the recent history of macroeconomics. Practising
 macroeconomists are eager to tell narratives of the evolution of their
 field that serve the purpose of intervening on current debates, by
@@ -93,3 +94,44 @@ data/networks.
 
 Here are all the scripts and docs used by Aurélien and Alexandre for
 their paper on the *European Economic Review*.
+
+## References
+
+<div id="refs" class="references">
+
+<div id="ref-backhouse1998">
+
+Backhouse, Roger E. 1998. “The Transformation of U.S. Economics,
+1920-1960, Viewed Through a Survey of Journal Articles.” *History of
+Political Economy* 30 (4): 85–107.
+<http://search.ebscohost.com/login.aspx?direct=true&db=bth&AN=7752166&lang=fr&site=ehost-live>.
+
+</div>
+
+<div id="ref-cherrier2018a">
+
+Cherrier, Beatrice, and Andrej Svorenčík. 2018. “The Quantitative Turn
+in the History of Economics: Promises, Perils and Challenges.” *Journal
+of Economic Methodology* 0 (0): 1–11.
+<https://doi.org/10.1080/1350178X.2018.1529217>.
+
+</div>
+
+<div id="ref-claveau2016">
+
+Claveau, François, and Yves Gingras. 2016. “Macrodynamics of Economics:
+A Bibliometric History.” *History of Political Economy* 48 (4): 551–92.
+<https://read.dukeupress.edu/hope/article-abstract/48/4/551/12684/Macrodynamics-of-Economics-A-Bibliometric-History>.
+
+</div>
+
+<div id="ref-edwards2018a">
+
+Edwards, José, Yann Giraud, and Christophe Schinckus. 2018. “A
+Quantitative Turn in the Historiography of Economics?” *Journal of
+Economic Methodology* 25 (4): 283–90.
+<https://doi.org/10.1080/1350178X.2018.1529133>.
+
+</div>
+
+</div>
