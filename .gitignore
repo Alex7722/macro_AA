@@ -20,3 +20,5 @@
 .Rproj.user
 .Rhistory
 
+# bibliography
+*.bib
