@@ -1,7 +1,7 @@
 #' ---
 #' title: "List of the functions built for network analysis"
 #' author: "Aurélien Goutsmedt and Alexandre Truc"
-#' date: "`r format(Sys.Date())`"
+#' date: "/ Last compiled on `r format(Sys.Date())`"
 #' output: 
 #'   github_document:
 #'     toc: true
@@ -1243,7 +1243,7 @@ graph_from_attribute <- function(nodes, edges, palette, Attribute_name, nb_compo
   }
 }
 
-clustering_communities <- function(graph, label_size = 6, threshold_com = 0.01) {
+clustering_communities <- function(graph, label_size = 6, number_size = 6, threshold_com = 0.01) {
   #' Function for building a heatmap of the communities
   #'
   #' This function takes as input a tidygraph object with communities as nodes and produce a heatmap of the links
@@ -1310,9 +1310,9 @@ clustering_communities <- function(graph, label_size = 6, threshold_com = 0.01) 
 
   # saving the heat map
   plot_heatmap <- ggplot(matrix, aes(x = Var1, y = Var2, fill = value)) +
-    geom_tile() +
-    theme(text = element_text(size = 14)) +
-    geom_text(aes(x = Var1, y = Var2, label = value), color = "black", size = label_size) +
+    geom_tile(show.legend = FALSE) +
+    theme(text = element_text(size = label_size)) +
+    geom_text(aes(x = Var1, y = Var2, label = value), color = "black", size = number_size) +
     scale_fill_viridis(discrete = FALSE) +
     ylab("In the cluster...") +
     xlab("...X% of links goes to")

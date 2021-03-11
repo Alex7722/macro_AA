@@ -1,10 +1,11 @@
 Script for building the networks for different sub-periods
 ================
 Aurélien Goutsmedt and Alexandre Truc
-2021-03-09
+/ Last compiled on 2021-03-11
 
   - [1 What is this script for?](#what-is-this-script-for)
-  - [2 LOADING PACKAGES, PATH AND DATA](#loading-packages-path-and-data)
+  - [2 Loading packages, paths and
+    data](#loading-packages-paths-and-data)
       - [2.1 External scripts](#external-scripts)
       - [2.2 Loading Data](#loading-data)
   - [3 Bibliographic Cocitation](#bibliographic-cocitation)
@@ -24,9 +25,17 @@ Subperiods are fixed in another
 loaded at the beginning (see the `start_date` and `end_date` objects).
 All the networks created are saved as `prior_` network and then loaded
 in the following
-[script](/Static_Network_Analysis/2_Script_Static_Network_Analysis.R).
+[script](/Static_Network_Analysis/2_Script_Static_Network_Analysis.md).
+Initially, we have created three seven-year periods (1970-1976,
+1977-1983, 1984-1990) and three six-year periods (1991-1996, 1997-2002,
+2003-2008). We maintained the break in 1990/1991 to take into account
+the JEL change of classification.
 
-# 2 LOADING PACKAGES, PATH AND DATA
+> WARNING: This script represents a first step of the project, and some
+> processes have been improved (notably by the creation of new
+> functions).
+
+# 2 Loading packages, paths and data
 
 ## 2.1 External scripts
 

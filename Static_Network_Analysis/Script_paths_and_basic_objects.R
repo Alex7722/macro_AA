@@ -5,11 +5,11 @@
 ##################### Packages ############################################--------------
 
 cran_list <- c(
-  "data.table", "tidyverse", "ggnewscale", "igraph",
-  "tm", "quanteda", "tidytext", "ggraph", "tidygraph", "ggrepel", "vite",
+  "data.table", "tidyverse", "ggnewscale", "igraph","ggplot2",
+  "tm", "quanteda", "tidytext", "ggraph", "tidygraph", "vite",
   "reticulate", "leidenAlg", "reshape2", "scales", "scico",
-  "ggforce", "directlabels", "patchwork", "DescTools", "DT", "grid", "ggdendro",
-  "ggalluvial", "knitr")
+  "ggforce", "directlabels", "patchwork", "DescTools", "DT",
+  "grid", "ggdendro","ggalluvial","ggrepel","leiden")
 for (p in cran_list) {
   if (p %in% installed.packages() == FALSE) {
     install.packages(p, dependencies = TRUE)

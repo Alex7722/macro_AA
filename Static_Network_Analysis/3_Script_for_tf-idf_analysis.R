@@ -1,7 +1,7 @@
 #' ---
 #' title: "Script for building the networks for different sub-periods"
 #' author: "Aurélien Goutsmedt and Alexandre Truc"
-#' date: "`r format(Sys.Date())`"
+#' date: "/ Last compiled on `r format(Sys.Date())`"
 #' output: github_document
 #' ---
 
@@ -10,12 +10,12 @@ knitr::opts_chunk$set(eval = FALSE)
 
 #' # What is this script for?
 #' 
-#' This script load the different networks built in the former [scrip](/2_Script_Static_Network_Analysis.R) and
+#' This script load the different networks built in the former [script](/2_Script_Static_Network_Analysis.md) and
 #' extract the unigrams and bigrams in their title, to measure the tf-idf of these terms with the documents
 #' of the Inverse-Document-Frequency being the communities. It allows us to extract the terms that identify
 #' the most each community.
 #' 
-#' # LOADING PACKAGES, PATH AND DATA
+#' # Loading packages, paths and data
 #' 
 #' ## External scripts
 

@@ -1,9 +1,15 @@
 Script for introducing the manual names of the communities
 ================
 Aurélien Goutsmedt and Alexandre Truc
-2021-03-10
+/ Last compiled on 2021-03-11
 
-## Introduction
+  - [1 What is this script for?](#what-is-this-script-for)
+  - [2 Loading packages paths and
+    data](#loading-packages-paths-and-data)
+  - [3 Renaming using the new community names (in
+    construction)](#renaming-using-the-new-community-names-in-construction)
+
+# 1 What is this script for?
 
 This script aims at creating the networks for different time windows. We
 want one-year moving time windows on the whole period (1969-2016) and we
@@ -14,12 +20,16 @@ in a long format, used for producing the platform.
 
 > WARNING: This script is not finished at all
 
-# LOADING PACKAGES, PATH AND DATA
+# 2 Loading packages paths and data
 
 ``` r
 source("~/macro_AA/functions/functions_for_network_analysis.R")
 source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
+```
 
+# 3 Renaming using the new community names (in construction)
+
+``` r
 ######################### Label **********************
 alluv_dt<-alluv_dt[, c("Label"):=NULL]
 label[new_Id_com=="c6Nqp2v2", Label:="Macroeconomics"]
