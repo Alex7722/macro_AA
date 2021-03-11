@@ -1,6 +1,7 @@
 Presentation of the Mapping Macroeconomics Project
 ================
 Aurélien Goutsmedt and Alexandre Truc
+/ Last compiled on 2021-03-11
 
 ## What is the Mapping Macroeconomics Project
 
@@ -12,6 +13,8 @@ It is conducted by [Aurélien Goutsmedt](aurelien-goutsmedt.com) and
 Truc](https://sites.google.com/view/alexandre-truc/home-and-contact).
 The full project demand can be find
 [here](aurelien-goutsmedt.com/project/mapping-macroeconomics/proposal_hes.pdf).
+You can find a more in-depth presentation of the project
+[here](https://aurelien-goutsmedt.com/project/mapping-macroeconomics/).
 Several collaborators are likely to join us progressively.
 
 It takes as a point of departure that economics has been characterized
@@ -57,17 +60,20 @@ quantitative inquiries to support their own research work.
 
 ## Structure of the Github repository
 
+You will find in this repository all the R scripts used to build our
+data and analyses.
+
 ### Corpus
 
 You will find here all the scripts and documentation relative to the
-extractiong of the JEL codes from Econlit and the matching with Web of
+extraction of the JEL codes from Econlit and the matching with Web of
 Science database. It deals with generating the list of articles,
 references, authors, affiliations, *etc.* that will be used after.
 
 ### Static\_Network\_Analysis
 
-This file gathers all the scripts and documentation for the first step
-of the project:
+This [directory](/Static_Network_Analysis/Readme.md) gathers all the
+scripts and documentation for the first step of the project:
 
   - testing different tools and methods
   - first round of analysis of our data by segmenting them in several
@@ -76,8 +82,9 @@ of the project:
 
 ### dynamic\_networks
 
-This file gathers all the scripts and documentation for the production
-of data for the online platform. It deals with:
+This [directory](/dynamic_networks/Readme.md) gathers all the scripts
+and documentation for the production of data for the online platform. It
+deals with:
 
   - creating networks with a moving window;
   - finding communities that remain over the windows.

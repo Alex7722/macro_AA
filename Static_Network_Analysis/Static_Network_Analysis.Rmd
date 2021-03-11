@@ -1,17 +1,29 @@
 ---
-title: "Static_Network_Analysis"
+author: "Aurélien Goutsmedt and Alexandre Truc"
+date: "Last compiled on `r format(Sys.Date())`"
 output: 
-  html_document:
-    toc: true
+  rmdformats::material:
+    fig_width: 9
+    fig_height: 8
     number_sections: true
-    toc_float: true
     code_folding: hide
     df_print: paged
+    thumbnails: true
+    lightbox: true
+    gallery: true
+editor_options: 
+  chunk_output_type: inline
 ---
 
-```{r setup, include=FALSE}
+```{r, setup, include=FALSE}
+library(knitr)
 knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = TRUE, cache=FALSE, dev = "png")
 
+```
+
+
+
+```{r packages, eval = TRUE}
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 ############################## PART I: LOADING PACKAGES, PATH AND DATA ####################################--------------
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -72,13 +84,18 @@ nodes_JEL <- nodes_JEL[, Nom := toupper(Nom)]
 start_date <- c(1970,1977,1984,1991,1997,2003)
 end_date <- c(1976,1983,1990,1996,2002,2008)
 
-i = 1 # choosing the period to study
+ i = 1 # choosing the period to study
 
+title_var <- paste0("Network Analysis for ",start_date[i],"-",end_date[i])
 ```
+
+---
+title: `r title_var`
+---
 
 # Bibliographic Coupling 
 
-```{r}
+```{r,  eval = TRUE}
 graph_coupling <- readRDS(paste0(graph_data_path,"graph_coupling_",start_date[i],"-",end_date[i],".rds"))
 
 ```
@@ -90,7 +107,7 @@ For the bibliographic coupling network, first, we have kept all the JEL articles
 ## Projecting the Graph
 
 
-```{r}
+```{r,  eval = TRUE}
 
 include_graphics(path.expand(paste0(picture_path,"graph_coupling_",start_date[i],"-",end_date[i],".png")))
 ```
@@ -102,7 +119,7 @@ Follows a table summarizing major information about the communities of the bibli
 To see how communities are positionned on the graph below, just look at the label of the most cited nodes in the table, and spot it on the graph.  
 
 
-```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE,  eval = TRUE}
 
 # Extracting the nodes of the network
 Nodes_coupling <- graph_coupling %>%
@@ -286,7 +303,7 @@ datatable(coupling_com, rownames = TRUE,
 
 ## TF-IDF on communities
 
-```{r, fig.width = 17, fig.height = 13}
+```{r, fig.width = 17, fig.height = 13,  eval = TRUE}
 
 TF_IDF <- readRDS(paste0(graph_data_path,"tf-idf_coupling_",start_date[i],"-",end_date[i],".rds"))
 
@@ -295,7 +312,7 @@ TF_IDF$plot
 
 ## Analyzing relations between coupling communities
 
-```{r, fig.height= 10, fig.width=15}
+```{r, fig.width = 13, fig.height = 10, eval = TRUE, message = FALSE}
 ############################# Projection of the graph #########################
 
 # loading the graph if necessary
@@ -317,11 +334,11 @@ ggraph(graph_coupling_community, "manual", x = x, y = y) +
 ```
 
 
-```{r, fig.height= 12, fig.width=18}
+```{r, fig.height = 12, fig.width = 18,  eval = TRUE, message = FALSE}
 # plotting the heatmap with the dendrogram
-heatmap <- clustering_communities(graph_coupling_community)
+heatmap <- clustering_communities(graph_coupling_community, label_size = 20, number_size = 10)
 
-png(path.expand(paste0(picture_path,"heatmap_coupling_",start_date[i],"-",end_date[i],".png")), width = 1200, height = 1000)
+png(path.expand(paste0(picture_path,"heatmap_coupling_",start_date[i],"-",end_date[i],".png")), width = 2500, height = 2000, pointsize = 100)
 grid.newpage()
 print(heatmap$heatmap, vp = viewport(x = 0.4, y = 0.5, width = 0.75, height = 1.0))
 print(heatmap$dendrogram, vp = viewport(x = 0.87, y = 0.5, width = 0.2, height = 0.9))
@@ -333,7 +350,7 @@ include_graphics(path.expand(paste0(picture_path,"heatmap_coupling_",start_date[
 
 ## Studying other attributes
 
-```{r, fig.height= 10, fig.width=15}
+```{r, message = FALSE, eval = TRUE}
 # Using the function we have built
 nodes_coupling <- graph_coupling %>% activate(nodes) %>% as.data.table()
 edges_coupling <- graph_coupling %>% activate(edges) %>% as.data.table()
@@ -355,12 +372,12 @@ plot_graph_journal <- ggraph(graph_journal, "manual", x = x, y = y) +
   geom_label_repel(data = important_journals, aes(x=x, y=y, label = Id, fill = color), size = 3, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
   #scale_size_continuous(range = c(1,4)) +
   theme_void() +
-  ggsave(paste0(picture_path,"graph_revue_",start_date[i],"-",end_date[i],".png"), width=30, height=30, units = "cm")
+  ggsave(paste0(picture_path,"graph_revue_",start_date[i],"-",end_date[i],".png"), width=25, height=25, units = "cm")
 
 include_graphics(path.expand(paste0(picture_path,"graph_revue_",start_date[i],"-",end_date[i],".png")))
 ```
 
-```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE,  eval = TRUE}
 # Biggest journal per community to be displayed
 journal_table <- top_ordering(graph_journal, ordering_column = "Size_att", top_n = 20, top_n_com = 5)
 journal_table <- journal_table[order(Com_ID),1:3]
@@ -376,7 +393,7 @@ datatable(journal_table, rownames = TRUE,
 # Bibliographic coupling per authors
 
 
-```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE,  eval = TRUE}
 
 # loading the graph if necessary
 graph_authors_coupling <- readRDS(paste0(graph_data_path,"graph_authors_coupling_",start_date[i],"-",end_date[i],".rds"))
@@ -385,14 +402,14 @@ graph_authors_coupling <- readRDS(paste0(graph_data_path,"graph_authors_coupling
 
 To build the authors network from bibliographic coupling data, first, we have kept all the JEL articles that has been cited at least `r unique(V(graph_authors_coupling)$threshold)`. Second, for tractability, we have kept the links between two authors, only if they share at least `r unique(E(graph_authors_coupling)$threshold)` references in all the JEL articles they have published. The graph has been filtered by keeping only the 
 
-```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE,  eval = TRUE}
 
 include_graphics(path.expand(paste0(picture_path,"graph_authors_coupling_",start_date[i],"-",end_date[i],".png")))
 ```
 
 ## Analyzing relations between coupling communities
 
-```{r, fig.width = 17, fig.height = 13}
+```{r, fig.width = 17, fig.height = 13,  eval = TRUE}
 
 graph_authors_coupling_community <- readRDS( paste0(graph_data_path,"graph_authors_coupling_community_",start_date[i],"-",end_date[i],".rds"))
 
@@ -413,11 +430,11 @@ include_graphics(path.expand(paste0(picture_path,"graph_authors_coupling_communi
 ```
 
 
-```{r, fig.height= 12, fig.width=18}
+```{r, fig.height= 12, fig.width=18,  eval = TRUE}
 # plotting the heatmap with the dendrogram
-heatmap <- clustering_communities(graph_authors_coupling_community)
+heatmap <- clustering_communities(graph_authors_coupling_community, label_size = 20, number_size = 10)
 
-png(path.expand(paste0(picture_path,"heatmap_authors_coupling_",start_date[i],"-",end_date[i],".png")), width = 1200, height = 1000)
+png(path.expand(paste0(picture_path,"heatmap_authors_coupling_",start_date[i],"-",end_date[i],".png")), width = 2500, height = 2000)
 grid.newpage()
 print(heatmap$heatmap, vp = viewport(x = 0.4, y = 0.5, width = 0.75, height = 1.0))
 print(heatmap$dendrogram, vp = viewport(x = 0.87, y = 0.5, width = 0.2, height = 0.9))
@@ -427,7 +444,7 @@ include_graphics(path.expand(paste0(picture_path,"heatmap_authors_coupling_",sta
 ```
 
 
-```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE,  eval = TRUE}
 
 # Extracting the nodes of the network
 Nodes_authors_coupling <- graph_authors_coupling %>%
@@ -624,7 +641,7 @@ datatable(authors_coupling_com, rownames = TRUE,
 ```
 
 
-```{r, fig.width = 17, fig.height = 13}
+```{r, fig.width = 17, fig.height = 13,  eval = TRUE}
 
 TF_IDF_authors <- readRDS(paste0(graph_data_path,"tf-idf_authors_coupling_",start_date[i],"-",end_date[i],".rds"))
 
@@ -633,7 +650,7 @@ TF_IDF_authors$plot
 
 ## Network of Institution from Bibliographic Coupling
 
-```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE,  eval = TRUE}
 
   # loading the graph if necessary
 graph_institutions_coupling <- readRDS(paste0(graph_data_path,"graph_institutions_coupling_",start_date[i],"-",end_date[i],".rds"))
@@ -643,7 +660,7 @@ include_graphics(path.expand(paste0(picture_path,"graph_institutions_coupling_",
 ```
 
 
-```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE,  eval = TRUE}
 
 
 institutions_data <- graph_institutions_coupling %>% 
@@ -667,7 +684,7 @@ datatable(institutions_data, rownames = FALSE,
 
 ## Projecting the Graph
 
-```{r}
+```{r,  eval = TRUE}
 
 graph_cocit <- readRDS(paste0(graph_data_path,"graph_cocit_",start_date[i],"-",end_date[i],".rds"))
 
@@ -676,14 +693,14 @@ graph_cocit <- readRDS(paste0(graph_data_path,"graph_cocit_",start_date[i],"-",e
 For the bibliographic cocitation network, first, we have kept all the references that has been cited at least `r print(unique(V(graph_cocit)$threshold))`. Second, for tractability, we have kept the links between two references, only if they were at least `r print(unique(E(graph_cocit)$threshold))` times together.
 
 
-```{r}
+```{r,  eval = TRUE}
 
 include_graphics(path.expand(paste0(picture_path,"graph_cocit",start_date[i],"-",end_date[i],".png")))
 ```
 
 ## Analyzing the communities of co-citation
 
-```{r, fig.width = 17, fig.height = 13}
+```{r, fig.width = 17, fig.height = 13,  eval = TRUE}
 
 # loading the graph if necessary
 graph_cocit_community <- readRDS(paste0(graph_data_path,"graph_cocit_community_",start_date[i],"-",end_date[i],".rds"))
@@ -704,18 +721,18 @@ ggraph(graph_cocit_community, "manual", x = x, y = y) +
 
 ```
 
-```{r, fig.width = 17, fig.height = 13}
+```{r, fig.width = 17, fig.height = 13,  eval = TRUE}
 
 TF_IDF_cocit <- readRDS(paste0(graph_data_path,"tf-idf_cocit_",start_date[i],"-",end_date[i],".rds"))
 
 TF_IDF_cocit$plot
 ```
 
-```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE,  eval = TRUE}
 # plotting the heatmap with the dendrogram
-heatmap <- clustering_communities(graph_cocit_community)
+heatmap <- clustering_communities(graph_cocit_community, label_size = 20, number_size = 10)
 
-png(path.expand(paste0(picture_path,"heatmap_cocit_",start_date[i],"-",end_date[i],".png")), width = 1200, height = 1000)
+png(path.expand(paste0(picture_path,"heatmap_cocit_",start_date[i],"-",end_date[i],".png")), width = 2500, height = 2000)
 grid.newpage()
 print(heatmap$heatmap, vp = viewport(x = 0.4, y = 0.5, width = 0.75, height = 1.0))
 print(heatmap$dendrogram, vp = viewport(x = 0.87, y = 0.5, width = 0.2, height = 0.9))
@@ -725,7 +742,7 @@ include_graphics(path.expand(paste0(picture_path,"heatmap_cocit_",start_date[i],
 ```
 
 
-```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE,  eval = TRUE}
 
 # Extracting the nodes of the network
 Nodes_cocit <- graph_cocit %>%
@@ -821,7 +838,7 @@ datatable(cocit_com, rownames = TRUE,
 
 ## Projecting the Graph
 
-```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE,  eval = TRUE}
 
 graph_coauthorship <- readRDS(paste0(graph_data_path,"graph_coauthorship_",start_date[i],"-",end_date[i],".rds"))
 
@@ -832,7 +849,7 @@ include_graphics(path.expand(paste0(picture_path,"graph_coauthorship_",start_dat
 
 ## Network of institutions, from co-authorship data
 
-```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE,  eval = TRUE}
 
 graph_institutions <-  readRDS(paste0(graph_data_path,"graph_co-authorship_institutions_",start_date[i],"-",end_date[i],".rds"))
 
@@ -841,7 +858,7 @@ include_graphics(path.expand(paste0(picture_path,"graph_co-authorship_institutio
 ```
 
 
-```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE,  eval = TRUE}
 
 data_institutions <- graph_institutions %>%
   activate(nodes) %>%
@@ -869,7 +886,7 @@ datatable(data_institutions, rownames = FALSE,
 
 ## Linking the coupling and cocitation networks
 
-```{r, fig.height= 10, fig.width=15}
+```{r, fig.height= 10, fig.width=15,  eval = TRUE}
 
 ############sankey diagram cocit/coupling-------------
 # Loading the cocit and coupling graph if necessary
@@ -931,7 +948,7 @@ ggplot(sankey_data, aes(x, id = id, split = y, value = value)) +
 
 ```
 
-```{r, fig.height= 10, fig.width=15}
+```{r, fig.height= 10, fig.width=15,  eval = TRUE}
 
 ############sankey diagram cocit/coupling-------------
 # Loading the cocit and coupling graph if necessary
@@ -1001,7 +1018,7 @@ ggplot(sankey_data, aes(x, id = id, split = y, value = value)) +
 
 ## List of the communities for different resolution
 
-```{r, fig.height= 10, fig.width=15}
+```{r, fig.height= 10, fig.width=15,  eval = TRUE}
 Leiden_coupling <- readRDS(paste0(graph_data_path,"Leiden_coupling_",start_date[i],"-",end_date[i],".rds")) %>% as.data.table()
 resolution_set = c(2,1.5,1,0.5)
 
@@ -1040,7 +1057,7 @@ n = 8
 
 ## Sankey diagrams of the links between communities for different resolution
 
-```{r, fig.height= 10, fig.width=15}
+```{r, fig.height= 10, fig.width=15,  eval = TRUE}
 # Building the sankey diagrams:
   
 # Keeping only the relevant columns and counting the links

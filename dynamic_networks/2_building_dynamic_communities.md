@@ -1,9 +1,21 @@
 Script for finding persisting communities
 ================
 Aurélien Goutsmedt and Alexandre Truc
-2021-03-10
+/ Last compiled on 2021-03-11
 
-## Introduction
+  - [1 What is this script for](#what-is-this-script-for)
+  - [2 Loading packages, paths and
+    data](#loading-packages-paths-and-data)
+  - [3 Intertemporal Naming: Find Communities Across
+    Time](#intertemporal-naming-find-communities-across-time)
+      - [3.1 Transforming the data in alluvial compatible
+        data](#transforming-the-data-in-alluvial-compatible-data)
+      - [3.2 Projecting the alluvials and
+        saving](#projecting-the-alluvials-and-saving)
+      - [3.3 Search tf-idf values for each
+        community](#search-tf-idf-values-for-each-community)
+
+# 1 What is this script for
 
 This takes as an input the list of networks saved in the previous
 [script](/dynamic_networks/1_building_dynamic_networks.md) The script
@@ -23,28 +35,21 @@ communities in the whole period.
 
 > WARNING: This script still needs a lot of cleaning
 
-## LOADING PACKAGES, PATH AND DATA
+# 2 Loading packages, paths and data
 
 ``` r
 source("~/macro_AA/functions/functions_for_network_analysis.R")
 source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
 
-
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-############################## PART I: LOADING PACKAGES, PATH AND DATA ####################################--------------
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-############################## 1) Make a List of tbl - coupling ##########################-----------------------
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 # loading the files 
 list_graph <- readRDS(paste0(graph_data_path, "list_graph_", 1969, "-", 2011, ".rds"))
+```
 
+# 3 Intertemporal Naming: Find Communities Across Time
 
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-#### Intertemporal Naming: Find Communities Across Time ####
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+Identifying which communities are the same
 
+``` r
 intertemporal_naming_function <- function(tbl_list = tbl_list, 
                                           community_column = Leiden1,
                                           individual_ids = Id,
@@ -179,11 +184,11 @@ intertemporal_naming_function <- function(tbl_list = tbl_list,
 }
 
 intertemporal_naming <- intertemporal_naming_function(tbl_list = list_graph, community_column = "Com_ID", individual_ids = "ID_Art", threshold_similarity = 0.60)
+```
 
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-#### Compute values for alluv ####
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+## 3.1 Transforming the data in alluvial compatible data
 
+``` r
 make_into_alluv_dt <- function(intertemporal_networks = intertemporal_networks, community_column=new_Id_com){
   
   #' This function 
@@ -237,7 +242,11 @@ unique_ids_color <- data.table(
   color = mypalette[c(1:alluv_dt[n_years>0 & share_leiden>=0.05,.N,new_Id_com][,.N])])
 alluv_dt<-merge(alluv_dt, unique_ids_color[,.(Leiden1,color)], by="Leiden1",all.x = TRUE)
 alluv_dt[is.na(color)==TRUE,color:="grey"]
+```
 
+## 3.2 Projecting the alluvials and saving
+
+``` r
 ######################### Label **********************
 label <- copy(alluv_dt)
 label <- label[,Window:=round(mean(as.numeric(Window))),new_Id_com][color!="grey", head(.SD, 1), .(new_Id_com)]
@@ -255,9 +264,24 @@ ggplot(alluv_dt, aes(x = Window, y=share, stratum = new_Id_com, alluvium = ID_Ar
   ggtitle("") +
   ggsave(paste0(picture_path,"alluvial.png"), width = 40, height = 30, units = "cm")
 
-################## search for tf-idf ############################
 alluv_dt <- alluv_dt[, Com_ID := new_Id_com]
 alluv_dt <- alluv_dt[, share_max := max(share_leiden), by = "Com_ID"]
+
+# adding a more simple label for naming communities later
+ID_bis <- unique(alluv_dt[color != "grey"][order(Window,-n_years), "Com_ID"])
+ID_bis <- ID_bis[, ID_bis:= 1:.N]
+alluv_dt <- merge(alluv_dt, ID_bis, by = "Com_ID")
+
+# saving the entire dt and just the community identifiers in csv
+write_csv2(unique(alluv_dt[,c("ID_bis","Com_ID")]), "community_list_1969-2015.csv")
+saveRDS(alluv_dt, paste0(graph_data_path, "alluv_dt_", first_year, "-", last_year + time_window - 1, ".rds"))
+```
+
+## 3.3 Search tf-idf values for each community
+
+``` r
+################## search for tf-idf ############################
+
 tf_idf_results <- tf_idf(nodes = alluv_dt[color != "grey"],
                          com_name_column = "new_Id_com",
                          number_of_words = 15, 
@@ -268,13 +292,4 @@ tf_idf_results <- tf_idf(nodes = alluv_dt[color != "grey"],
 tf_idf_results$plot + ggsave(paste0(picture_path,"tf-idf.png"), width = 55, height = 55, units = "cm")
 
 saveRDS(tf_idf_results, paste0(graph_data_path, "tf_idf_alluvial", first_year, "-", last_year + time_window - 1, ".rds"))
-
-# adding a more simple label for naming communities later
-ID_bis <- unique(alluv_dt[color != "grey"][order(Window,-n_years), "Com_ID"])
-ID_bis <- ID_bis[, ID_bis:= 1:.N]
-alluv_dt <- merge(alluv_dt, ID_bis, by = "Com_ID")
-
-# saving the entire dt and just the community identifiers in csv
-write_csv2(unique(alluv_dt[,c("ID_bis","Com_ID")]), "community_list_1969-2015.csv")
-saveRDS(alluv_dt, paste0(graph_data_path, "alluv_dt_", first_year, "-", last_year + time_window - 1, ".rds"))
 ```

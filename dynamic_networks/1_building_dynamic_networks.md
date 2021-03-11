@@ -1,9 +1,23 @@
 Script for building the networks for moving time window
 ================
 Aurélien Goutsmedt and Alexandre Truc
-2021-03-10
+/ Last compiled on 2021-03-11
 
-## Introduction
+  - [1 What is this script for?](#what-is-this-script-for)
+  - [2 Loading packages, paths and
+    data](#loading-packages-paths-and-data)
+  - [3 Building the networks](#building-the-networks)
+      - [3.1 Creation of the networks](#creation-of-the-networks)
+      - [3.2 Finding Communities](#finding-communities)
+      - [3.3 Running force atlas](#running-force-atlas)
+      - [3.4 Integrating Community names
+        (temporary)](#integrating-community-names-temporary)
+      - [3.5 Projecting graphs](#projecting-graphs)
+  - [4 Extracting networks data for the
+    platform](#extracting-networks-data-for-the-platform)
+      - [4.1 Transforming in long format](#transforming-in-long-format)
+
+# 1 What is this script for?
 
 This script aims at creating the networks for different time windows. We
 want one-year moving time windows on the whole period (1969-2016) and we
@@ -14,7 +28,7 @@ in a long format, used for producing the platform.
 
 > WARNING: This script still needs a lot of cleaning
 
-## LOADING PACKAGES, PATH AND DATA
+# 2 Loading packages, paths and data
 
 We first load all the functions created in the functions script. We also
 have a separated script with all the packages needed for the scripts in
@@ -27,9 +41,9 @@ source("~/macro_AA/functions/functions_for_network_analysis.R")
 source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
 ```
 
-## PART II: BUILDING THE NETWORKS
+# 3 Building the networks
 
-### Creation the networks
+## 3.1 Creation of the networks
 
 We prepare our list. We want a weight threshold of 2 until 1986
 (included). As the network are changing a lot with 1991, because of the
@@ -86,7 +100,7 @@ gc()
 rm(list = c("edges_JEL", "nodes_JEL","tbl_coup_list_bis"))
 ```
 
-### Finding Communities
+## 3.2 Finding Communities
 
 We use the leiden\_workflow function of the networkflow package (it uses
 the leidenAlg package). We set the number of iteration at 10000 to be
@@ -97,7 +111,7 @@ tbl_coup_list <- lapply(tbl_coup_list, leiden_workflow, niter = 10000)
 # list_graph <- lapply(list_graph, FUN = community_colors, palette = mypalette)
 ```
 
-### Running force atlas
+## 3.3 Running force atlas
 
 ``` r
 tbl_coup_list <- readRDS(paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
@@ -127,7 +141,7 @@ for (Year in all_years) {
 saveRDS(list_graph_position, paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
 ```
 
-### Integrating Community names (temporary)
+## 3.4 Integrating Community names (temporary)
 
 ``` r
 # Listing all the graph computed in `static_network_analysis.R`
@@ -175,7 +189,7 @@ for (Year in all_years) {
 saveRDS(list_graph_position, paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
 ```
 
-### Projecting graphs
+## 3.5 Projecting graphs
 
 This step is not necessary for producting the data for the online
 platform. If you want to run this part, set `run` to “TRUE”.
@@ -224,9 +238,9 @@ for (i in c(1, 9, 18, 27, 35)) {
 }
 ```
 
-## PART II: EXTRACTING NETWORKS DATA FOR THE PLATFORM
+# 4 Extracting networks data for the platform
 
-### Transforming in long format
+## 4.1 Transforming in long format
 
 ``` r
 # loading the data
