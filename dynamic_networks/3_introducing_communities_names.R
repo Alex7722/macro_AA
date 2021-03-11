@@ -1,11 +1,14 @@
 #' ---
 #' title: "Script for introducing the manual names of the communities"
 #' author: "Aurélien Goutsmedt and Alexandre Truc"
-#' date: "`r format(Sys.Date())`"
-#' output: github_document
+#' date: "/ Last compiled on `r format(Sys.Date())`"
+#' output: 
+#'   github_document:
+#'     toc: true
+#'     number_sections: true
 #' ---
 #' 
-#' ## Introduction
+#' # What is this script for?
 #' 
 #' This script aims at creating the networks for different time windows. We want one-year moving time 
 #' windows on the whole period (1969-2016) and we need functions automating the creation
@@ -19,10 +22,12 @@
 #+ r setup, include = FALSE
 knitr::opts_chunk$set(eval = FALSE)
 
-#' # LOADING PACKAGES, PATH AND DATA
+#' # Loading packages paths and data
 
 source("~/macro_AA/functions/functions_for_network_analysis.R")
 source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
+
+#' # Renaming using the new community names (in construction)
 
 ######################### Label **********************
 alluv_dt<-alluv_dt[, c("Label"):=NULL]

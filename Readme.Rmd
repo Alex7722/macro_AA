@@ -3,6 +3,7 @@ title: "Presentation of the Mapping Macroeconomics Project"
 author: Aurélien Goutsmedt and Alexandre Truc
 output: github_document
 bibliography: Bibliography.bib
+date: "/ Last compiled on `r format(Sys.Date())`"
 ---
 
 ```{r setup, include=FALSE}
@@ -11,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## What is the Mapping Macroeconomics Project
 
-This project has received a grant from the _History of Economics Sociey_ [New Initiatives Fund](https://historyofeconomics.org/about-the-society/new-initiatives/). It is conducted by [Aurélien Goutsmedt](aurelien-goutsmedt.com) and [Alexandre Truc](https://sites.google.com/view/alexandre-truc/home-and-contact). The full project demand can be find [here](aurelien-goutsmedt.com/project/mapping-macroeconomics/proposal_hes.pdf). Several collaborators are likely to join us progressively. 
+This project has received a grant from the _History of Economics Sociey_ [New Initiatives Fund](https://historyofeconomics.org/about-the-society/new-initiatives/). It is conducted by [Aurélien Goutsmedt](aurelien-goutsmedt.com) and [Alexandre Truc](https://sites.google.com/view/alexandre-truc/home-and-contact). The full project demand can be find [here](aurelien-goutsmedt.com/project/mapping-macroeconomics/proposal_hes.pdf). You can find a more in-depth presentation of the project [here](https://aurelien-goutsmedt.com/project/mapping-macroeconomics/). Several collaborators are likely to join us progressively. 
 
 It takes as a point of departure that economics has been characterized since the 1970s by an exponential increase in the number of articles published in academic journals. This phenomenon makes it harder for historians of economics to properly assess the trends in the transformation of economics, the main topics researched, the most influential authors and ideas, _etc_. As a result, historians of this period run the risk of relying, at least as first pass, on a presentist view of the history of ideas: what today’s economists consider as important contributions from the past and the most influential authors. When historians shield themselves from the retrospective views of the practising economists, they have to delve into the literature of the past that has been forgotten for the most part and to scrutinize the network of authors that are little known. This effort allows historians to correct the potted histories of the practising economists and to propose alternative narratives of the evolution of the discipline. However, the bigger the literature to be studied is, the harder the historians’ capacity to grasp the overall picture of the time.
 
@@ -22,20 +23,22 @@ Our goal is to build an online interactive platform displaying bibliometric data
 
 ## Structure of the Github repository
 
+You will find in this repository all the R scripts used to build our data and analyses. 
+
 ### Corpus
 
-You will find here all the scripts and documentation relative to the extractiong of the JEL codes from Econlit and the matching with Web of Science database. It deals with generating the list of articles, references, authors, affiliations, _etc._ that will be used after.
+You will find here all the scripts and documentation relative to the extraction of the JEL codes from Econlit and the matching with Web of Science database. It deals with generating the list of articles, references, authors, affiliations, _etc._ that will be used after.
 
 ### Static_Network_Analysis
 
-This file gathers all the scripts and documentation for the first step of the project: 
+This [directory](/Static_Network_Analysis/Readme.md) gathers all the scripts and documentation for the first step of the project: 
 
 - testing different tools and methods
 - first round of analysis of our data by segmenting them in several sub-periods. We build different networks (coupling, cocitation, co-authorship, _etc_.) and analyse them for each sub-period.
 
 ### dynamic_networks
 
-This file gathers all the scripts and documentation for the production of data for the online platform. It deals with:
+This [directory](/dynamic_networks/Readme.md) gathers all the scripts and documentation for the production of data for the online platform. It deals with:
 
 - creating networks with a moving window;
 - finding communities that remain over the windows.
