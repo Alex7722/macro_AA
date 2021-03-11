@@ -1,17 +1,17 @@
 Script for building the networks for different sub-periods
 ================
 Aurélien Goutsmedt and Alexandre Truc
-2021-03-09
+/ Last compiled on 2021-03-11
 
 # What is this script for?
 
 This script load the different networks built in the former
-[scrip](/2_Script_Static_Network_Analysis.R) and extract the unigrams
+[script](/2_Script_Static_Network_Analysis.md) and extract the unigrams
 and bigrams in their title, to measure the tf-idf of these terms with
 the documents of the Inverse-Document-Frequency being the communities.
 It allows us to extract the terms that identify the most each community.
 
-# LOADING PACKAGES, PATH AND DATA
+# Loading packages, paths and data
 
 ## External scripts
 

@@ -1,7 +1,7 @@
 List of the functions built for network analysis
 ================
 Aurélien Goutsmedt and Alexandre Truc
-2021-03-09
+/ Last compiled on 2021-03-11
 
   - [1 What is this script for?](#what-is-this-script-for)
   - [2 GENERAL FUNCTIONS FOR NETWORK
@@ -52,7 +52,7 @@ package.
 
 ## 2.1 `bibliographic_coupling()`
 
-This function could now be replace by
+This function could now be replaced by
 [biblio\_coupling()](https://agoutsmedt.github.io/biblionetwork/reference/biblio_coupling.html)
 in the biblionetwork package.
 
@@ -157,7 +157,7 @@ bibliographic_coupling <- function(dt, source, ref, normalized_weight_only = TRU
 
 ## 2.2 `bibliographic_coupling_alt()`
 
-This function could now be replace by
+This function could now be replaced by
 [coupling\_strength()](https://agoutsmedt.github.io/biblionetwork/reference/coupling_strength.html)
 in the biblionetwork package.
 
@@ -244,7 +244,7 @@ bibliographic_coupling_alt <- function(dt, source, ref, weight_threshold = 1) {
 
 ## 2.3 `bibliographic_coupling_authors()`
 
-This function could now be replace by
+This function could now be replaced by
 [coupling\_entity()](https://agoutsmedt.github.io/biblionetwork/reference/coupling_entity.html)
 in the biblionetwork package.
 
@@ -355,7 +355,7 @@ bibliographic_coupling_authors <- function(dt, source, ref, authors, weight_thre
 
 ## 2.4 `bibliographic_cocitation()`
 
-This function could now be replace by
+This function could now be replaced by
 [biblio\_cocitation()](https://agoutsmedt.github.io/biblionetwork/reference/biblio_cocitation.html)
 in the biblionetwork package.
 
@@ -473,7 +473,7 @@ implemented and improved in the
 ## 3.1 `tbl_main_components()`
 
 See now the
-[`tbl_main_component`](https://github.com/agoutsmedt/networkflow/blob/master/R/tbl_main_component.R)
+[`tbl_main_component()`](https://github.com/agoutsmedt/networkflow/blob/master/R/tbl_main_component.R)
 function in networkflow package.
 
 ``` r
@@ -1277,7 +1277,7 @@ graph_from_attribute <- function(nodes, edges, palette, Attribute_name, nb_compo
   }
 }
 
-clustering_communities <- function(graph, label_size = 6, threshold_com = 0.01) {
+clustering_communities <- function(graph, label_size = 6, number_size = 6, threshold_com = 0.01) {
   #' Function for building a heatmap of the communities
   #'
   #' This function takes as input a tidygraph object with communities as nodes and produce a heatmap of the links
@@ -1344,9 +1344,9 @@ clustering_communities <- function(graph, label_size = 6, threshold_com = 0.01) 
 
   # saving the heat map
   plot_heatmap <- ggplot(matrix, aes(x = Var1, y = Var2, fill = value)) +
-    geom_tile() +
-    theme(text = element_text(size = 14)) +
-    geom_text(aes(x = Var1, y = Var2, label = value), color = "black", size = label_size) +
+    geom_tile(show.legend = FALSE) +
+    theme(text = element_text(size = label_size)) +
+    geom_text(aes(x = Var1, y = Var2, label = value), color = "black", size = number_size) +
     scale_fill_viridis(discrete = FALSE) +
     ylab("In the cluster...") +
     xlab("...X% of links goes to")

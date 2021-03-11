@@ -1,7 +1,7 @@
 #' ---
 #' title: "Script for building the networks for different sub-periods"
 #' author: "Aurélien Goutsmedt and Alexandre Truc"
-#' date: "`r format(Sys.Date())`"
+#' date: "/ Last compiled on `r format(Sys.Date())`"
 #' output: 
 #'   github_document:
 #'     toc: true
@@ -16,9 +16,15 @@ knitr::opts_chunk$set(eval = FALSE)
 #' In this script, we build different networks (cocitation, coupling, coupling with authors, co-authorship, _etc._)
 #' for different subperiods. Subperiods are fixed in another [script](/Static_Network_Analysis/Script_paths_and_basic_objects.R) loaded at the beginning
 #' (see the `start_date` and `end_date` objects). All the networks created are saved as `prior_` network and then loaded in
-#' the following [script](/Static_Network_Analysis/2_Script_Static_Network_Analysis.R).
+#' the following [script](/Static_Network_Analysis/2_Script_Static_Network_Analysis.md). Initially, we have 
+#' created three seven-year periods (1970-1976, 1977-1983, 1984-1990) and three six-year
+#' periods (1991-1996, 1997-2002, 2003-2008). We maintained the break in 1990/1991 to take
+#' into account the JEL change of classification.
 #' 
-#' # LOADING PACKAGES, PATH AND DATA
+#' > WARNING: This script represents a first step of the project, and some processes have been
+#' improved (notably by the creation of new functions).
+#' 
+#' # Loading packages, paths and data
 #' 
 #' ## External scripts
 
