@@ -11,6 +11,7 @@ output:
     thumbnails: true
     lightbox: true
     gallery: true
+    css: material_alt.css
 editor_options: 
   chunk_output_type: inline
 ---
