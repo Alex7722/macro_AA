@@ -266,14 +266,11 @@ saveRDS(alluv_dt, paste0(graph_data_path, "alluv_dt_", first_year, "-", last_yea
 
 tf_idf_results <- tf_idf(nodes = alluv_dt[color != "grey"],
                          com_name_column = "new_Id_com",
-                         number_of_words = 15, 
+                         number_of_words = 20, 
                          treshold_com = 0.05,
                          com_size_column = "share_max",
-                         size_title_wrap=10,
-                         unstemming = FALSE)
+                         size_title_wrap=10)
 tf_idf_results$plot + ggsave(paste0(picture_path,"tf-idf.png"), width = 55, height = 55, units = "cm")
 
 saveRDS(tf_idf_results, paste0(graph_data_path, "tf_idf_alluvial", first_year, "-", last_year + time_window - 1, ".rds"))
-
-
 

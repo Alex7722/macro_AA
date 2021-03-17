@@ -1,7 +1,7 @@
 Presentation of the Mapping Macroeconomics Project
 ================
 Aurélien Goutsmedt and Alexandre Truc
-/ Last compiled on 2021-03-11
+/ Last compiled on 2021-03-17
 
 ## What is the Mapping Macroeconomics Project
 
@@ -12,7 +12,7 @@ It is conducted by [Aurélien Goutsmedt](aurelien-goutsmedt.com) and
 [Alexandre
 Truc](https://sites.google.com/view/alexandre-truc/home-and-contact).
 The full project demand can be find
-[here](aurelien-goutsmedt.com/project/mapping-macroeconomics/proposal_hes.pdf).
+[here](https://aurelien-goutsmedt.com/project/mapping-macroeconomics/proposal_hes.pdf).
 You can find a more in-depth presentation of the project
 [here](https://aurelien-goutsmedt.com/project/mapping-macroeconomics/).
 Several collaborators are likely to join us progressively.

@@ -3,7 +3,6 @@
 #' author: "Aurélien Goutsmedt and Alexandre Truc"
 #' date: "/ Last compiled on `r format(Sys.Date())`"
 #' output: github_document
-#' 
 #' ---
 
 #+ r setup, include = FALSE

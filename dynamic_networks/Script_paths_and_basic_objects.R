@@ -5,11 +5,11 @@
 ##################### Packages ############################################--------------
 
 cran_list <- c(
-  "data.table", "magrittr", "ggnewscale", "igraph","quanteda","forcats",
+  "data.table", "magrittr", "ggnewscale", "igraph","forcats",
   "tidytext", "ggraph", "tidygraph", "ggrepel", "leidenAlg", "reshape2", "scales", 
   "ggforce", "directlabels", "patchwork", "DescTools", "DT", "grid", "scico",
   "ggalluvial", "dplyr","gridExtra","readr","stringi","tm","stringr",
-  "RColorBrewer"
+  "RColorBrewer","textstem","tidyr","tidytext","quanteda"
 )
 for (p in cran_list) {
   if (p %in% installed.packages() == FALSE) {
