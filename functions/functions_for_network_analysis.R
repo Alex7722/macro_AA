@@ -1484,9 +1484,9 @@ dynamic_biblio_coupling <- function(corpus,
       quantile <- quantile_threshold
     }
     
-    message(paste0("- Creation of the network for the ", Year, "-", Year + time_window - 1, " window."))
+    message(paste0("- Creation of the network for the ", Year, "-", Year + time_window_length - 1, " window."))
     nodes_of_the_year <- nodes[time_variable >= (Year + time_window_move) & 
-                                 time_variable < (Year + time_window_move + time_window)] # < for time_window being the number of years, note the value of the addition
+                                 time_variable < (Year + time_window_move + time_window_length)] # < for time_window being the number of years, note the value of the addition
     edges_of_the_year <- direct_citation_dt[source %in% nodes_of_the_year$source]
     # size of nodes
     nb_cit <- edges_of_the_year[, .N, source_as_ref]
