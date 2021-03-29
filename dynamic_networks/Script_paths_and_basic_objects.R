@@ -5,10 +5,11 @@
 ##################### Packages ############################################--------------
 
 cran_list <- c(
-  "data.table", "magrittr", "ggnewscale", "igraph","quanteda",
+  "data.table", "magrittr", "ggnewscale", "igraph","forcats",
   "tidytext", "ggraph", "tidygraph", "ggrepel", "leidenAlg", "reshape2", "scales", 
   "ggforce", "directlabels", "patchwork", "DescTools", "DT", "grid", "scico",
-  "ggalluvial", "knitr", "dplyr","gridExtra","readr","stringi"
+  "ggalluvial", "dplyr","gridExtra","readr","stringi","tm","stringr",
+  "RColorBrewer","textstem","tidyr","tidytext","quanteda"
 )
 for (p in cran_list) {
   if (p %in% installed.packages() == FALSE) {
@@ -57,7 +58,7 @@ edges_JEL <- rbind(edges_JEL, edges_old_JEL)
 rm("edges_old_JEL")
 
 first_year <- nodes_JEL[order(Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique
-last_year <- (nodes_JEL[order(-Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique - time_window + 1) # +1 to get the very last year in the window
+last_year <- (nodes_JEL[order(-Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique - time_window + 1) - 1 # +1 to get the very last year in the window / -1 because 2016 is incomplete
 all_years <- first_year:last_year
 
 

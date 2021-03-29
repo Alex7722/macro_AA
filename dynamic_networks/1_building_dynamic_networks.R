@@ -1,11 +1,14 @@
 #' ---
 #' title: "Script for building the networks for moving time window"
 #' author: "Aurélien Goutsmedt and Alexandre Truc"
-#' date: "`r format(Sys.Date())`"
-#' output: github_document
+#' date: "/ Last compiled on `r format(Sys.Date())`"
+#' output: 
+#'   github_document:
+#'     toc: true
+#'     number_sections: true
 #' ---
 #' 
-#' ## Introduction
+#' # What is this script for?
 #' 
 #' This script aims at creating the networks for different time windows. We want one-year moving time 
 #' windows on the whole period (1969-2016) and we need functions automating the creation
@@ -13,10 +16,15 @@
 #' of communities, calculates coordinates and saves the nodes and edges data in a long format,
 #' used for producing the platform.
 #' 
-#' ## PART I: LOADING PACKAGES, PATH AND DATA
+#' 
+#' > WARNING: This script still needs a lot of cleaning
+#' 
+
 
 #+ r setup, include = FALSE
 knitr::opts_chunk$set(eval = FALSE)
+
+#' # Loading packages, paths and data
 
 #' We first load all the functions created in the functions script. 
 #' We also have a separated script with all the packages needed for the scripts
@@ -28,97 +36,78 @@ knitr::opts_chunk$set(eval = FALSE)
 source("~/macro_AA/functions/functions_for_network_analysis.R")
 source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
 
-#' ## PART II: BUILDING THE NETWORKS 
+#' # Building the networks
+#' 
+#' ## Creation of the networks
 
-#' ### Creation the networks
-
-#' We prepare our list
+#' We prepare our list. We want a weight threshold of 2 until 1986 (included). As the network are changing
+#' a lot with 1991, because of the changes in the JEL classification, we prefer to change the weight
+#' threshold manually at this point. Thus we move to 3 as soon as 1987-1991. 
+#' 
+#' For the moment, we have decided to keep 3 until the end of the period, at least for computing the 
+#' Leiden.
 
 #+ r list
-tbl_coup_list <- list()
-Limit_edges <- 400000
-decile <- FALSE
-quantile_threshold <- 0.85
+tbl_coup_list <- dynamic_biblio_coupling(corpus = nodes_JEL[between(Annee_Bibliographique, 1969, 1990)], 
+                                    direct_citation_dt = edges_JEL, 
+                                    source = "ID_Art",
+                                    source_as_ref = "ItemID_Ref",
+                                    ref = "New_id2", 
+                                    time_variable = "Annee_Bibliographique",
+                                    coupling_method = "coupling_strength",
+                                    time_window_length = 5,
+                                    time_window_move = 0,
+                                    weight_treshold = 2,
+                                    nodes_threshold = 0,
+                                    controlling_nodes = FALSE,
+                                    controlling_edges = TRUE,
+                                    nodes_limit = 10000,
+                                    edges_limit = 400000,
+                                    distribution_pruning = FALSE,
+                                    quantile_threshold = 1,
+                                    quantile_move = 0)
 
-for (Year in all_years) {
-  message(paste0("Creation of the network for the ", Year, "-", Year + time_window - 1, " window."))
-  # fixing the initial value of the threshold
-  edges_threshold <- 1
+tbl_coup_list_bis <- dynamic_biblio_coupling(corpus = nodes_JEL[between(Annee_Bibliographique, 1987, 2015)], 
+                                         direct_citation_dt = edges_JEL, 
+                                         source = "ID_Art",
+                                         source_as_ref = "ItemID_Ref",
+                                         ref = "New_id2", 
+                                         time_variable = "Annee_Bibliographique",
+                                         coupling_method = "coupling_strength",
+                                         time_window_length = 5,
+                                         time_window_move = 0,
+                                         weight_treshold = 3,
+                                         nodes_threshold = 0,
+                                         controlling_nodes = FALSE,
+                                         controlling_edges = TRUE,
+                                         nodes_limit = 10000,
+                                         edges_limit = 500000,
+                                         distribution_pruning = FALSE,
+                                         quantile_threshold = 1,
+                                         quantile_move = 0)
 
-  # creating nodes and edges
-  nodes_of_the_year <- nodes_JEL[Annee_Bibliographique >= Year & Annee_Bibliographique < Year + time_window, ]
-  edges_of_the_year <- edges_JEL[ID_Art %in% nodes_of_the_year$ID_Art]
-
-  # size of nodes
-  nb_cit <- edges_of_the_year[, .N, ItemID_Ref]
-  colnames(nb_cit)[colnames(nb_cit) == "N"] <- "size"
-  nodes_of_the_year <- merge(nodes_of_the_year, nb_cit, by.x = "ItemID_Ref", by.y = "ItemID_Ref", all.x = TRUE)
-  nodes_of_the_year[is.na(size), size := 0]
-
-  # coupling
-  edges_of_the_year <- coupling_strength(edges_of_the_year, "ID_Art", "New_id2",
-    weight_threshold = edges_threshold,
-    output_in_character = TRUE
-  )
-
-
-  if (decile == TRUE) {
-    edges_prob_threshold <- quantile(edges_of_the_year$weight, prob = quantile_threshold + 0.0025)
-    edges_of_the_year <- edges_of_the_year[weight >= edges_prob_threshold]
-  }
-
-  # Loop to avoid to large networks - Step 2: reducing edges
-  if (length(edges_of_the_year$from) > Limit_edges) {
-    for (k in 1:100) {
-      edges_threshold <- edges_threshold + 1
-
-      nodes_of_the_year <- nodes_JEL[Annee_Bibliographique >= Year & Annee_Bibliographique < Year + time_window]
-      edges_of_the_year <- edges_JEL[ID_Art %in% nodes_of_the_year$ID_Art]
-
-      # size of nodes
-      nb_cit <- edges_of_the_year[, .N, ItemID_Ref]
-      colnames(nb_cit)[colnames(nb_cit) == "N"] <- "size"
-      nodes_of_the_year <- merge(nodes_of_the_year, nb_cit, by.x = "ItemID_Ref", by.y = "ItemID_Ref", all.x = TRUE)
-      nodes_of_the_year[is.na(size), size := 0]
-
-      # coupling
-      edges_of_the_year <- coupling_strength(edges_of_the_year, "ID_Art", "New_id2",
-        weight_threshold = edges_threshold, output_in_character = TRUE
-      )
-      if (length(edges_of_the_year$from) < Limit_edges) {
-        break
-      }
-    }
-  }
-
-  message(paste0("The final threshold for edges is:", edges_threshold))
-  # remove nodes with no edges
-  nodes_of_the_year <- nodes_of_the_year[ID_Art %in% edges_of_the_year$from | ID_Art %in% edges_of_the_year$to]
-  nodes_of_the_year$ID_Art <- as.character(nodes_of_the_year$ID_Art)
-  edges_of_the_year$threshold <- edges_threshold
-
-  # make tbl
-  tbl_coup_list[[as.character(Year)]] <- networkflow::tbl_main_component(nodes = nodes_of_the_year, edges = edges_of_the_year, directed = FALSE, node_key = "ID_Art", nb_components = 2)
-
-  gc() # cleaning what is not useful anymore
-}
+tbl_coup_list <- append(tbl_coup_list,tbl_coup_list_bis)
 
 # cleaning now useless objects
-rm(list = c("edges_JEL", "nb_cit", "edges_of_the_year", "nodes_JEL", "nodes_of_the_year"))
+gc()
+rm(list = c("edges_JEL", "nodes_JEL","tbl_coup_list_bis"))
 
-#' ### Finding Communities
+#' ## Finding Communities
 
 #' We use the leiden_workflow function of the networkflow package (it uses the 
-#' leidenAlg package).
+#' leidenAlg package). We set the number of iteration at 10000 to be sure but 
+#' it seems to converge well before.
 
 #+ r communities
-tbl_coup_list <- lapply(tbl_coup_list, leiden_workflow)
+tbl_coup_list <- lapply(tbl_coup_list, leiden_workflow, niter = 10000)
 # list_graph <- lapply(list_graph, FUN = community_colors, palette = mypalette)
 
+#+ r saving_com, include = FALSE
 # intermediary saving
-saveRDS(tbl_coup_list, paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
+saveRDS(tbl_coup_list, paste0(graph_data_path, "list_graph_", names(tbl_coup_list[1]), "-", 
+                              as.integer(names(tbl_coup_list[length(tbl_coup_list)])), ".rds"))
 
-#' ### Running force atlas 
+#' ## Running force atlas 
 
 tbl_coup_list <- readRDS(paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
 
@@ -147,7 +136,7 @@ for (Year in all_years) {
 saveRDS(list_graph_position, paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
 
 
-#' ### Integrating Community names (temporary)
+#' ## Integrating Community names (temporary)
 
 #+ r names
 # Listing all the graph computed in `static_network_analysis.R`
@@ -195,7 +184,7 @@ for (Year in all_years) {
 saveRDS(list_graph_position, paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
 
 
-#' ### Projecting graphs
+#' ## Projecting graphs
 
 #' This step is not necessary for producting the data for the online platform.
 #' If you want to run this part, set `run` to "TRUE".
@@ -243,9 +232,9 @@ for (i in c(1, 9, 18, 27, 35)) {
 }
 }
 
-#' ## PART II: EXTRACTING NETWORKS DATA FOR THE PLATFORM
-
-#' ### Transforming in long format 
+#' # Extracting networks data for the platform
+#'
+#' ## Transforming in long format 
 
 #+ r platform
 # loading the data

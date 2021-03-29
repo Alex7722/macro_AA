@@ -1,43 +1,55 @@
-#' ---
-#' title: "Script for finding persisting communities"
-#' author: "Aurélien Goutsmedt and Alexandre Truc"
-#' date: "/ Last compiled on `r format(Sys.Date())`"
-#' output: 
-#'   github_document:
-#'     toc: true
-#'     number_sections: true
-#' ---
-#' 
-#' # What is this script for
-#' 
-#' This  takes as an input the list of networks saved in the previous 
-#' [script](/dynamic_networks/1_building_dynamic_networks.md) The script implements a procedure 
-#' to find communities that are persisting over time. 
-#' Basically, for each community in two close networks (for instance 1973-1977 and 1974-1978), it looks how many nodes 
-#' existing in both networks (that is articles published between 1974 and 1977) are in each community. If a community A 
-#' from 1973-1977 has a high percentage of nodes going in community B from 1974-1978, and if a large proportion of nodes 
-#' in community B comes from A, thus we consider A and B as the same community. The procedure is implemented for the whole
-#' period and we save the data.frame with all the nodes for each period and the community they belong to for each window.
-#' 
-#' We also project the composition of each network and the flows between communities in the whole period.
-#' 
-#' > WARNING: This script still needs a lot of cleaning
+Script for finding persisting communities
+================
+Aurélien Goutsmedt and Alexandre Truc
+/ Last compiled on 2021-03-11
 
-#+ r setup, include = FALSE
-knitr::opts_chunk$set(eval = FALSE)
+  - [1 What is this script for](#what-is-this-script-for)
+  - [2 Loading packages, paths and
+    data](#loading-packages-paths-and-data)
+  - [3 Intertemporal Naming: Find Communities Across
+    Time](#intertemporal-naming-find-communities-across-time)
+      - [3.1 Transforming the data in alluvial compatible
+        data](#transforming-the-data-in-alluvial-compatible-data)
+      - [3.2 Projecting the alluvials and
+        saving](#projecting-the-alluvials-and-saving)
+      - [3.3 Search tf-idf values for each
+        community](#search-tf-idf-values-for-each-community)
 
-#' # Loading packages, paths and data
+# 1 What is this script for
 
+This takes as an input the list of networks saved in the previous
+[script](/dynamic_networks/1_building_dynamic_networks.md) The script
+implements a procedure to find communities that are persisting over
+time. Basically, for each community in two close networks (for instance
+1973-1977 and 1974-1978), it looks how many nodes existing in both
+networks (that is articles published between 1974 and 1977) are in each
+community. If a community A from 1973-1977 has a high percentage of
+nodes going in community B from 1974-1978, and if a large proportion of
+nodes in community B comes from A, thus we consider A and B as the same
+community. The procedure is implemented for the whole period and we save
+the data.frame with all the nodes for each period and the community they
+belong to for each window.
+
+We also project the composition of each network and the flows between
+communities in the whole period.
+
+> WARNING: This script still needs a lot of cleaning
+
+# 2 Loading packages, paths and data
+
+``` r
 source("~/macro_AA/functions/functions_for_network_analysis.R")
 source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
 
 # loading the files 
 list_graph <- readRDS(paste0(graph_data_path, "list_graph_", 1969, "-", 2011, ".rds"))
+```
 
+# 3 Intertemporal Naming: Find Communities Across Time
 
-#' # Intertemporal Naming: Find Communities Across Time 
-#'
-#' Identifying which communities are the same
+Identifying which communities are the same
+
+``` r
 intertemporal_naming_function <- function(tbl_list = tbl_list, 
                                           community_column = Leiden1,
                                           individual_ids = Id,
@@ -172,9 +184,11 @@ intertemporal_naming_function <- function(tbl_list = tbl_list,
 }
 
 intertemporal_naming <- intertemporal_naming_function(tbl_list = list_graph, community_column = "Com_ID", individual_ids = "ID_Art", threshold_similarity = 0.60)
+```
 
-#' ## Transforming the data in alluvial compatible data
+## 3.1 Transforming the data in alluvial compatible data
 
+``` r
 make_into_alluv_dt <- function(intertemporal_networks = intertemporal_networks, community_column=new_Id_com){
   
   #' This function 
@@ -228,9 +242,11 @@ unique_ids_color <- data.table(
   color = mypalette[c(1:alluv_dt[n_years>0 & share_leiden>=0.05,.N,new_Id_com][,.N])])
 alluv_dt<-merge(alluv_dt, unique_ids_color[,.(Leiden1,color)], by="Leiden1",all.x = TRUE)
 alluv_dt[is.na(color)==TRUE,color:="grey"]
+```
 
-#' ## Projecting the alluvials and saving
+## 3.2 Projecting the alluvials and saving
 
+``` r
 ######################### Label **********************
 label <- copy(alluv_dt)
 label <- label[,Window:=round(mean(as.numeric(Window))),new_Id_com][color!="grey", head(.SD, 1), .(new_Id_com)]
@@ -259,18 +275,21 @@ alluv_dt <- merge(alluv_dt, ID_bis, by = "Com_ID")
 # saving the entire dt and just the community identifiers in csv
 write_csv2(unique(alluv_dt[,c("ID_bis","Com_ID")]), "community_list_1969-2015.csv")
 saveRDS(alluv_dt, paste0(graph_data_path, "alluv_dt_", first_year, "-", last_year + time_window - 1, ".rds"))
+```
 
-#' ## Search tf-idf values for each community
+## 3.3 Search tf-idf values for each community
 
+``` r
 ################## search for tf-idf ############################
 
 tf_idf_results <- tf_idf(nodes = alluv_dt[color != "grey"],
                          com_name_column = "new_Id_com",
-                         number_of_words = 20, 
+                         number_of_words = 15, 
                          treshold_com = 0.05,
                          com_size_column = "share_max",
-                         size_title_wrap=10)
+                         size_title_wrap=10,
+                         unstemming = FALSE)
 tf_idf_results$plot + ggsave(paste0(picture_path,"tf-idf.png"), width = 55, height = 55, units = "cm")
 
 saveRDS(tf_idf_results, paste0(graph_data_path, "tf_idf_alluvial", first_year, "-", last_year + time_window - 1, ".rds"))
-
+```

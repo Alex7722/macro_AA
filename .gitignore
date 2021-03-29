@@ -20,3 +20,8 @@
 .Rproj.user
 .Rhistory
 
+# bibliography
+*.bib
+
+# ignoring generating Readme files
+Readme.Rmd
