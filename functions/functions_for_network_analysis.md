@@ -1,41 +1,62 @@
-#' ---
-#' title: "List of the functions built for network analysis"
-#' author: "Aurélien Goutsmedt and Alexandre Truc"
-#' date: "/ Last compiled on `r format(Sys.Date())`"
-#' output: 
-#'   github_document:
-#'     toc: true
-#'     number_sections: true
-#' ---
+List of the functions built for network analysis
+================
+Aurélien Goutsmedt and Alexandre Truc
+/ Last compiled on 2021-03-11
 
-#+ r setup, include = FALSE
-knitr::opts_chunk$set(eval = FALSE)
+  - [1 What is this script for?](#what-is-this-script-for)
+  - [2 GENERAL FUNCTIONS FOR NETWORK
+    ANALYSIS](#general-functions-for-network-analysis)
+      - [2.1 `bibliographic_coupling()`](#bibliographic_coupling)
+      - [2.2
+        `bibliographic_coupling_alt()`](#bibliographic_coupling_alt)
+      - [2.3
+        `bibliographic_coupling_authors()`](#bibliographic_coupling_authors)
+      - [2.4 `bibliographic_cocitation()`](#bibliographic_cocitation)
+  - [3 Building graphs - Basics](#building-graphs---basics)
+      - [3.1 `tbl_main_components()`](#tbl_main_components)
+  - [4 Building Graphs - Secondary and to be
+    improved](#building-graphs---secondary-and-to-be-improved)
+  - [5 Dynamic networks: building the different
+    lists](#dynamic-networks-building-the-different-lists)
+      - [5.1 `dynamic_biblio_coupling()`](#dynamic_biblio_coupling)
+  - [6 Functions for word analysis (titles) of
+    networks](#functions-for-word-analysis-titles-of-networks)
+      - [6.1 `tf_idf()`](#tf_idf)
 
-#' # What is this script for?
-#' 
-#' This script lists all the functions built for network analysis for the project. The functions are documenting in a way to be
-#' later implemented in packages or at least for generating a help page (see below).
-#' 
-#' We first load the [docstring](https://cran.r-project.org/web/packages/docstring/vignettes/docstring_intro.html) package
-#' to be able to write documentation in a roxygen2 style. You can then run docstring(name_of_function) to get the standard help page.
+# 1 What is this script for?
 
+This script lists all the functions built for network analysis for the
+project. The functions are documenting in a way to be later implemented
+in packages or at least for generating a help page (see below).
+
+We first load the
+[docstring](https://cran.r-project.org/web/packages/docstring/vignettes/docstring_intro.html)
+package to be able to write documentation in a roxygen2 style. You can
+then run docstring(name\_of\_function) to get the standard help page.
+
+``` r
 if ("docstring" %in% installed.packages() == FALSE) {
   install.packages("docstring", dependencies = TRUE)
 }
 library(docstring)
+```
 
+# 2 GENERAL FUNCTIONS FOR NETWORK ANALYSIS
 
-#' # GENERAL FUNCTIONS FOR NETWORK ANALYSIS
-#' 
-#' The functions in this section are uniquely used in the [Static_Network_Analysis](/Static_Network_Analysis) directory 
-#' to build networks for different sub-periods, but are not used any more as they have been integrated and improved in
-#' the [biblionetwork](https://agoutsmedt.github.io/biblionetwork/index.html) package.
-#' 
-#' ## `bibliographic_coupling()` 
-#' 
-#' This function could now be replaced by [biblio_coupling()](https://agoutsmedt.github.io/biblionetwork/reference/biblio_coupling.html) 
-#' in the biblionetwork package.
+The functions in this section are uniquely used in the
+[Static\_Network\_Analysis](/Static_Network_Analysis) directory to build
+networks for different sub-periods, but are not used any more as they
+have been integrated and improved in the
+[biblionetwork](https://agoutsmedt.github.io/biblionetwork/index.html)
+package.
 
+## 2.1 `bibliographic_coupling()`
+
+This function could now be replaced by
+[biblio\_coupling()](https://agoutsmedt.github.io/biblionetwork/reference/biblio_coupling.html)
+in the biblionetwork package.
+
+``` r
 bibliographic_coupling <- function(dt, source, ref, normalized_weight_only = TRUE, weight_threshold = 1, output_in_character = TRUE) {
   #' function for edges of bibliographic coupling
   #'
@@ -132,14 +153,15 @@ bibliographic_coupling <- function(dt, source, ref, normalized_weight_only = TRU
     }
   }
 }
+```
 
+## 2.2 `bibliographic_coupling_alt()`
 
+This function could now be replaced by
+[coupling\_strength()](https://agoutsmedt.github.io/biblionetwork/reference/coupling_strength.html)
+in the biblionetwork package.
 
-#' ## `bibliographic_coupling_alt()`
-#'
-#' This function could now be replaced by [coupling_strength()](https://agoutsmedt.github.io/biblionetwork/reference/coupling_strength.html) 
-#' in the biblionetwork package.
-#' 
+``` r
 bibliographic_coupling_alt <- function(dt, source, ref, weight_threshold = 1) {
   #' function for edges of bibliographic coupling
   #'
@@ -218,11 +240,15 @@ bibliographic_coupling_alt <- function(dt, source, ref, weight_threshold = 1) {
 
   return(bib_coup)
 }
+```
 
-#' ## `bibliographic_coupling_authors()`
-#' 
-#' This function could now be replaced by [coupling_entity()](https://agoutsmedt.github.io/biblionetwork/reference/coupling_entity.html) 
-#' in the biblionetwork package.
+## 2.3 `bibliographic_coupling_authors()`
+
+This function could now be replaced by
+[coupling\_entity()](https://agoutsmedt.github.io/biblionetwork/reference/coupling_entity.html)
+in the biblionetwork package.
+
+``` r
 bibliographic_coupling_authors <- function(dt, source, ref, authors, weight_threshold = 1) {
   #' function for edges of bibliographic coupling
   #'
@@ -325,12 +351,15 @@ bibliographic_coupling_authors <- function(dt, source, ref, authors, weight_thre
 
   return(bib_coup)
 }
+```
 
-#' ## `bibliographic_cocitation()` 
-#' 
-#'
-#' This function could now be replaced by [biblio_cocitation()](https://agoutsmedt.github.io/biblionetwork/reference/biblio_cocitation.html) 
-#' in the biblionetwork package.
+## 2.4 `bibliographic_cocitation()`
+
+This function could now be replaced by
+[biblio\_cocitation()](https://agoutsmedt.github.io/biblionetwork/reference/biblio_cocitation.html)
+in the biblionetwork package.
+
+``` r
 bibliographic_cocitation <- function(dt, source, ref, normalized_weight_only = TRUE, weight_threshold = 1, output_in_character = TRUE) {
   #' function for creating the edges of bibliographic cocitation
   #'
@@ -433,18 +462,21 @@ bibliographic_cocitation <- function(dt, source, ref, normalized_weight_only = T
   #    return (bib_cocit[, c("from","to","weight","nb_shared_references")])
   #  }
 }
+```
 
+# 3 Building graphs - Basics
 
-#' # Building graphs - Basics
-#' 
-#' Some of the functions here are not necessary anymore as they have been implemented and improved 
-#' in the [networkflow](https://github.com/agoutsmedt/networkflow) package. 
-#' 
-#' ## `tbl_main_components()`
-#' 
-#' See now the [`tbl_main_component()`](https://github.com/agoutsmedt/networkflow/blob/master/R/tbl_main_component.R)
-#'  function in networkflow package.
+Some of the functions here are not necessary anymore as they have been
+implemented and improved in the
+[networkflow](https://github.com/agoutsmedt/networkflow) package.
 
+## 3.1 `tbl_main_components()`
+
+See now the
+[`tbl_main_component()`](https://github.com/agoutsmedt/networkflow/blob/master/R/tbl_main_component.R)
+function in networkflow package.
+
+``` r
 tbl_main_components <- function(edges, nodes, directed = FALSE, node_key = NULL, nb_components = 1, threshold_alert = 0.05) {
   #' Main component tidygraph from edges and nodes
   #'
@@ -1023,13 +1055,16 @@ label_com <- function(graph, biggest_community = FALSE, community_threshold = 0.
 
   return(label_com)
 }
+```
 
-#' # Building Graphs - Secondary and to be improved
+# 4 Building Graphs - Secondary and to be improved
 
-#' This function takes as input a tidygraph object, it switches the names of individual nodes
-#' by the name of their community, calculate the number of nodes in the community, and
-#' transforms the whole community as a unique node.
-#' 
+This function takes as input a tidygraph object, it switches the names
+of individual nodes by the name of their community, calculate the number
+of nodes in the community, and transforms the whole community as a
+unique node.
+
+``` r
 graph_community <- function(graph, Community_name = "Community_name", nb_components = 1, preparing_graph = TRUE) {
   #' Function for building of graph with community as nodes
   #'
@@ -1125,7 +1160,6 @@ graph_community <- function(graph, Community_name = "Community_name", nb_compone
     graph_community <- graph_community %>%
       activate(nodes) %>%
       left_join(color_community, by = c("Id" = "Community_name"))
-
 
     # Integration a size variable for implementing non-overlapping function of Force Atlas
     graph_community <- graph_community %>%
@@ -1370,19 +1404,20 @@ important_nodes <- function(graph, top_n = 3) {
   Important_nodes <- unique(Important_nodes)
 }
 # ideally an aggregation of the top_centrality_com function for different centrality measure
+```
 
+# 5 Dynamic networks: building the different lists
 
+## 5.1 `dynamic_biblio_coupling()`
 
-#' # Dynamic networks: building the different lists
+This function creates a list of tbl graph from a corpus and its
+references in a direct citation data frame (the list of the references
+cited by each document) of the corpus. You can set different types of
+time windows, use different types of coupling methods, as well as to
+choose different methods to reduce the number of nodes and edges if you
+want to avoid creating too large networks.
 
-
-#' ## `dynamic_biblio_coupling()`
-
-#' This function creates a list of tbl graph from a corpus and its references in a direct
-#' citation data frame (the list of the references cited by each document) of the corpus.
-#' You can set different types of time windows, use different types of coupling methods,
-#' as well as to choose different methods to reduce the number of nodes and edges if you
-#' want to avoid creating too large networks. 
+``` r
 dynamic_biblio_coupling <- function(corpus, 
                                     direct_citation_dt, 
                                     source = "ID_Art",
@@ -1484,9 +1519,9 @@ dynamic_biblio_coupling <- function(corpus,
       quantile <- quantile_threshold
     }
     
-    message(paste0("- Creation of the network for the ", Year, "-", Year + time_window_length - 1, " window."))
+    message(paste0("- Creation of the network for the ", Year, "-", Year + time_window - 1, " window."))
     nodes_of_the_year <- nodes[time_variable >= (Year + time_window_move) & 
-                                 time_variable < (Year + time_window_move + time_window_length)] # < for time_window being the number of years, note the value of the addition
+                                 time_variable < (Year + time_window_move + time_window)] # < for time_window being the number of years, note the value of the addition
     edges_of_the_year <- direct_citation_dt[source %in% nodes_of_the_year$source]
     # size of nodes
     nb_cit <- edges_of_the_year[, .N, source_as_ref]
@@ -1645,230 +1680,19 @@ dynamic_biblio_coupling <- function(corpus,
   
   return (tbl_list)
 }
+```
 
-#' # Functions for word analysis (titles) of networks 
-#' 
-#' ## `tf_idf()`
-#' 
-#' This function takes as input a tidygraph object or a data frame with nodes, both with a community attribute, and analyzes
-#' the words use in the title of the articles to calculate the words with the highest TF-IDF
-#' value for each community.
-#' 
+# 6 Functions for word analysis (titles) of networks
 
+## 6.1 `tf_idf()`
+
+This function takes as input a tidygraph object or a data frame with
+nodes, both with a community attribute, and analyzes the words use in
+the title of the articles to calculate the words with the highest TF-IDF
+value for each community.
+
+``` r
 tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_column = "Com_ID", color_column = "color",
-                           com_name_column = "Community_name", com_size_column = "Size_com", treshold_com = 0.01, number_of_words = 12,
-                           palette = NULL, size_title_wrap = 8, lemmatize_bigrams = TRUE) {
-  #' Creating a TF-IDF analysis of the titles of WoS corpus
-  #'
-  #' This function takes as input a tidygraph object or a data frame with nodes, both with a community attribute, and analyzes
-  #' the words use in the title of the articles to calculate the words with the highest TF-IDF
-  #' value for each community.
-  #'
-  #' @param graph
-  #' A tidygraph object. By default `NULL` in case you prefer to enter a data frame with nodes.
-  #'
-  #' @param nodes
-  #' A data frame with the nodes of the network, and community and title attributes.
-  #'
-  #' @param title_column
-  #' The name of the column with the titles of the articles. The function renames the column
-  #' "Titre", as in the OST WoS database ("Titre" is the default value).
-  #'
-  #' @param com_column
-  #' The name of the column with the id of the communities. The function renames the column
-  #' "Com_ID" (default value).
-  #'
-  #' @param color_column
-  #' The name of the column with the color attribute of the communities. The function renames the column
-  #' "color" (default value).
-  #'
-  #' @param com_name_column
-  #' The name of the column with the name of the communities.
-  #'
-  #' @param com_size_column
-  #' The name of the column with the share of total nodes in each community.
-  #'
-  #' @param threshold_com
-  #' The minimun percentage of nodes in the community for the community to be displayed on the plot.
-  #'
-  #' @param number_of_words
-  #' How many words you want to display on the final graph.
-  #'
-  #' @param palette
-  #' If you don't already have a color attribute for your communities in your tidygraph object,
-  #' the function will generate one from a palette that you can add in the paramaters (NULL by default).
-  #'
-  #' @param size_title_wrap
-  #' The size of the community title in the plot.
-  #' 
-  #' @param lemmatize_bigrams
-  #' Chose whether you want to lemmatize each word in a bigram (which could lead to a bigram that has no 
-  #' clear meaning) or not.
-  
-  # extracting the nodes
-  if (!is.null(graph)) {
-    tf_idf_save <- graph %>%
-      activate(nodes) %>%
-      as.data.table()
-  }
-  else {
-    tf_idf_save <- nodes %>% as.data.table()
-  }
-  
-  # changing the names of the column for titles and communities
-  colnames(tf_idf_save)[colnames(tf_idf_save) == com_column] <- "Com_ID"
-  colnames(tf_idf_save)[colnames(tf_idf_save) == title_column] <- "Titre"
-  colnames(tf_idf_save)[colnames(tf_idf_save) == com_name_column] <- "Community_name"
-  colnames(tf_idf_save)[colnames(tf_idf_save) == com_size_column] <- "Size_com"
-  
-  
-  
-  # adding a color column attribute in case it doesn't exist
-  if (any(names(tf_idf_save) == color_column)) {
-    color <- data.table(
-      Com_ID = 1:500,
-      color = mypalette
-    )
-    color <- color %>%
-      mutate(Com_ID = sprintf("%02d", Com_ID)) %>%
-      mutate(Com_ID = as.character(Com_ID))
-    
-    tf_idf <- merge(tf_idf_save, color, by = "Com_ID", all.x = TRUE)
-  } else {
-    colnames(tf_idf_save)[colnames(tf_idf_save) == color_column] <- "color"
-  }
-  
-  tf_idf <- tf_idf_save # we will need tf_idf_save later
-  # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-  #### Unigram ####
-  # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-  # Cleaning the titles
-  
-  tf_idf <- tf_idf[Titre != "NULL"]
-  tf_idf[, Titre := removeWords(Titre, stopwords("english"))]
-  tf_idf[, Titre := gsub("-", " ", Titre)] # to avoid having non-existing words like UnitedStates
-  tf_idf[, Titre := stripWhitespace(Titre)]
-  tf_idf[, Titre := removePunctuation(Titre)]
-  tf_idf[, Titre := removeNumbers(Titre)]
-  tf_idf[, Titre := tolower(Titre)]
-  tf_idf[, Titre := removeWords(Titre, stopwords("english"))]
-  tf_idf[, Titre := as.character(Titre)]
-  tf_idf$Titre <- quanteda::tokens(tf_idf$Titre, remove_punct = TRUE)
-  tf_idf$Titre <- quanteda::tokens_ngrams(tf_idf$Titre, n = 1)
-  tible_tf_idf <- tf_idf[, paste(Titre, collapse = " "), by = "Com_ID"]
-  tible_tf_idf[, V1 := stripWhitespace(V1)]
-  # Dictionnary to find the root of stem word before stemming
-  tf_idf_table <- tible_tf_idf
-  tf_idf_table <- tf_idf_table %>% unnest_tokens(word, V1) %>% as.data.table()
-  tf_idf_table <- tf_idf_table[, word := textstem::lemmatize_words(word)] 
-  tf_idf_table <- tf_idf_table[, count := .N, by = c("Com_ID","word")] %>% unique()
-  # applying tf-idf
-  tf_idf_table <- tidytext::bind_tf_idf(tf_idf_table, word, Com_ID, count)
-  tf_idf_table_uni <- tf_idf_table
-  
-  
-  
-  # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-  #### Bigram ####
-  # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-  # cleaning
-  
-  tf_idf <- tf_idf_save[Titre != "NULL"]
-  tf_idf[, Titre := removeWords(Titre, stopwords("english"))]
-  tf_idf[, Titre := gsub("-", " ", Titre)] # to avoid having non-existing words like UnitedStates
-  tf_idf[, Titre := stripWhitespace(Titre)]
-  tf_idf[, Titre := removePunctuation(Titre)]
-  tf_idf[, Titre := removeNumbers(Titre)]
-  tf_idf[, Titre := tolower(Titre)]
-  tf_idf[, Titre := removeWords(Titre, stopwords("english"))]
-  tf_idf[, Titre := as.character(Titre)]
-  # ngraming
- # tf_idf[, Titre := stemDocument(Titre)]
-  tf_idf$Titre <- tokens(tf_idf$Titre, remove_punct = TRUE)
-  tf_idf$Titre <- tokens_ngrams(tf_idf$Titre, n = 2)
-  tible_tf_idf <- tf_idf[, paste(Titre, collapse = " "), by = "Com_ID"]
-  tible_tf_idf[, V1 := stripWhitespace(V1)]
-  
-  tf_idf_table <- tible_tf_idf
-  tf_idf_table <- tf_idf_table %>% unnest_tokens(word, V1) %>% as.data.table()
-  tf_idf_table$word <- gsub("_", " ", tf_idf_table$word)
-  
-  if(lemmatize_bigrams == TRUE){
-  tf_idf_table[, word1 := str_extract(tf_idf_table$word, "\\S+")]
-  tf_idf_table[, word2 := str_extract(tf_idf_table$word, "\\S+$")]
-  tf_idf_table <- tf_idf_table[, word1 := textstem::lemmatize_words(word1)]
-  tf_idf_table <- tf_idf_table[, word2 := textstem::lemmatize_words(word2)] 
-  tf_idf_table <- tf_idf_table %>%
-    tidyr::unite(word, word1, word2, sep = " ") %>% 
-    as.data.table()
-  }
-  
-  tf_idf_table <- tf_idf_table[, count := .N, by = c("Com_ID","word")] %>% unique()
-  
-  # applying tf-idf
-  tf_idf_table <- tidytext::bind_tf_idf(tf_idf_table, word, Com_ID, count)
-  tf_idf_table_bi <- tf_idf_table
-  
-  # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-  #### Plot ####
-  # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-  tf_idf_table <- rbind(tf_idf_table_uni, tf_idf_table_bi, fill = TRUE)
-  tf_idf_table <- tf_idf_table[order(-tf_idf)][, head(.SD, number_of_words), Com_ID]
-  
-  # Get info about size of communities
-  Size_com <- unique(tf_idf_save[, .(Com_ID, Community_name, Size_com, color)])
-  tf_idf_table <- merge(tf_idf_table, Size_com, by = "Com_ID", all.x = TRUE) # merge
-  
-  # Wrap Name and Reorder according to share_leiden
-  tf_idf_table$Com_wrap <- str_wrap(tf_idf_table$Community_name, width = 10)
-  tf_idf_table <- tf_idf_table[order(-Size_com)] # order by variable
-  tf_idf_table <- tf_idf_table[order(-Size_com)] # order by variable
-  tf_idf_table$Com_wrap <- factor(tf_idf_table$Com_wrap) # make a factor
-  tf_idf_table$Com_wrap <- fct_inorder(tf_idf_table$Com_wrap) # by order of appearance
-  
-  # fixing the number of columns, depending of the number of communities
-  n_columns <- 3
-  if (length(unique(tf_idf_table[Size_com >= treshold_com]$Com_wrap)) > 9) {
-    n_columns <- 4
-  }
-  
-  if (length(unique(tf_idf_table[Size_com >= treshold_com]$Com_wrap)) > 12) {
-    n_columns <- 5
-  }
-  
-  if (length(unique(tf_idf_table[Size_com >= treshold_com]$Com_wrap)) > 15) {
-    n_columns <- 6
-  }
-  
-  # plotting the graph
-  tf_idf_plot <- ggplot(tf_idf_table[Size_com >= treshold_com], aes(reorder_within(word, tf_idf, color), tf_idf, fill = color)) +
-    geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
-    labs(
-      title = "Highest tf-idf",
-      x = "Words", y = "tf-idf"
-    ) +
-    facet_wrap(~Com_wrap, ncol = n_columns, scales = "free") +
-    scale_x_reordered() +
-    scale_fill_identity() +
-    theme(strip.text = element_text(size = size_title_wrap)) +
-    coord_flip()
-  
-  list_return <- list("plot" = tf_idf_plot, "list_words" = tf_idf_table)
-  return(list_return)
-}
-
-
-#' ## `tf_idf_old()`
-#' 
-#' > This is former function that used stemming. We now prefer using lemmatization.
-#' 
-#' 
-#' This function takes as input a tidygraph object or a data frame with nodes, both with a community attribute, and analyzes
-#' the words use in the title of the articles to calculate the words with the highest TF-IDF
-#' value for each community.
-#' 
-
-tf_idf_stemmed <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_column = "Com_ID", color_column = "color",
                    com_name_column = "Community_name", com_size_column = "Size_com", treshold_com = 0.01, number_of_words = 12,
                    palette = NULL, size_title_wrap = 8, unstemming = TRUE) {
   #' Creating a TF-IDF analysis of the titles of WoS corpus
@@ -1930,13 +1754,14 @@ tf_idf_stemmed <- function(graph = NULL, nodes = NULL, title_column = "Titre", c
   # changing the names of the column for titles and communities
   colnames(tf_idf_save)[colnames(tf_idf_save) == com_column] <- "Com_ID"
   colnames(tf_idf_save)[colnames(tf_idf_save) == title_column] <- "Titre"
+  colnames(tf_idf_save)[colnames(tf_idf_save) == color_column] <- "color"
   colnames(tf_idf_save)[colnames(tf_idf_save) == com_name_column] <- "Community_name"
   colnames(tf_idf_save)[colnames(tf_idf_save) == com_size_column] <- "Size_com"
 
 
 
   # adding a color column attribute in case it doesn't exist
-  if (any(names(tf_idf_save) == color_column)) {
+  if (colnames(tf_idf_save)[colnames(tf_idf_save) == "color"] != "color") {
     color <- data.table(
       Com_ID = 1:500,
       color = mypalette
@@ -1946,8 +1771,6 @@ tf_idf_stemmed <- function(graph = NULL, nodes = NULL, title_column = "Titre", c
       mutate(Com_ID = as.character(Com_ID))
 
     tf_idf <- merge(tf_idf_save, color, by = "Com_ID", all.x = TRUE)
-  } else {
-    colnames(tf_idf_save)[colnames(tf_idf_save) == color_column] <- "color"
   }
 
   tf_idf <- tf_idf_save # we will need tf_idf_save later
@@ -1964,8 +1787,6 @@ tf_idf_stemmed <- function(graph = NULL, nodes = NULL, title_column = "Titre", c
   tf_idf[, Titre := tolower(Titre)]
   tf_idf[, Titre := removeWords(Titre, stopwords("english"))]
   tf_idf[, Titre := as.character(Titre)]
-  tf_idf$Titre <- tokens(tf_idf$Titre, remove_punct = TRUE)
-  tf_idf$Titre <- tokens_ngrams(tf_idf$Titre, n = 1)
   tible_tf_idf <- tf_idf[, paste(Titre, collapse = " "), by = "Com_ID"]
   tible_tf_idf[, V1 := stripWhitespace(V1)]
   # Dictionnary to find the root of stem word before stemming
@@ -1980,17 +1801,10 @@ tf_idf_stemmed <- function(graph = NULL, nodes = NULL, title_column = "Titre", c
   documents_names <- cbind(docvars(tible_tf_idf), quanteda::convert(tible_tf_idf, to = "data.frame")) %>% as.data.table()
   tible_tf_idf <- tidy(tible_tf_idf) %>% as.data.table()
   tf_idf_table <- merge(tible_tf_idf, documents_names[, .(doc_id, Com_ID)], by.x = "document", by.y = "doc_id")
-  setkey(tf_idf_table,term)
-  setkey(dictionary, word)
   
   if(unstemming==TRUE){
-  # we separate the terms to optimise the matching with unstemmed words
-  terms <- unique(tf_idf_table$term) %>% as.data.table()
-  setnames(terms,".","term")
-  setkey(terms, term)
-  terms <- terms[, unstemmed_word:= stemCompletion(term, dictionary$word, type = "prevalent")]
-  tf_idf_table <- merge(tf_idf_table, terms, by = "term")
-  tf_idf_table[unstemmed_word=="",unstemmed_word:=term] # unstem with most common word
+    tf_idf_table[,unstemmed_word:=stemCompletion(tf_idf_table$term, dictionary$word, type = "prevalent")] # unstem with most common word
+    tf_idf_table[unstemmed_word=="",unstemmed_word:=term] # unstem with most common word
   }
   if(unstemming==FALSE){
     tf_idf_table[,unstemmed_word:=term]
@@ -2032,21 +1846,12 @@ tf_idf_stemmed <- function(graph = NULL, nodes = NULL, title_column = "Titre", c
   tf_idf_table$term <- gsub("_", " ", tf_idf_table$term)
   tf_idf_table[, term1 := str_extract(tf_idf_table$term, "\\S+")]
   tf_idf_table[, term2 := str_extract(tf_idf_table$term, "\\S+$")]
-  setkey(tf_idf_table,term1, term2)
-  setkey(dictionary, word)
   
   if(unstemming==TRUE){
-    terms <- unique(tf_idf_table$term1) %>% as.data.table()
-    terms2 <- unique(tf_idf_table$term2) %>% as.data.table()
-    terms <- rbind(terms,terms2) %>% unique()
-    setnames(terms,".","term")
-    setkey(terms, term)
-    terms <- terms[, unstemmed_word:= stemCompletion(term, dictionary$word, type = "prevalent")]
-    tf_idf_table <- merge(tf_idf_table, terms, by.x = "term1", by.y = "term")
-    tf_idf_table <- merge(tf_idf_table, terms, by.x = "term2", by.y = "term")
-    tf_idf_table[unstemmed_word.x=="",unstemmed_word:=term1]
-    tf_idf_table[unstemmed_word.y=="",unstemmed_word:=term2]
-    setnames(tf_idf_table,c("unstemmed_word.x","unstemmed_word.y"),c("unstemmed_word1","unstemmed_word2"))
+    tf_idf_table[,unstemmed_word1:=stemCompletion(tf_idf_table$term1, dictionary$word, type = "prevalent")] # unstem with most common word
+    tf_idf_table[unstemmed_word1=="",unstemmed_word:=term1]
+    tf_idf_table[,unstemmed_word2:=stemCompletion(tf_idf_table$term2, dictionary$word, type = "prevalent")] # unstem with most common word
+    tf_idf_table[unstemmed_word2=="",unstemmed_word:=term2]
   }
   if(unstemming==FALSE){
     tf_idf_table[,unstemmed_word1:=term1]
@@ -2103,4 +1908,4 @@ tf_idf_stemmed <- function(graph = NULL, nodes = NULL, title_column = "Titre", c
   list_return <- list("plot" = tf_idf_plot, "list_words" = tf_idf_table)
   return(list_return)
 }
-
+```

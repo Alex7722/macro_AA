@@ -1,14 +1,41 @@
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-############################## PART I: LOADING PACKAGES, PATH AND DATA ####################################--------------
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#' ---
+#' title: "Script for building the networks for different sub-periods"
+#' author: "Aurélien Goutsmedt and Alexandre Truc"
+#' date: "/ Last compiled on `r format(Sys.Date())`"
+#' output: 
+#'   github_document:
+#'     toc: true
+#'     number_sections: true
+#' ---
+
+#+ r setup, include = FALSE
+knitr::opts_chunk$set(eval = FALSE)
+
+#' # What is this script for?
+#' 
+#' In this script, we find communities on the coupling networks of each sub-periods for different
+#' level of resolution. In the Leiden algorithm, a higher resolution will lead the algorithm to 
+#' find a higher number of communities. We set the basis for the projection of Sankey diagrams
+#' which give us an information about how communities are merged together when we decrease the 
+#' resolution level.
+#' 
+#' > WARNING: This script represents a first step of the project, and some processes have been
+#' improved (notably by the creation of new functions). Besides, it is a bit sketchy and needs
+#' a lot of cleaning.
+
+#' # Loading packages, paths and data
 
 source("~/macro_AA/functions/functions_for_network_analysis.R")
 source("~/macro_AA/Static_Network_Analysis/Script_paths_and_basic_objects.R")
 
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-############################## PART II: TESTING LEIDEN ####################################--------------
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#' # Testing Leiden
 
+#' ## Finding communities for different resolution of Leiden
+#' 
+#' We set different resolution levels first. Then we run the algorithm for these different levels, automatically
+#' attributes names to communiites. We then merge with the names chosen for the communities found in 
+#' [2_Script_Static_Network_Analysis](/Static_Network_Analysis/2_Script_Static_Network_Analysis.md) (probably with
+#' a resolution equals to 1). 
 
 resolution_set <- c(2, 1.5, 1, 0.5)
 for (i in 1:length(start_date)) {
@@ -57,8 +84,13 @@ for (i in 1:length(start_date)) {
   saveRDS(Leiden_coupling, paste0(graph_data_path, "Leiden_coupling_", start_date[i], "-", end_date[i], ".rds"))
 }
 
+#' ## Building the Sankey diagrams
+#' 
+#' You don't have to run this code. It is used in [Static_Nework_Analysis.Rmd](/Static_Network_Analysis/Static_Nework_Analysis.Rmd) 
+#' to project the Sankey Diagrams for each subperiod.
+#' 
 
-Leiden_coupling <- readRDS(paste0(graph_data_path, "Leiden_coupling_", start_date[i], "-", end_date[i], ".rds")) %>% as.data.table()
+#Leiden_coupling <- readRDS(paste0(graph_data_path, "Leiden_coupling_", start_date[i], "-", end_date[i], ".rds")) %>% as.data.table()
 
 # identifying the most cited nodes per resolution
 All_com <- data.table()
@@ -69,13 +101,16 @@ for (j in 1:(length(resolution_set))) {
   All_com <- rbind(All_com, Com, use.names = FALSE)
 }
 
-Leiden_coupling_data <- merge(Leiden_coupling[, c("Id", "Label", "Titre", "nb_cit")], All_com, by = "Id")
-colnames(Leiden_coupling_data)[colnames(Leiden_coupling_data) == "Community_name_2.5"] <- "Community_name"
-colnames(Leiden_coupling_data)[colnames(Leiden_coupling_data) == "Size_com_2.5"] <- "Size_com"
-Leiden_coupling_data <- Leiden_coupling_data %>%
-  arrange(desc(Resolution), Community_name, desc(nb_cit)) %>%
-  group_by(Resolution, Community_name) %>%
-  slice(1:5) %>%
+# cleaning the table and keeping the top n values
+n = 8
+
+Leiden_coupling_data <- merge(Leiden_coupling[,c("Id","Label", "Titre", "nb_cit")],All_com, by = "Id")
+colnames(Leiden_coupling_data)[colnames(Leiden_coupling_data) == "Community_name_2"] = "Community_name"
+colnames(Leiden_coupling_data)[colnames(Leiden_coupling_data) == "Size_com_2"] = "Size_com"
+Leiden_coupling_data <- Leiden_coupling_data %>% 
+  arrange(desc(Resolution),Community_name,desc(nb_cit)) %>%
+  group_by(Resolution,Community_name) %>%
+  slice(1:n)  %>%
   arrange(desc(Resolution), desc(Size_com), desc(nb_cit))
 
 

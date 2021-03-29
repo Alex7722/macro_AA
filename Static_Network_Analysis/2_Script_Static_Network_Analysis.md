@@ -1,46 +1,56 @@
-#' ---
-#' title: "Script for building the networks for moving time window"
-#' author: "Aurélien Goutsmedt and Alexandre Truc"
-#' date: "/ Last compiled on `r format(Sys.Date())`"
-#' output: 
-#'   github_document:
-#'     toc: true
-#'     number_sections: true
-#'     toc_depth: 2
-#' ---
-#' 
-#' # What is this script about?
-#' 
-#' This script takes as input the different networks created for different sub-periods in the former 
-#' [script](/Static_Network_Analysis/1_Script_for_building_networks.md)
-#' and find communities, implement names to these communities (names that were assess by looking at the main features of each community), calculates
-#' coordinates using the [Force Atlas algorithm](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0098679) 
-#' and finally project the different graphs using [GGRAPH](https://ggraph.data-imaginist.com/).
-#' 
-#' 
-#' > WARNING: This script represents a first step of the project, and some processes have been
-#' improved (notably by the creation of new functions).
-#' 
+Script for building the networks for moving time window
+================
+Aurélien Goutsmedt and Alexandre Truc
+/ Last compiled on 2021-03-11
 
-#+ r setup, include = FALSE
-knitr::opts_chunk$set(eval = FALSE)
+  - [1 What is this script about?](#what-is-this-script-about)
+  - [2 Loading packages, paths and
+    data](#loading-packages-paths-and-data)
+  - [3 Network Analysis](#network-analysis)
+      - [3.1 Bibliographic Co-citation](#bibliographic-co-citation)
+      - [3.2 Bibliographic Coupling](#bibliographic-coupling)
+      - [3.3 Author Graph from Bibliographic
+        Coupling](#author-graph-from-bibliographic-coupling)
+      - [3.4 Institutions network from
+        Coupling](#institutions-network-from-coupling)
+      - [3.5 Co-Authorship Graphs](#co-authorship-graphs)
 
-#' # Loading packages, paths and data
+# 1 What is this script about?
 
+This script takes as input the different networks created for different
+sub-periods in the former
+[script](/Static_Network_Analysis/1_Script_for_building_networks.md) and
+find communities, implement names to these communities (names that were
+assess by looking at the main features of each community), calculates
+coordinates using the [Force Atlas
+algorithm](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0098679)
+and finally project the different graphs using
+[GGRAPH](https://ggraph.data-imaginist.com/).
+
+> WARNING: This script represents a first step of the project, and some
+> processes have been improved (notably by the creation of new
+> functions).
+
+# 2 Loading packages, paths and data
+
+``` r
 source("~/macro_AA/functions/functions_for_network_analysis.R")
 source("~/macro_AA/Static_Network_Analysis/Script_paths_and_basic_objects.R")
+```
 
-#' # Network Analysis
+# 3 Network Analysis
 
+## 3.1 Bibliographic Co-citation
 
-#' ## Bibliographic Co-citation
+We first use the six networks created in the former
+[script](/Static_Network_Analysis/1_Script_for_building_networks.md) and
+run a loop to find communities, to give them color and names (the label
+of the most significant node in the community) and to calculate
+coordinates using Force Atlas 2.
 
-#' We first use the six networks created in the former [script](/Static_Network_Analysis/1_Script_for_building_networks.md) and 
-#' run a loop to find communities, to give them color and names (the label of the most significant node in the community) and to
-#' calculate coordinates using Force Atlas 2.
-#' 
-#' ### building the co-citation graphs
+### 3.1.1 building the co-citation graphs
 
+``` r
 for (i in 1:length(start_date)) {
   graph_cocit <- readRDS(paste0(graph_data_path, "prior_graph_cocit_", start_date[i], "-", end_date[i], ".rds"))
 
@@ -70,12 +80,15 @@ for (i in 1:length(start_date)) {
   # Saving the graph
   saveRDS(graph_cocit, paste0(graph_data_path, "graph_cocit_", start_date[i], "-", end_date[i], ".rds"))
 }
+```
 
-#' ### Renaming cocitation communities
-#' 
-#' This first step has allowed us to study the composition of the different communities, and to qualitatively 
-#' determine appropriate names for all the communities. We implement these names here.
+### 3.1.2 Renaming cocitation communities
 
+This first step has allowed us to study the composition of the different
+communities, and to qualitatively determine appropriate names for all
+the communities. We implement these names here.
+
+``` r
 ################################### Recoloring graphs depending on the new titles ##########################
 
 for (i in 1:length(start_date)) {
@@ -98,12 +111,14 @@ for (i in 1:length(start_date)) {
   # Saving the graph
   saveRDS(graph_cocit, paste0(graph_data_path, "graph_cocit_", start_date[i], "-", end_date[i], ".rds"))
 }
+```
 
-#' ### Projecting the coupling graphs 
-#' 
-#' We can now display the networks using ggraph. `i` has to be set manually, to verify that each graph
-#' renders well.
+### 3.1.3 Projecting the coupling graphs
 
+We can now display the networks using ggraph. `i` has to be set
+manually, to verify that each graph renders well.
+
+``` r
 ############################# Projection of the graph #########################-----------
 i <- 6
 graph_cocit <- readRDS(paste0(graph_data_path, "graph_cocit_", start_date[i], "-", end_date[i], ".rds"))
@@ -131,15 +146,17 @@ ggraph(graph_cocit, "manual", x = x, y = y) +
   scale_size_continuous(range = c(0.5, 5)) +
   theme_void() +
   ggsave(paste0(picture_path, "graph_cocit", start_date[i], "-", end_date[i], ".png"), width = 35, height = 35, units = "cm")
+```
 
+### 3.1.4 Graph of community as nodes from cocitation
 
-#' ### Graph of community as nodes from cocitation
-#' 
-#' We now aggregate all the nodes in each community, and each community will now represent a node. The size 
-#' depends of the number of articles in the community that forms the node, and the links between node represent
-#' the sum of the weights of the edges between two communities, on the sum of all the weights of the two communities
-#' (we use the salton's cosine).
+We now aggregate all the nodes in each community, and each community
+will now represent a node. The size depends of the number of articles in
+the community that forms the node, and the links between node represent
+the sum of the weights of the edges between two communities, on the sum
+of all the weights of the two communities (we use the salton’s cosine).
 
+``` r
 for (i in 1:length(start_date)) {
   graph_cocit <- readRDS(paste0(graph_data_path, "graph_cocit_", start_date[i], "-", end_date[i], ".rds"))
 
@@ -149,13 +166,15 @@ for (i in 1:length(start_date)) {
   # Saving the graph
   saveRDS(graph_cocit_community, paste0(graph_data_path, "graph_cocit_community_", start_date[i], "-", end_date[i], ".rds"))
 }
+```
 
-#' ## Bibliographic Coupling
-#' 
-#' We basically follow the same process as for co-citation networks
-#' 
-#' ### Building the coupling graphs
+## 3.2 Bibliographic Coupling
 
+We basically follow the same process as for co-citation networks
+
+### 3.2.1 Building the coupling graphs
+
+``` r
 ################## Working on the coupling tidygraph and its attributes ######################----
 for (i in 1:length(start_date)) {
   graph_coupling <- readRDS(paste0(graph_data_path, "prior_graph_coupling_", start_date[i], "-", end_date[i], ".rds"))
@@ -186,9 +205,11 @@ for (i in 1:length(start_date)) {
   # Saving the graph
   saveRDS(graph_coupling, paste0(graph_data_path, "graph_coupling_", start_date[i], "-", end_date[i], ".rds"))
 }
+```
 
-#' ### Renaming coupling communities
+### 3.2.2 Renaming coupling communities
 
+``` r
 ############################### Recoloring Graph depending on the new titles ###############################
 for (i in 1:length(start_date)) {
   # loading the graph if necessary
@@ -211,9 +232,11 @@ for (i in 1:length(start_date)) {
   # Saving the graph
   saveRDS(graph_coupling, paste0(graph_data_path, "graph_coupling_", start_date[i], "-", end_date[i], ".rds"))
 }
+```
 
-#' ### Projecting coupling graphs
+### 3.2.3 Projecting coupling graphs
 
+``` r
 ############################# Projection of the graph #########################
 i <- 6
 # loading the graph if necessary
@@ -244,9 +267,11 @@ ggraph(graph_coupling, "manual", x = x, y = y) +
   ggsave(paste0(picture_path, "graph_coupling_", start_date[i], "-", end_date[i], ".png"), width = 35, height = 35, units = "cm")
 
 min(E(graph_cocit)$weight)
+```
 
-#' ### Graph of community as nodes from coupling
+### 3.2.4 Graph of community as nodes from coupling
 
+``` r
 #################################### Graph of community as nodes from coupling ######################################
 
 for (i in 1:length(start_date)) {
@@ -258,13 +283,16 @@ for (i in 1:length(start_date)) {
   # Saving the graph
   saveRDS(graph_coupling_community, paste0(graph_data_path, "graph_coupling_community_", start_date[i], "-", end_date[i], ".rds"))
 }
+```
 
-#' ## Author Graph from Bibliographic Coupling
-#' 
-#' We now look at the references shared by different the authors of macro articles.
-#' 
-#' ### Building the author-coupling graphs
+## 3.3 Author Graph from Bibliographic Coupling
 
+We now look at the references shared by different the authors of macro
+articles.
+
+### 3.3.1 Building the author-coupling graphs
+
+``` r
 ################## Working on the author coupling tidygraph and its attributes ######################----
 
 for (i in 1:length(start_date)) {
@@ -296,9 +324,11 @@ for (i in 1:length(start_date)) {
   # Saving the graph
   saveRDS(graph_authors_coupling, paste0(graph_data_path, "graph_authors_coupling_", start_date[i], "-", end_date[i], ".rds"))
 }
+```
 
-#' ### Renaming the author-coupling communities
+### 3.3.2 Renaming the author-coupling communities
 
+``` r
 ############################### Recoloring Graph depending on the new titles ###############################
 for (i in 1:length(start_date)) {
   # loading the graph if necessary
@@ -320,9 +350,11 @@ for (i in 1:length(start_date)) {
   # Saving the graph
   saveRDS(graph_authors_coupling, paste0(graph_data_path, "graph_authors_coupling_", start_date[i], "-", end_date[i], ".rds"))
 }
+```
 
-#' ### Projecting author-coupling graphs
+### 3.3.3 Projecting author-coupling graphs
 
+``` r
 ############################# Projection of the graph #########################
 
 i <- 6
@@ -350,9 +382,11 @@ ggraph(graph_authors_coupling, "manual", x = x, y = y) +
   scale_size_continuous(range = c(0.5, 3.5)) +
   theme_void() +
   ggsave(paste0(picture_path, "graph_authors_coupling_", start_date[i], "-", end_date[i], ".png"), width = 30, height = 30, units = "cm")
+```
 
-#' ### Building a network with communities as nodes from author-coupling networks
+### 3.3.4 Building a network with communities as nodes from author-coupling networks
 
+``` r
 ################## Authors coupling graph with community as nodes ######################----
 
 for (i in 1:length(start_date)) {
@@ -364,13 +398,15 @@ for (i in 1:length(start_date)) {
   # Saving the graph
   saveRDS(graph_authors_coupling_community, paste0(graph_data_path, "graph_authors_coupling_community_", start_date[i], "-", end_date[i], ".rds"))
 }
+```
 
-#' ## Institutions network from Coupling 
-#' 
-#' We do the same but for institutions rather than for authors
-#' 
-#' ### Building the institutions-coupling graphs
+## 3.4 Institutions network from Coupling
 
+We do the same but for institutions rather than for authors
+
+### 3.4.1 Building the institutions-coupling graphs
+
+``` r
 ################## Working on the Institution coupling tidygraph and its attributes ######################----
 
 for (i in 1:length(start_date)) {
@@ -399,10 +435,11 @@ for (i in 1:length(start_date)) {
   # Saving the graph
   saveRDS(graph_institutions_coupling, paste0(graph_data_path, "graph_institutions_coupling_", start_date[i], "-", end_date[i], ".rds"))
 }
+```
 
-#' ### Projecting the coupling-institutions graphs
-#' 
+### 3.4.2 Projecting the coupling-institutions graphs
 
+``` r
 ############################# Projection of the graph #########################
 
 i <- 2
@@ -427,14 +464,16 @@ ggraph(graph_institutions_coupling, "manual", x = x, y = y) +
   geom_label_repel(data = com_label, aes(x = x, y = y, label = Community_name, fill = color), size = 5, fontface = "bold", alpha = 1, point.padding = NA, show.legend = FALSE) +
   theme_void() +
   ggsave(paste0(picture_path, "graph_institutions_coupling_", start_date[i], "-", end_date[i], ".png"), width = 30, height = 30, units = "cm")
+```
 
+## 3.5 Co-Authorship Graphs
 
-#' ## Co-Authorship Graphs
-#' 
-#' #' > NOTE: At this point, the co-authorship graphs are quite unsatisfying.
-#' 
-#' ### Building the co-authorship graphs
+\#’ \> NOTE: At this point, the co-authorship graphs are quite
+unsatisfying.
 
+### 3.5.1 Building the co-authorship graphs
+
+``` r
 ################## Working on the author coupling tidygraph and its attributes ######################----
 
 for (i in 1:length(start_date)) {
@@ -463,10 +502,11 @@ for (i in 1:length(start_date)) {
   # Saving the graph
   saveRDS(graph_coauthorship, paste0(graph_data_path, "graph_coauthorship_", start_date[i], "-", end_date[i], ".rds"))
 }
+```
 
-#' ### Projecting the co-authorship graphs
+### 3.5.2 Projecting the co-authorship graphs
 
-
+``` r
 ############################# Projection of the graph #########################
 
 i <- 6
@@ -491,11 +531,13 @@ ggraph(graph_coauthorship, "manual", x = x, y = y) +
   geom_label_repel(data = com_label, aes(x = x, y = y, label = Community_name, fill = color), size = 4, fontface = "bold", alpha = 1, point.padding = NA, show.legend = FALSE) +
   theme_void() +
   ggsave(paste0(picture_path, "graph_coauthorship_", start_date[i], "-", end_date[i], ".png"), width = 30, height = 30, units = "cm")
+```
 
-#' ### co-authorship institutions graphs
-#' 
-#' We do the same but for institutions rather than for authors.
+### 3.5.3 co-authorship institutions graphs
 
+We do the same but for institutions rather than for authors.
+
+``` r
 ################## Working on the institution co-authorship tidygraph and its attributes ######################----
 
 for (i in 1:length(start_date)) {
@@ -548,3 +590,4 @@ ggraph(graph_institutions, "manual", x = x, y = y) +
   geom_label_repel(data = com_label, aes(x = x, y = y, label = Community_name, fill = color), size = 4, fontface = "bold", alpha = 1, point.padding = NA, show.legend = FALSE) +
   theme_void() +
   ggsave(paste0(picture_path, "graph_co-authorship_institutions_", start_date[i], "-", end_date[i], ".png"), width = 20, height = 20, units = "cm")
+```
