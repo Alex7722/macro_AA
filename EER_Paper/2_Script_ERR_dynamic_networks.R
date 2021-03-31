@@ -23,13 +23,20 @@
 #' 
 #+ r setup, include = FALSE
 knitr::opts_chunk$set(eval = FALSE)
-
+set.seed(500)
 #' # Loading packages, paths and data
 #' 
 
 
 source("EER_Paper/Script_paths_and_basic_objects_EER.R")
 source("functions/functions_for_network_analysis.R")
+source("/home/alexandre/functions_dynamics_networks.R")
+source("/home/alexandre/functions_networks.R")
+
+Corpus <- readRDS(file = "EER/1_Corpus_Prepped_and_Merged/Corpus.rds")
+Institutions <- readRDS(file = "EER/1_Corpus_Prepped_and_Merged/Institutions.rds")
+Authors <- readRDS("EER/1_Corpus_Prepped_and_Merged/Authors.rds")
+Refs <- readRDS("EER/1_Corpus_Prepped_and_Merged/Refs.rds")
 
 #' # Creating the networks for each time windows
 #' 
@@ -39,27 +46,26 @@ source("functions/functions_for_network_analysis.R")
 #+ r list
 
 # renaming columns in ref dt for use in the function
-setnames(eer_ref, c("ID_Art_Source","ItemID_Ref_Target"), c("ID_Art","ItemID_Ref"))
-
-tbl_coup_list <- dynamic_biblio_coupling(corpus = eer_nodes[between(Annee_Bibliographique, 1974, 2018)], 
-                                         direct_citation_dt = eer_ref, 
-                                         source = "ID_Art",
-                                         source_as_ref = "ItemID_Ref",
-                                         ref = "ItemID_Ref", 
-                                         time_variable = "Annee_Bibliographique",
-                                         coupling_method = "coupling_strength",
-                                         time_window_length = 7,
-                                         time_window_move = 0,
-                                         weight_treshold = 1,
-                                         nodes_threshold = 0,
-                                         controlling_nodes = FALSE,
-                                         controlling_edges = TRUE,
-                                         nodes_limit = 10000,
-                                         edges_limit = 400000,
-                                         distribution_pruning = FALSE,
-                                         quantile_threshold = 1,
-                                         quantile_move = 0)
-
+# setnames(eer_ref, c("ID_Art_Source","ItemID_Ref_Target"), c("ID_Art","ItemID_Ref"))
+# 
+# tbl_coup_list <- dynamic_biblio_coupling(corpus = eer_nodes[between(Annee_Bibliographique, 1974, 2018)],
+#                                          direct_citation_dt = eer_ref,
+#                                          source = "ID_Art",
+#                                          source_as_ref = "ItemID_Ref",
+#                                          ref = "ItemID_Ref",
+#                                          time_variable = "Annee_Bibliographique",
+#                                          coupling_method = "coupling_strength",
+#                                          time_window_length = 7,
+#                                          time_window_move = 0,
+#                                          weight_treshold = 1,
+#                                          nodes_threshold = 0,
+#                                          controlling_nodes = FALSE,
+#                                          controlling_edges = TRUE,
+#                                          nodes_limit = 10000,
+#                                          edges_limit = 400000,
+#                                          distribution_pruning = FALSE,
+#                                          quantile_threshold = 1,
+#                                          quantile_move = 0)
 #' ## Finding Communities
 
 #' We use the leiden_workflow function of the networkflow package (it uses the 
@@ -67,4 +73,51 @@ tbl_coup_list <- dynamic_biblio_coupling(corpus = eer_nodes[between(Annee_Biblio
 #' it seems to converge well before.
 
 #+ r communities
-tbl_coup_list <- lapply(tbl_coup_list, leiden_workflow, niter = 10000)
+# tbl_coup_list <- lapply(tbl_coup_list, leiden_workflow, niter = 10000)
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Dynamic Networks and Communities ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+time_window <- 7
+first_year <- Corpus[order(Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique
+last_year <- (Corpus[order(-Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique - time_window +1) # +1 to get the very last year in the window
+all_years <- first_year:last_year
+
+tbl_coup_list <- dynamics_coupling_networks(corpus = Corpus, 
+                                             references = Refs, 
+                                             source = "ID_Art", 
+                                             target = "ItemID_Ref", 
+                                             time_variable = Annee_Bibliographique,
+                                             time_window = time_window, 
+                                             weight_treshold_value = 2)
+
+tbl_coup_list <- lapply(tbl_coup_list, detect_leidenalg, niter = 10000)
+tbl_coup_list <- intertemporal_naming_function(tbl_coup_list)
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Alluvial ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+alluv_dt <- make_into_alluv_dt(tbl_coup_list)
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Positions ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+list_networks <- lapply(tbl_coup_list, function(tbl){tbl %>% activate(nodes) %>% mutate(Leiden1=new_Id_com)})
+list_graph_position <- list()
+for (Year in all_years) {
+  if(is.null(list_networks[[paste0(Year-1)]])){
+    list_graph_position[[paste0(Year)]] <- layout_fa2_java(list_networks[[paste0(Year)]])
+  }
+  if(!is.null(list_networks[[paste0(Year-1)]])){
+    past_position <- list_graph_position[[paste0(Year-1)]] %>% activate(nodes) %>% as.data.table()
+    past_position <- past_position[,.(ID_Art,x,y)]
+    
+    tbl <- list_networks[[paste0(Year)]] %>% activate(nodes) %>% left_join(past_position)
+    
+    list_graph_position[[paste0(Year)]] <- layout_fa2_java(tbl)
+  }
+}
+
+list_graph_position <- make_into_alluv_dt(list_graph_position)
