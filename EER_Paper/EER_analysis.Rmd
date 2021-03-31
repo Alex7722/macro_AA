@@ -14,51 +14,51 @@ output:
 ```{r setup, include=FALSE}
 #library(knitr)
 knitr::opts_knit$set(root.dir = "/projects/data/macro_AA")
-#library(png)
-#library(grid)
-#library(ggnewscale)
-#library(vite)
-#library(RMySQL)
-#library(NetworkToolbox)
-#library(broom)
-#library(igraph)
-# library(dplyr)
-#library(data.table)
-#library(ggplot2)
-#library(magrittr)
-#library(tm)
-#library(tidyr)
-#library(tidytext)
-#library('cluster')
-#library('ggraph')
-#library('tibble')
-#library('tidygraph')
-#library(ggrepel)
-#library(readr)
-#library(leiden)
-#library(ggraph)
-#library(ggnewscale)
-#library(remotes)
-#library(vite)
-#library("reticulate")
-#library(reticulate)
-#library(leiden)
-#library(tidygraph)
-#library(rlang)
-#library(leiden)
-#library(ggforce)
-#library(d3Network)
-#library(scales)
-#library(RColorBrewer)
-#require(DescTools)
-#require(stringr)
-#library(docstring)
-#library(quanteda)
-#library(pander)
-#library(DT)
-#require(forcats)
-#require(tidyverse)
-#library(sigmajs)
+library(png)
+library(grid)
+library(ggnewscale)
+library(vite)
+library(RMySQL)
+library(NetworkToolbox)
+library(broom)
+library(igraph)
+library(dplyr)
+library(data.table)
+library(ggplot2)
+library(magrittr)
+library(tm)
+library(tidyr)
+library(tidytext)
+library('cluster')
+library('ggraph')
+library('tibble')
+library('tidygraph')
+library(ggrepel)
+library(readr)
+library(leiden)
+library(ggraph)
+library(ggnewscale)
+library(remotes)
+library(vite)
+library("reticulate")
+library(reticulate)
+library(leiden)
+library(tidygraph)
+library(rlang)
+library(leiden)
+library(ggforce)
+library(d3Network)
+library(scales)
+library(RColorBrewer)
+require(DescTools)
+require(stringr)
+library(docstring)
+library(quanteda)
+library(pander)
+library(DT)
+require(forcats)
+require(tidyverse)
+library(sigmajs)
 source(path.expand("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R"))
 source("/home/alexandre/functions_networks.R")
 
@@ -68,42 +68,10 @@ ESH <- dbConnect(MySQL(), user=usr, password=pswd, dbname='OST_Expanded_SciHum',
                  host='127.0.0.1')
 setwd("/projects/data/macro_AA")
 
-######################### Naming communities #########################
-name_coup_2 <-  data.table(Leiden1 = "NA", Leiden_num= as.double(1:20))
-name_coup_2[Leiden_num==1, Leiden1:="Consumption & Production Functions Estimations"]
-name_coup_2[Leiden_num==2, Leiden1:="Disequilibrium Theory"]
-name_coup_2[Leiden_num==3, Leiden1:="International Macroeconomics"]
-name_coup_2[Leiden_num==4, Leiden1:="Rational Expectations"]
-name_coup_2[Leiden_num==5, Leiden1:="Production Function & Investment"]
-name_coup_2[Leiden_num==6, Leiden1:="Time Series & Consumption"]
-name_coup_2[Leiden_num==7, Leiden1:="Firm Theory"]
-name_coup_2[Leiden_num==8, Leiden1:="Micro-analysis of Markets"]
 
-
-
-all_names <- rbind(name_coup_2) %>% as.data.table()
-all_names <- all_names[Leiden1!="NA"]
-
-n_color <- all_names[,.N]
-seed <- brewer.pal(8, name = "Dark2")
-
-######################### The colors of communities #########################
-color = data.table(
-  Leiden1 = 1:500,
-  color = brewer.pal(8, name = "Dark2"))
-
-color[Leiden1>=201, color == rep(brewer.pal(8, name = "Dark2"))]
-color[Leiden1>208 & Leiden1<=220, color := brewer.pal(12, name = "Paired")]
-color[Leiden1>220 & Leiden1<=228, color := brewer.pal(8, name = "Dark2")]
-color[Leiden1>228 & Leiden1<=240, color := brewer.pal(12, name = "Paired")]
-
-color <- color %>%  mutate(Leiden1 = sprintf("%02d", Leiden1)) %>% mutate(Leiden1 = as.character(Leiden1))
-
-color[Leiden1>=201 & Leiden1<201+all_names[,.N,Leiden1][,.N], Leiden1:=all_names[,.N,Leiden1]$Leiden1]
-
-color[Leiden1=="NA", color:="#c1c1c1"]
-
-######################### Disciplines #########################
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Disciplines ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
 revues <- fread("all_journals.csv", quote="") %>% data.table
 revues[,Code_Discipline:=as.character(Code_Discipline)]
@@ -148,10 +116,6 @@ Corpus[, c("Code_Discipline"):=NULL]
 # Document types
 Corpus <- Corpus[Code_Document == 1 | Code_Document == 2 | Code_Document == 3 | Code_Document == 6]
 
-# Decades
-Corpus <- Corpus[, decade:= cut(Annee_Bibliographique, seq(1969, 2025, 8), right = FALSE, dig.lab = 4)]
-Corpus <- Corpus[decade!="NA"]
-
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### Authors ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -160,29 +124,27 @@ Authors[,ID_Art:=as.character(ID_Art)]
 Authors <- Authors[ID_Art %in% Corpus$ID_Art][,Nom_ISI:=toupper(Nom_ISI)]
 
 # info about sources
-Authors <- merge(Authors, Corpus[,.(ID_Art, Annee_Bibliographique, decade)], by = "ID_Art", all.x = TRUE)
+Authors <- merge(Authors, Corpus[,.(ID_Art, Annee_Bibliographique)], by = "ID_Art", all.x = TRUE)
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### Institutions ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-setwd("/projects/data/macro_AA")
-
-UE <- fread("EER/UE.csv") %>% data.table
-UE <- fread("EER/Europe_continent.csv") %>% data.table
+# UE <- fread("EER/UE.csv") %>% data.table
+UE <- fread("EER/Europe_continent.csv") %>% data.table 
 Institutions <- fread("EER/Corpus_EER/EER_INST_XP.csv", quote="") %>% data.table
 Institutions[Pays=="FED-REP-GER", Pays:="GERMANY"]
 
 # Cleaning this wrong info
 Institutions[, c("Nom_ISI", "Ordre"):=NULL] # removing useless columns
-Institutions <- Institutions[,head(.SD, 1),.(ID_Art,Institution)] #keeping unique institutions by ID_Art (as in BD)
+Institutions <- Institutions[,head(.SD, 1),.(ID_Art,Institution)] #keeping unique institutions by ID_Art
 Institutions <- Institutions[Institution!="NULL" | Pays!="NULL" ]
-  
+
 Institutions[,ID_Art:=as.character(ID_Art)]
 Institutions <- Institutions[ID_Art %in% Corpus$ID_Art]
 
 # info about sources
-Institutions <- merge(Institutions, Corpus[,.(ID_Art, Annee_Bibliographique, decade)], by = "ID_Art", all.x = TRUE)
+Institutions <- merge(Institutions, Corpus[,.(ID_Art, Annee_Bibliographique)], by = "ID_Art", all.x = TRUE)
 
 # Identifying europe
 Institutions[, Countries_grouped:=Pays]
@@ -191,17 +153,18 @@ Institutions[Countries_grouped=="CZECHOSLOVAKIA" | Countries_grouped=="CZECH-REP
 Institutions[Pays %in% toupper(UE$Countries), Countries_grouped:="Europe"]
 
 # Identifying Collaborations
-Institutions[,EU:=0][Countries_grouped=="Europe", EU:=1][,EU:=sum(EU),ID_Art]
-Institutions[,US:=0][Countries_grouped=="USA", US:=1][,US:=sum(US),ID_Art]
-Institutions[EU>=1 & US>=1, EU_US_collab:= "Collaboration", ID_Art]
-Institutions[EU==0 & US>=1, EU_US_collab:= "USA Only", ID_Art]
-Institutions[EU>=1 & US==0, EU_US_collab:= "Europe Only", ID_Art]
-Institutions[EU==0 & US==0, EU_US_collab:= "Neither", ID_Art]
+Institutions[,n_institutions_tot:=.N,.(ID_Art)]
+Institutions[,EU:=0][Countries_grouped=="Europe", EU:=1][,EU_share:=sum(EU)/n_institutions_tot,ID_Art]
+Institutions[,US:=0][Countries_grouped=="USA", US:=1][,US_share:=sum(US)/n_institutions_tot,ID_Art]
+Institutions[, EU_US_collab:= "Neither", ID_Art]
+Institutions[EU_share>0 & US_share>0, EU_US_collab:= "Collaboration", ID_Art]
+Institutions[EU_share==0 & US_share==1, EU_US_collab:= "USA Only", ID_Art]
+Institutions[EU_share==1 & US_share==0, EU_US_collab:= "Europe Only", ID_Art]
 
 
 bridges_collab <- Institutions[EU_US_collab== "Collaboration"][,list(Target = rep(Institution[1:(length(Institution)-1)],(length(Institution)-1):1),
-                       Source = rev(Institution)[sequence((length(Institution)-1):1)]),
-                 by= ID_Art]
+                                                                     Source = rev(Institution)[sequence((length(Institution)-1):1)]),
+                                                               by= ID_Art]
 bridges_collab <- bridges_collab[Source > Target, c("Target", "Source") := list(Source, Target)] # exchanging
 bridges_collab[,.N,.(Target,Source)][order(-N)] %>% top_n(20)
 
@@ -221,6 +184,39 @@ Corpus[, c("name_short"):=NULL]
 #### Corpus Final ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 Corpus <- merge(Corpus, revues[,.(Code_Revue, Revue)], by="Code_Revue", all.x = TRUE)
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### References ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+refs <- fread("EER/Corpus_EER/EER_REFS_XP.csv", quote="") %>% data.table 
+refs <- refs[ID_Art_Source %in% Corpus$ID_Art]
+
+refs[,ID_Art_Source:=as.character(ID_Art_Source)]
+refs[,Id:=as.character(ItemID_Ref_Target)]
+refs[,Annee_Bibliographique_Target:=Annee]
+refs[,Nom_Target:=Nom]
+refs[,Code_Revue:=as.character(Code_Revue)]
+refs[,Code_Discipline:=as.character(Code_Discipline)]
+
+# Label column
+refs <- refs[, name_short:=  gsub("-.*","",Nom)]
+refs$name_short <- toupper(refs$name_short)
+refs <- refs[,Label_Target:=paste0(name_short,",",Annee_Bibliographique_Target)]
+refs[, c("name_short"):=NULL]
+
+# Disciplines and journals
+refs <- merge(refs, revues[,.(Code_Revue, Revue)], by="Code_Revue", all.x = TRUE)
+refs[,Revue := sub("\r","", Revue)]
+refs <- merge(refs, disciplines, by="Code_Discipline", all.x = TRUE)
+
+# Info about Sources
+refs[,nb_cit:=.N,ItemID_Ref_Target]
+
+# Info about Sources
+refs <- merge(refs, Corpus[,.(ID_Art, Annee_Bibliographique, decade)], by.x = "ID_Art_Source", by.y = "ID_Art", all.x = TRUE)
+refs[, c("ID_Art"):=NULL]
+setnames(refs, "Annee_Bibliographique", "Annee_Bibliographique_Source")
 
 ```
 
@@ -330,35 +326,6 @@ Corpus[,.N, Revue][order(-N)]
 # A Look at References
 
 ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-refs <- fread("EER/Corpus_EER/EER_REFS_XP.csv", quote="") %>% data.table 
-refs <- refs[ID_Art_Source %in% Corpus$ID_Art]
-
-refs[,ID_Art_Source:=as.character(ID_Art_Source)]
-refs[,Id:=as.character(ItemID_Ref_Target)]
-refs[,Annee_Bibliographique_Target:=Annee]
-refs[,Nom_Target:=Nom]
-refs[,Code_Revue:=as.character(Code_Revue)]
-refs[,Code_Discipline:=as.character(Code_Discipline)]
-
-# Label column
-refs <- refs[, name_short:=  gsub("-.*","",Nom)]
-refs$name_short <- toupper(refs$name_short)
-refs <- refs[,Label_Target:=paste0(name_short,",",Annee_Bibliographique_Target)]
-refs[, c("name_short"):=NULL]
-
-# Disciplines and journals
-refs <- merge(refs, revues[,.(Code_Revue, Revue)], by="Code_Revue", all.x = TRUE)
-refs[,Revue := sub("\r","", Revue)]
-refs <- merge(refs, disciplines, by="Code_Discipline", all.x = TRUE)
-
-# Info about Sources
-refs[,nb_cit:=.N,ItemID_Ref_Target]
-
-# Info about Sources
-refs <- merge(refs, Corpus[,.(ID_Art, Annee_Bibliographique, decade)], by.x = "ID_Art_Source", by.y = "ID_Art", all.x = TRUE)
-refs[, c("ID_Art"):=NULL]
-setnames(refs, "Annee_Bibliographique", "Annee_Bibliographique_Source")
-
 refs[,.(ID_Art_Source, ItemID_Ref_Target, Code_Discipline, ESpecialite, ESpecialite_custom, Annee_Bibliographique_Target, Nom_Target, Label_Target, nb_cit)]
 
 ```
