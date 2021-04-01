@@ -27,7 +27,6 @@ set.seed(500)
 #' # Loading packages, paths and data
 #' 
 
-
 source("EER_Paper/Script_paths_and_basic_objects_EER.R")
 source("functions/functions_for_network_analysis.R")
 source("/home/alexandre/functions_dynamics_networks.R")
@@ -81,7 +80,7 @@ Refs <- readRDS("EER/1_Corpus_Prepped_and_Merged/Refs.rds")
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 time_window <- 7
 first_year <- Corpus[order(Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique
-last_year <- (Corpus[order(-Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique - time_window +1) # +1 to get the very last year in the window
+last_year <- (as.numeric(Corpus[order(-Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique) - time_window + 1) # +1 to get the very last year in the window
 all_years <- first_year:last_year
 
 tbl_coup_list <- dynamics_coupling_networks(corpus = Corpus, 
@@ -121,3 +120,10 @@ for (Year in all_years) {
 }
 
 list_graph_position <- make_into_alluv_dt(list_graph_position)
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Saving ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+saveRDS(list_graph_position, file = "EER/2_Raw_Networks_and_Alluv/list_networks.rds")
+saveRDS(alluv_dt, file = "EER/2_Raw_Networks_and_Alluv/alluv_dt.rds")
