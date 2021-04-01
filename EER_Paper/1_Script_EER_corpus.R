@@ -196,7 +196,7 @@ Corpus[, c("name_short","n_tiret"):=NULL]
 refs <- fread("EER/Corpus_EER/EER_REFS_XP.csv", quote="") %>% data.table 
 refs <- refs[ID_Art_Source %in% Corpus$ID_Art]
 
-#### Scopus merging %%%
+################  Scopus merging %%%%%%%%%%%%
 # Scopus normalization
 refs_scopus <- readRDS("EER/Corpus_EER/scopus_references.RDS")
 refs_scopus <- refs_scopus %>% rename(ID_Art = temp_id)
@@ -220,31 +220,23 @@ refs_scopus_match <- refs_scopus_match[,matching_col:=paste0(Nom,Annee,Volume,fi
 scopus_ItemID_Ref <- merge(refs_scopus_match[,.(matching_col,temp_idref)], id_ref_match[,.(matching_col,ItemID_Ref)], by = "matching_col")
 scopus_ItemID_Ref <- scopus_ItemID_Ref[,head(.SD, 1),matching_col]
 
-#### Scopus and bind %%%
+#### Give uniques IDs to the sames references that are not in WoS %%%
 refs_scopus <- merge(refs_scopus[,.(ID_Art, temp_idref, Nom, Annee, journal_scopus=journal, Titre_scopus=title)], scopus_ItemID_Ref[,.(temp_idref,ItemID_Ref)], by = "temp_idref", all.x = TRUE)
-refs_to_give_unique_Ids <- refs_scopus[is.na(ItemID_Ref)==TRUE][,find_scopus_ids:=.N,.(Nom,Annee)][find_scopus_ids>1][order(find_scopus_ids)]
-write.csv(refs_to_give_unique_Ids, "refs_to_give_unique_Ids.csv")
-
-
-
-
-
-
-
+refs_to_give_unique_Ids <- refs_scopus[,find_scopus_ids:=.N,.(Nom,Annee)][find_scopus_ids>1][order(find_scopus_ids)]
+write.csv(refs_to_give_unique_Ids, "EER/Corpus_EER/refs_to_give_unique_Ids.csv")
+refs_to_give_unique_Ids <- fread("EER/Corpus_EER/refs_to_give_unique_Ids_cleaned.csv", quote="") %>% data.table
+refs_to_give_unique_Ids <- refs_to_give_unique_Ids[manual_ids!=""]
 
 #### Scopus and bind %%%
-refs_scopus[is.na(ItemID_Ref)==FALSE]
+refs_scopus <- merge(refs_scopus, refs_to_give_unique_Ids[,.(temp_idref,manual_ids)], by="temp_idref", all.x = TRUE)
+refs_scopus[is.na(ItemID_Ref)==TRUE, ItemID_Ref:=manual_ids]
+refs_scopus[is.na(ItemID_Ref)==TRUE, ItemID_Ref:=temp_idref]
 
+refs <- rbind(refs, refs_scopus[,.(ID_Art_Source=ID_Art,ItemID_Ref_Target=ItemID_Ref, Nom, Annee, journal_scopus,Titre_scopus)], fill=TRUE)
+refs[is.na(Titre), Titre:=toupper(Titre_scopus)]
+refs[, c("Titre_scopus"):=NULL]
 
-
-refs_scopus <- refs_scopus %>% rename(Ordre = order_inst)
-refs_scopus <- refs_scopus %>% rename(Institution = institution)
-refs_scopus <- refs_scopus %>% rename(Pays = country)
-Institutions_scopus[,Pays:=toupper(Pays)]
-Institutions_scopus[,Institution:=toupper(Institution)]
-Institutions <- rbind(Institutions, Institutions_scopus[,.(ID_Art, Institution, Pays, Ordre)], fill=TRUE)
-
-
+################ Completing Refs Informations %%%%%%%%%%%%
 refs[,ID_Art_Source:=as.character(ID_Art_Source)]
 refs[,Id:=as.character(ItemID_Ref_Target)]
 refs[,Annee_Bibliographique_Target:=Annee]
@@ -262,9 +254,11 @@ refs[, c("name_short"):=NULL]
 refs <- merge(refs, revues[,.(Code_Revue, Revue)], by="Code_Revue", all.x = TRUE)
 refs[,Revue := sub("\r","", Revue)]
 refs <- merge(refs, disciplines, by="Code_Discipline", all.x = TRUE)
+refs[is.na(Revue), Revue:=toupper(journal_scopus)]
+refs[, c("journal_scopus"):=NULL]
 
 # Info about Sources
-refs[,nb_cit:=.N,ItemID_Ref_Target]
+refs[,nb_cit_tot:=.N,ItemID_Ref_Target]
 
 # Info about Sources
 refs <- merge(refs, Corpus[,.(ID_Art, Annee_Bibliographique)], by.x = "ID_Art_Source", by.y = "ID_Art", all.x = TRUE)
