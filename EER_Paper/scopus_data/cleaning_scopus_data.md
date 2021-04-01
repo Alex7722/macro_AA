@@ -1,8 +1,8 @@
-New Script for cleaning the missing articles and references extracting
-in Scopus
+Script for cleaning the missing articles and references extracting in
+Scopus
 ================
 Aurélien Goutsmedt
-/ Last compiled on 2021-03-31
+/ Last compiled on 2021-04-01
 
   - [1 What is this script for?](#what-is-this-script-for)
   - [2 Loading packages, paths and
@@ -38,8 +38,6 @@ Aurélien Goutsmedt
 This script aims at cleaning scopus data. The input is a .txt with
 articles metadata and their references extracted from scopus. It aims at
 producing a data.frame that we will merge with WoS data.
-
-> WARNING: This script still needs a lot of cleaning
 
 # 2 Loading packages, paths and data
 
@@ -87,10 +85,8 @@ remove_lines <- c("ISSN",
                   "FUNDING ",
                   "INDEX KEYWORDS")
 
-for(i in 1:length(remove_lines)){
-delete <- which(str_detect(scopus$Scopus, pattern = remove_lines[i]))
+delete <- which(str_detect(scopus$Scopus, pattern = paste0(remove_lines, collapse = "|")))
 scopus <- scopus[-delete]
-}
 ```
 
 ### 3.1.2 identifying the relevant information to put them in a data frame
@@ -101,7 +97,7 @@ missing years.
 #### 3.1.2.1 Identifying ids
 
 ``` r
-scopus$id <- str_detect(scopus$Scopus, pattern = "[:digit:]{6,}")
+scopus$id <- str_detect(scopus$Scopus, pattern = "^[:digit:]{8,}")
 ```
 
 #### 3.1.2.2 Identifying authors
