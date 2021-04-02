@@ -9,7 +9,7 @@ package_list <- c(
   "quanteda", "tidytext", "ggraph", "tidygraph",
   "leidenAlg", "reshape2", "scales","RMySQL",
   "ggforce", "directlabels", "patchwork", "DescTools", "DT", 
-  "grid", "ggdendro", "knitr", "readtext", "pander","RColorBrewer")
+  "grid", "ggdendro", "readtext", "pander","RColorBrewer")
 for (p in package_list) {
   if (p %in% installed.packages() == FALSE) {
     install.packages(p, dependencies = TRUE)
