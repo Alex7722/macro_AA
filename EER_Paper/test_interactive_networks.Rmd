@@ -1,0 +1,93 @@
+---
+title: "Test on interactive EER networks"
+output: 
+  html_document:
+    theme: readable
+    code_folding: hide
+author: "Aurélien Goutsmedt and Alexandre Truc"
+date: "last complied on `r format(Sys.Date())`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+source("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R")
+source("~/macro_AA/functions/functions_for_network_analysis.R")
+```
+
+```{r, eval = TRUE}
+library(plotly)
+library(scico)
+library(crosstalk)
+
+list_graph <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/list_networks.rds"))
+alluv_dt <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/alluv_dt.rds"))
+alluv_dt <- alluv_dt[share_leiden_max >=0.05 & n_years >= 3][,c("Leiden1","Window","Id")]
+list_graph <- lapply(list_graph, function(tbl)(tbl %>% activate(nodes) %>% mutate(Leiden_num = as.character(Leiden_num))))
+list_graph <- lapply(list_graph, function(tbl)(tbl %>% activate(nodes) %>% mutate(size = replace(size, size == 0, 1))))
+list_graph <- lapply(list_graph, function(tbl) (tbl %>% activate(nodes) %>% mutate(x = rescale(x, to = c(0,1000)), y = rescale(y, to = c(0,1000)))))
+
+# creating a table with the data for nodes and edges for each window
+
+nodes_lf <- lapply(list_graph, function(tbl) (tbl %>% activate(nodes) %>% mutate(x = rescale(x), y = rescale(y))))
+nodes_lf <- lapply(list_graph, function(tbl) (tbl %>% activate(nodes) %>% as.data.table()))
+nodes_lf <- lapply(nodes_lf, function(dt) (dt[, .(ID_Art, x, y, size, Leiden_num, Label, Titre, Nom_ISI)]))
+nodes_lf <- rbindlist(nodes_lf, idcol = "window")
+nodes <- merge(nodes_lf, alluv_dt, by.x = c("ID_Art","window"), by.y = c("Id","Window"), all.x = TRUE) 
+
+nodes <- nodes[, window := paste0(window, "-", as.integer(window) + 6)][order(ID_Art, window)]
+
+nodes <- nodes %>% 
+  mutate(Leiden1 = replace(Leiden1, is.na(Leiden1), "small communities"))
+
+color <- c("gray",scico(n = length(unique(nodes$Leiden1)) - 1, palette = "roma") %>% 
+  sample())
+
+nodes$Leiden1 <- factor(nodes$Leiden1, levels = c(unique(nodes[Leiden1 == "small communities"]$Leiden1), unique(nodes[Leiden1 != "small communities"]$Leiden1)))
+
+nodes[Leiden1 != "small communities", `:=` (com_x = mean(x), com_y = mean(y)), by = c("Leiden1","window")]
+
+#nodes <- highlight_key(nodes, ~Leiden1)
+
+graphs <- plot_ly(nodes, 
+                  x = ~x, 
+                  y = ~y,
+                  type = "scatter",
+                  mode = "markers",
+                  text = ~paste('</br>', Label,
+                                '</br>', Titre,
+                                '</br> Community:', Leiden1),
+                  hoverinfo = "text",
+                  size = ~log(size),
+                  sizes = c(30,300),
+                  frame = ~window,
+                  ids = ~ID_Art,
+                  color = ~Leiden1,
+                  colors = color,
+                  showlegend = TRUE) %>% 
+  add_text(x = ~com_x,
+           y = ~com_y,
+           text = ~Leiden1,
+           textfont = list(size = 20),
+           frame = ~window)  %>% 
+  add_trace(alpha = 0.8) %>% 
+  layout(yaxis = list(zeroline = FALSE,
+                      showgrid = FALSE),
+         xaxis = list(zeroline = FALSE,
+                      showgrid = FALSE)) %>% 
+  config(scrollZoom = TRUE) %>% 
+  highlight(on = "plotly_selected", 
+            selectize = TRUE, 
+            persistent = TRUE) %>% 
+  animation_opts(frame = 2000,
+                 transition = 1000,
+                 redraw = TRUE,
+                 mode = "next") 
+
+htmlwidgets::saveWidget(graphs,paste0(picture_path,"moving_graphs.html"), selfcontained = TRUE)
+
+
+```
+
