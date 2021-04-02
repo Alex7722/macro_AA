@@ -30,6 +30,7 @@ for (p in github_list) {
 boards_path <- "/projects/data/macro_AA/EER/editorial_boards/"
 eer_data <- "/projects/data/macro_AA/EER/Corpus_EER/"
 picture_path <- "/home/aurelien/macro_AA/EER_Paper/Pictures/"
+data_path <- "/projects/data/macro_AA/"
 
 eer_nodes <- fread(paste0(eer_data,"EER_NODES_XP.csv")) %>% as.data.table()
 eer_ref <- fread(paste0(eer_data,"EER_REFS_XP.csv")) %>% as.data.table()
