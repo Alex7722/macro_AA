@@ -75,6 +75,7 @@ Corpus_scopus <- Corpus_scopus %>% rename(ID_Art = temp_id)
 Corpus_scopus[,ID_Art:=paste0("S",ID_Art)]
 Corpus_scopus <- Corpus_scopus %>% rename(Titre = title)
 Corpus_scopus <- Corpus_scopus %>% rename(Nom_ISI = author)
+Corpus_scopus[,Nom_ISI:=toupper(Nom_ISI)]
 Corpus_scopus[,Code_Document:=99]
 Corpus_scopus[,Code_Revue:=5200]
 Corpus_scopus[,Code_Discipline:=119]
@@ -180,7 +181,8 @@ bridges_collab[,.N,.(Target,Source)][order(-N)] %>% top_n(20)
 #### Labels, Journals and Disciplines of Corpus ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #label
-Corpus <- merge(Corpus, rbind(Corpus_scopus[, .(Nom_ISI, ID_Art)],Authors[Ordre==1, .(Nom_ISI, ID_Art)]), by = "ID_Art", all.x = TRUE)
+first_aut <- Authors[Ordre==1, .(Nom_ISI, ID_Art)]
+Corpus <- merge(Corpus, first_aut, by = "ID_Art", all.x = TRUE)
 Corpus[,n_tiret:=str_count(Nom_ISI,"-")]
 Corpus[,name_short:=Nom_ISI]
 Corpus[n_tiret>1, name_short:=  str_replace(Nom_ISI, "\\-","")]
@@ -188,6 +190,8 @@ Corpus[, name_short:=  gsub("-.*","",name_short)]
 Corpus$name_short <- toupper(Corpus$name_short)
 Corpus <- Corpus[,Label:=paste0(name_short,",",Annee_Bibliographique)]
 Corpus[, c("name_short","n_tiret"):=NULL]
+
+Corpus[,.N,ID_Art][N>1]
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### References ####
@@ -238,7 +242,7 @@ refs[, c("Titre_scopus"):=NULL]
 
 ################ Completing Refs Informations %%%%%%%%%%%%
 refs[,ID_Art_Source:=as.character(ID_Art_Source)]
-refs[,Id:=as.character(ItemID_Ref_Target)]
+refs[,Id:=as.character(ID_Art_Source)]
 refs[,Annee_Bibliographique_Target:=Annee]
 refs[,Nom_Target:=Nom]
 refs[,Code_Revue:=as.character(Code_Revue)]
@@ -267,7 +271,7 @@ refs[,ID_Art:=ID_Art_Source]
 refs[,ItemID_Ref:=ItemID_Ref_Target]
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-#### References ####
+#### Saving ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 saveRDS(Corpus, file = "EER/1_Corpus_Prepped_and_Merged/Corpus.rds")
 saveRDS(Institutions, file = "EER/1_Corpus_Prepped_and_Merged/Institutions.rds")
