@@ -9,7 +9,7 @@ package_list <- c(
   "quanteda", "tidytext", "ggraph", "tidygraph",
   "leidenAlg", "reshape2", "scales","RMySQL",
   "ggforce", "directlabels", "patchwork", "DescTools", "DT", 
-  "grid", "ggdendro", "knitr", "readtext", "pander","RColorBrewer")
+  "grid", "ggdendro", "readtext", "pander","RColorBrewer")
 for (p in package_list) {
   if (p %in% installed.packages() == FALSE) {
     install.packages(p, dependencies = TRUE)
@@ -30,6 +30,7 @@ for (p in github_list) {
 boards_path <- "/projects/data/macro_AA/EER/editorial_boards/"
 eer_data <- "/projects/data/macro_AA/EER/Corpus_EER/"
 picture_path <- "/home/aurelien/macro_AA/EER_Paper/Pictures/"
+data_path <- "/projects/data/macro_AA/"
 
 eer_nodes <- fread(paste0(eer_data,"EER_NODES_XP.csv")) %>% as.data.table()
 eer_ref <- fread(paste0(eer_data,"EER_REFS_XP.csv")) %>% as.data.table()
