@@ -26,6 +26,53 @@ knitr::opts_chunk$set(eval = FALSE)
 set.seed(500)
 #' # Loading packages, paths and data
 #' 
+library(png)
+library(grid)
+library(ggnewscale)
+library(vite)
+library(RMySQL)
+library(NetworkToolbox)
+library(broom)
+library(igraph)
+library(dplyr)
+library(data.table)
+library(ggplot2)
+library(magrittr)
+library(tm)
+library(tidyr)
+library(tidytext)
+library('cluster')
+library('ggraph')
+library('tibble')
+library('tidygraph')
+library(ggrepel)
+library(readr)
+library(leiden)
+library(ggraph)
+library(ggnewscale)
+library(remotes)
+library(vite)
+library("reticulate")
+library(reticulate)
+library(leiden)
+library(tidygraph)
+library(rlang)
+library(leiden)
+library(ggforce)
+library(d3Network)
+library(scales)
+library(RColorBrewer)
+require(DescTools)
+require(stringr)
+library(docstring)
+library(quanteda)
+library(pander)
+library(DT)
+require(forcats)
+require(tidyverse)
+library(sigmajs)
+setwd("/projects/data/macro_AA")
+
 
 source("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R")
 source("~/macro_AA/functions/functions_for_network_analysis.R")
@@ -66,8 +113,27 @@ tbl_coup_list <- dynamic_biblio_coupling(corpus = Corpus,
 #+ r communities
 tbl_coup_list <- lapply(tbl_coup_list, leiden_workflow, niter = 10000)
 
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Dynamic Networks and Communities ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+time_window <- 7
+first_year <- Corpus[order(Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique
+last_year <- (as.numeric(Corpus[order(-Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique) - time_window + 1) # +1 to get the very last year in the window
+all_years <- first_year:last_year
+
+tbl_coup_list <- dynamics_coupling_networks(corpus = Corpus, 
+                                             references = Refs, 
+                                             source = "ID_Art", 
+                                             target = "ItemID_Ref", 
+                                             time_variable = Annee_Bibliographique,
+                                             time_window = time_window, 
+                                             weight_treshold_value = 1)
+
+tbl_coup_list <- lapply(tbl_coup_list, main_components)
+tbl_coup_list <- lapply(tbl_coup_list, detect_leidenalg, niter = 10000)
 #' We name communities:
-tbl_coup_list <- intertemporal_naming_function(tbl_coup_list)
+tbl_coup_list <- intertemporal_naming_function(tbl_coup_list, treshold_similarity = 0.55)
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### Alluvial ####
@@ -96,7 +162,6 @@ for (Year in all_years) {
   }
 }
 
-list_graph_position <- make_into_alluv_dt(list_graph_position)
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### Saving ####
