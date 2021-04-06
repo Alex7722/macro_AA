@@ -3,16 +3,36 @@ title: "European Economic Review"
 author: "Aurélien Goutsmedt and Alexandre Truc"
 output: 
   html_document:
+    theme: united
     toc: true
     number_sections: true
     toc_float: true
+    toc_depth: 3
     code_folding: hide
-    df_print: paged
 ---
 
+```{css zoom-lib-src, echo = FALSE}
+# Follows the css and js script used for allow zooming in graphs
+script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"
+```
+
+```{js zoom-jquery, echo = FALSE}
+ $(document).ready(function() {
+    $('body').prepend('<div class=\"zoomDiv\"><img src=\"\" class=\"zoomImg\"></div>');
+    // onClick function for all plots (img's)
+    $('img:not(.zoomImg)').click(function() {
+      $('.zoomImg').attr('src', $(this).attr('src')).css({width: '100%'});
+      $('.zoomDiv').css({opacity: '1', width: 'auto', border: '1px solid white', borderRadius: '5px', position: 'fixed', top: '50%', left: '50%', marginRight: '-50%', transform: 'translate(-50%, -50%)', boxShadow: '0px 0px 50px #888888', zIndex: '50', overflow: 'auto', maxHeight: '100%'});
+    });
+    // onClick function for zoomImg
+    $('img.zoomImg').click(function() {
+      $('.zoomDiv').css({opacity: '0', width: '0%'}); 
+    });
+  });
+```
 
 ```{r setup, include=FALSE}
-#library(knitr)
+library(knitr)
 knitr::opts_knit$set(root.dir = "/projects/data/macro_AA")
 library(png)
 library(grid)
@@ -59,6 +79,12 @@ library(DT)
 require(forcats)
 require(tidyverse)
 library(sigmajs)
+require(Polychrome)
+require(plotly)
+require(biblionetwork)
+require( Rforceatlas )
+library(kableExtra)
+
 source(path.expand("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R"))
 source("/home/alexandre/functions_networks.R")
 
@@ -69,154 +95,16 @@ ESH <- dbConnect(MySQL(), user=usr, password=pswd, dbname='OST_Expanded_SciHum',
 setwd("/projects/data/macro_AA")
 
 
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-#### Disciplines ####
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+Corpus <- readRDS(file = "EER/1_Corpus_Prepped_and_Merged/Corpus.rds")
+Institutions <- readRDS(file = "EER/1_Corpus_Prepped_and_Merged/Institutions.rds")
+Authors <- readRDS("EER/1_Corpus_Prepped_and_Merged/Authors.rds")
+Refs <- readRDS("EER/1_Corpus_Prepped_and_Merged/Refs.rds")
+Refs[,Id:=ID_Art_Source] #To delete after the 05/04/2021
 
-revues <- fread("all_journals.csv", quote="") %>% data.table
-revues[,Code_Discipline:=as.character(Code_Discipline)]
-revues[,Code_Revue:=as.character(Code_Revue)]
-
-disciplines  <-  dbGetQuery(ESH, "SELECT ESpecialite, EGrande_Discipline, Code_Discipline FROM OST_Expanded_SciHum.Disciplines;") %>% data.table
-disciplines <- disciplines[EGrande_Discipline=="Natural Sciences and Engineering", ESpecialite_custom:="Other NSE"]
-disciplines <- disciplines[EGrande_Discipline=="Social Sciences and Humanities", ESpecialite_custom:="Other SSH"]
-disciplines <- disciplines[Code_Discipline==132, ESpecialite_custom:= "Management"]
-disciplines <- disciplines[Code_Discipline==119, ESpecialite_custom:= "Economics"]
-disciplines <- disciplines[Code_Discipline==18, ESpecialite_custom:= "General NSE"]
-
-disciplines <- disciplines[Code_Discipline>=101 & Code_Discipline<=109, ESpecialite_custom:="Psychology"]
-
-disciplines <- disciplines[Code_Discipline==4, ESpecialite_custom:= "Ecology and ES"]
-disciplines <- disciplines[Code_Discipline==69, ESpecialite_custom:= "Ecology and ES"]
-
-disciplines <- disciplines[Code_Discipline==125, ESpecialite_custom:= "Pol Sci"]
-
-disciplines <- disciplines[Code_Discipline==120, ESpecialite_custom:= "Geography"]
-
-disciplines <- disciplines[Code_Discipline==91, ESpecialite_custom:= "Math and Stat"] # statistics
-disciplines <- disciplines[Code_Discipline==88, ESpecialite_custom:= "Math and Stat"]
-disciplines <- disciplines[Code_Discipline==89, ESpecialite_custom:= "Math and Stat"]
-disciplines <- disciplines[Code_Discipline==90, ESpecialite_custom:= "Math and Stat"]
-
-# disciplines$ESpecialite_custom <- str_wrap(disciplines$ESpecialite_custom, width = 10)
-
-disciplines[,Code_Discipline:=as.character(Code_Discipline)]
-
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-#### Basic Corpus ####
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-Corpus <- fread("EER/Corpus_EER/EER_NODES_XP.csv", quote="") %>% data.table
-Corpus[,Id:=as.character(ID_Art)]
-Corpus[,ID_Art:=as.character(ID_Art)]
-Corpus[,ItemID_Ref:=as.character(ItemID_Ref)]
-Corpus[,Code_Revue:=as.character(Code_Revue)]
-Corpus[, c("Code_Discipline"):=NULL]
-
-# Document types
-Corpus <- Corpus[Code_Document == 1 | Code_Document == 2 | Code_Document == 3 | Code_Document == 6]
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-#### Authors ####
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-Authors <- fread("EER/Corpus_EER/EER_AUT_XP.csv", quote="") %>% data.table
-Authors[,ID_Art:=as.character(ID_Art)]
-Authors <- Authors[ID_Art %in% Corpus$ID_Art][,Nom_ISI:=toupper(Nom_ISI)]
-
-# info about sources
-Authors <- merge(Authors, Corpus[,.(ID_Art, Annee_Bibliographique)], by = "ID_Art", all.x = TRUE)
-
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-#### Institutions ####
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-# UE <- fread("EER/UE.csv") %>% data.table
-UE <- fread("EER/Europe_continent.csv") %>% data.table 
-Institutions <- fread("EER/Corpus_EER/EER_INST_XP.csv", quote="") %>% data.table
-Institutions[Pays=="FED-REP-GER", Pays:="GERMANY"]
-
-# Cleaning this wrong info
-Institutions[, c("Nom_ISI", "Ordre"):=NULL] # removing useless columns
-Institutions <- Institutions[,head(.SD, 1),.(ID_Art,Institution)] #keeping unique institutions by ID_Art
-Institutions <- Institutions[Institution!="NULL" | Pays!="NULL" ]
-
-Institutions[,ID_Art:=as.character(ID_Art)]
-Institutions <- Institutions[ID_Art %in% Corpus$ID_Art]
-
-# info about sources
-Institutions <- merge(Institutions, Corpus[,.(ID_Art, Annee_Bibliographique)], by = "ID_Art", all.x = TRUE)
-
-# Identifying europe
-Institutions[, Countries_grouped:=Pays]
-Institutions[Countries_grouped=="CZECHOSLOVAKIA" | Countries_grouped=="CZECH-REPUBLIC", Countries_grouped:="CZECH REPUBLIC"]
-
-Institutions[Pays %in% toupper(UE$Countries), Countries_grouped:="Europe"]
-
-# Identifying Collaborations
-Institutions[,n_institutions_tot:=.N,.(ID_Art)]
-Institutions[,EU:=0][Countries_grouped=="Europe", EU:=1][,EU_share:=sum(EU)/n_institutions_tot,ID_Art]
-Institutions[,US:=0][Countries_grouped=="USA", US:=1][,US_share:=sum(US)/n_institutions_tot,ID_Art]
-Institutions[, EU_US_collab:= "Neither", ID_Art]
-Institutions[EU_share>0 & US_share>0, EU_US_collab:= "Collaboration", ID_Art]
-Institutions[EU_share==0 & US_share==1, EU_US_collab:= "USA Only", ID_Art]
-Institutions[EU_share==1 & US_share==0, EU_US_collab:= "Europe Only", ID_Art]
-
-
-bridges_collab <- Institutions[EU_US_collab== "Collaboration"][,list(Target = rep(Institution[1:(length(Institution)-1)],(length(Institution)-1):1),
-                                                                     Source = rev(Institution)[sequence((length(Institution)-1):1)]),
-                                                               by= ID_Art]
-bridges_collab <- bridges_collab[Source > Target, c("Target", "Source") := list(Source, Target)] # exchanging
-bridges_collab[,.N,.(Target,Source)][order(-N)] %>% top_n(20)
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-#### Labels, Journals and Disciplines ####
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-#label
-Corpus <- merge(Corpus, Authors[Ordre==1, .(Nom_ISI, ID_Art)], by = "ID_Art", all.x = TRUE)
-Corpus <- Corpus[, name_short:=  gsub("-.*","",Nom_ISI)]
-Corpus$name_short <- toupper(Corpus$name_short)
-Corpus <- Corpus[,Label:=paste0(name_short,",",Annee_Bibliographique)]
-Corpus[, c("name_short"):=NULL]
-
-
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-#### Corpus Final ####
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-Corpus <- merge(Corpus, revues[,.(Code_Revue, Revue)], by="Code_Revue", all.x = TRUE)
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-#### References ####
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-
-refs <- fread("EER/Corpus_EER/EER_REFS_XP.csv", quote="") %>% data.table 
-refs <- refs[ID_Art_Source %in% Corpus$ID_Art]
-
-refs[,ID_Art_Source:=as.character(ID_Art_Source)]
-refs[,Id:=as.character(ItemID_Ref_Target)]
-refs[,Annee_Bibliographique_Target:=Annee]
-refs[,Nom_Target:=Nom]
-refs[,Code_Revue:=as.character(Code_Revue)]
-refs[,Code_Discipline:=as.character(Code_Discipline)]
-
-# Label column
-refs <- refs[, name_short:=  gsub("-.*","",Nom)]
-refs$name_short <- toupper(refs$name_short)
-refs <- refs[,Label_Target:=paste0(name_short,",",Annee_Bibliographique_Target)]
-refs[, c("name_short"):=NULL]
-
-# Disciplines and journals
-refs <- merge(refs, revues[,.(Code_Revue, Revue)], by="Code_Revue", all.x = TRUE)
-refs[,Revue := sub("\r","", Revue)]
-refs <- merge(refs, disciplines, by="Code_Discipline", all.x = TRUE)
-
-# Info about Sources
-refs[,nb_cit:=.N,ItemID_Ref_Target]
-
-# Info about Sources
-refs <- merge(refs, Corpus[,.(ID_Art, Annee_Bibliographique, decade)], by.x = "ID_Art_Source", by.y = "ID_Art", all.x = TRUE)
-refs[, c("ID_Art"):=NULL]
-setnames(refs, "Annee_Bibliographique", "Annee_Bibliographique_Source")
+time_window <- 7
+first_year <- as.numeric(Corpus[order(Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique)
+last_year <- (as.numeric(Corpus[order(-Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique) - time_window + 1)
+all_years <- first_year:last_year
 
 ```
 
@@ -238,11 +126,30 @@ ggplot(Corpus, aes(as.numeric(Annee_Bibliographique))) +
 
 ```
 
+
+## Share Macro
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+mean_jel <- Corpus[,mean(JEL_id),Annee_Bibliographique]
+
+ggplot(mean_jel[V1!=0 & Annee_Bibliographique!="2016"], aes(x=as.numeric(Annee_Bibliographique), y=V1)) +
+  geom_smooth(method="auto", se=TRUE, fullrange=FALSE, level=0.95, span = 0.75)+
+  geom_point()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  scale_x_continuous("Years") +
+  scale_y_continuous("Share of Macro_JEL") +
+  coord_cartesian(ylim = c(0,1)) +
+  theme_minimal() +
+  ggsave("EER/Graphs/mean_jel.png", width=30, height=20, units = "cm")
+
+```
+
 ## Most Productive authors
 
 ```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
 Authors[,.N,Nom_ISI][order(-N)] %>% top_n(20)
 ```
+
 
 ## Most Productive Institutions and Countries
 
@@ -259,7 +166,7 @@ count_year <- count_year[n_inst_tot<300, Pays:="OTHER"]
 count_year <- count_year[, nb_aut_country:=.N, .(Annee_Bibliographique, Pays)]
 
 
-ggplot(count_year, aes(Annee_Bibliographique, after_stat(count), fill = fct_rev(fct_infreq(Pays)))) +
+ggplot(count_year, aes(as.numeric(Annee_Bibliographique), after_stat(count), fill = fct_rev(fct_infreq(Pays)))) +
   geom_density(position = "fill") +
   labs(fill = "Countries (Top 7)") +
   scale_x_continuous("Years") +
@@ -273,12 +180,12 @@ count_year <- count_year[n_inst_tot<300, Countries_grouped:="OTHER"]
 count_year <- count_year[, nb_aut_country:=.N, .(Annee_Bibliographique, Countries_grouped)]
 
 
-ggplot(count_year, aes(Annee_Bibliographique, after_stat(count), fill = fct_rev(fct_infreq(Countries_grouped)))) +
+ggplot(count_year, aes(as.numeric(Annee_Bibliographique), after_stat(count), fill = fct_rev(fct_infreq(Countries_grouped)))) +
   geom_density(position = "fill") +
   labs(fill = "Countries (Grouped)") +
   scale_x_continuous("Years") +
   scale_y_continuous("Countries Identified by Unique Institution by Paper") +
-  theme_classic() +
+  theme_minimal() +
   scale_fill_manual(values = c(rev(brewer.pal(n = 9, name = "Paired")))) 
   # ggsave("Graphs/country_time_stacked.png", scale = 1)
 
@@ -286,7 +193,7 @@ count_year <- Institutions[,n_inst_tot:=.N, Countries_grouped][order(-n_inst_tot
 count_year <- count_year[n_inst_tot<300, Countries_grouped:="OTHER"]
 count_year <- count_year %>% group_by(Annee_Bibliographique, Countries_grouped) %>% summarise(n = n()) %>%  mutate(freq = n / sum(n)) %>% as.data.table()
 
-ggplot(count_year, aes(x=Annee_Bibliographique, y=freq, group=Countries_grouped, color=Countries_grouped)) +
+ggplot(count_year, aes(x=as.numeric(Annee_Bibliographique), y=freq, group=Countries_grouped, color=Countries_grouped)) +
   geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.4) +
   geom_point() +
   labs(fill = "Countries") +
@@ -303,7 +210,7 @@ ggplot(count_year, aes(x=Annee_Bibliographique, y=freq, group=Countries_grouped,
 count_year <- Institutions[, head(.SD, 1), .(ID_Art)][Annee_Bibliographique>=1974]
 count_year <- count_year %>% group_by(Annee_Bibliographique, EU_US_collab) %>% summarise(n = n()) %>%  mutate(freq = n / sum(n)) %>% as.data.table()
 
-ggplot(count_year, aes(x=Annee_Bibliographique, y=freq, group=EU_US_collab, color=EU_US_collab)) +
+ggplot(count_year, aes(x=as.numeric(Annee_Bibliographique), y=freq, group=EU_US_collab, color=EU_US_collab)) +
   geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.3) +
   geom_point() +
   labs(fill = "Countries (Top 7)") +
@@ -317,68 +224,68 @@ ggplot(count_year, aes(x=Annee_Bibliographique, y=freq, group=EU_US_collab, colo
   # ggsave("Graphs/country_time_stacked.png", scale = 1)
 ```
 
-## Most Important Journals
-
-```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
-Corpus[,.N, Revue][order(-N)]
-```
 
 # A Look at References
 
 ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-refs[,.(ID_Art_Source, ItemID_Ref_Target, Code_Discipline, ESpecialite, ESpecialite_custom, Annee_Bibliographique_Target, Nom_Target, Label_Target, nb_cit)]
+
+datatable(Refs[ItemID_Ref_Target!="NULL"][order(-nb_cit_tot), head(.SD, 1), .(ItemID_Ref_Target)][,.(Titre, Annee_Bibliographique_Target, Label_Target, ESpecialite_custom, nb_cit_tot)], rownames = FALSE, class = 'cell-border stripe')
 
 ```
 
 ## Top Disciplines
 
 ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-refs[,.N, ESpecialite][order(-N)]
+kable(Refs[,.N, ESpecialite][order(-N)] %>% top_n(20)) %>% kable_styling(bootstrap_options = c("striped", "condensed", full_width = F))
 
 ```
 
 ## Top Journals
 
 ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-refs[,.N, Revue][order(-N)]
-refs[,.N, .(decade,Revue)][order(-decade,-N)][, head(.SD, 3), .(decade)][is.na(Revue)==FALSE]
+kable(Refs[,.N, Revue][order(-N)]%>% top_n(50)) %>% kable_styling(bootstrap_options = c("striped", "condensed", full_width = F))
+
 ```
 
 ## Top References
 
 ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-refs[ItemID_Ref_Target!="NULL"][order(-nb_cit)][, head(.SD, 1), .(Label_Target)][,.(Label_Target,nb_cit)] %>% top_n(50)
+kable(Refs[ItemID_Ref_Target!="NULL"][order(-nb_cit_tot)][, head(.SD, 1), .(Label_Target)][,.(Label_Target, Titre, nb_cit_tot)] %>% top_n(50)) %>% kable_styling(bootstrap_options = c("striped", "condensed", full_width = F))
 
 ```
 
 ## Top References by disciplines
 
 ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-refs[ItemID_Ref_Target!="NULL"][order(-nb_cit)][, head(.SD, 1), .(Label_Target, ESpecialite_custom)][order(ESpecialite_custom), head(.SD, 5), .(ESpecialite_custom)][,.(ESpecialite_custom, Label_Target, nb_cit)]
+kable(Refs[ItemID_Ref_Target!="NULL"][order(-nb_cit_tot)][, head(.SD, 1), .(Label_Target, ESpecialite_custom)][order(ESpecialite_custom), head(.SD, 5), .(ESpecialite_custom)][,.(ESpecialite_custom, Label_Target, Titre, nb_cit_tot)]) %>% kable_styling(bootstrap_options = c("striped", "condensed", full_width = F))
 
 ```
 
 ## Share of Economics and Management in References Over Time
 
 ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-eco_ref_year <- refs[complete.cases(ESpecialite_custom)==TRUE][ESpecialite_custom=="Economics" | ESpecialite_custom=="Management", .N, .(Annee_Bibliographique_Source)]
+eco_ref_year <- Refs[complete.cases(ESpecialite_custom)==TRUE][ESpecialite_custom=="Economics" | ESpecialite_custom=="Management", .N, .(Annee_Bibliographique_Source)]
 setnames(eco_ref_year,"N", "n_eco_ref")
 
-n_ref <- refs[complete.cases(ESpecialite_custom)==TRUE,.N, Annee_Bibliographique_Source]
+n_ref <- Refs[complete.cases(ESpecialite_custom)==TRUE,.N, Annee_Bibliographique_Source]
 setnames(n_ref,"N", "n_ref_year")
 
 eco_ref_year <- merge(eco_ref_year, n_ref, by = "Annee_Bibliographique_Source")
 # eco_ref_year <- eco_ref_year[,share_years_mean:=frollmean(n_eco_ref/n_ref_year, 3)]
 
+weight <- Corpus[,.(weight=.N),Annee_Bibliographique]
+eco_ref_year <- merge(eco_ref_year, weight, by.x = "Annee_Bibliographique_Source", by.y = "Annee_Bibliographique")
 
-ggplot(eco_ref_year, aes(x=Annee_Bibliographique_Source, y=n_eco_ref/n_ref_year)) +
-  geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.4)+
+ggplot(eco_ref_year, aes(x=as.numeric(Annee_Bibliographique_Source), y=n_eco_ref/n_ref_year, weight=weight)) +
+  geom_smooth(method="auto", se=TRUE, fullrange=FALSE, level=0.95, span = 0.75)+
   geom_point()+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
   scale_x_continuous("Years") +
   scale_y_continuous("Share of Economics and Management in References") +
-  coord_cartesian(ylim = c(NA,NA)) 
-  # ggsave("Graphs/coc.png", scale = 1)
+  coord_cartesian(ylim = c(0,1)) +
+  theme_minimal() +
+  ggsave("EER/Graphs/coc.png", width=30, height=20, units = "cm")
+
 
 
 
@@ -387,1327 +294,471 @@ ggplot(eco_ref_year, aes(x=Annee_Bibliographique_Source, y=n_eco_ref/n_ref_year)
 ## Share of Other Disciplines in References Over Time
 
 ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-disc_ref_year <- refs[, .N, .(Annee_Bibliographique_Source, ESpecialite_custom)]
+disc_ref_year <- Refs[, .N, .(Annee_Bibliographique_Source, ESpecialite_custom)]
 disc_ref_year <- disc_ref_year[complete.cases(ESpecialite_custom)==TRUE]
 disc_ref_year <- complete(disc_ref_year, ESpecialite_custom, Annee_Bibliographique_Source) %>% as.data.table
 disc_ref_year <- disc_ref_year[is.na(N), N:=0]
 setnames(disc_ref_year,"N", "nb_cit_disc")
 
-n_ref <- refs[complete.cases(ESpecialite_custom)==TRUE,.N, Annee_Bibliographique_Source]
+n_ref <- Refs[complete.cases(ESpecialite_custom)==TRUE,.N, Annee_Bibliographique_Source]
 disc_ref_year <- merge(disc_ref_year, n_ref, by = "Annee_Bibliographique_Source")
 setnames(disc_ref_year,"N", "n_ref_year")
 
 disc_ref_year <- disc_ref_year[,share_years_mean:=frollmean(nb_cit_disc/n_ref_year, 3), ESpecialite_custom]
 
+weight <- Corpus[,.(weight=.N),Annee_Bibliographique]
+disc_ref_year <- merge(disc_ref_year, weight, by.x = "Annee_Bibliographique_Source", by.y = "Annee_Bibliographique")
 
-ggplot(disc_ref_year[ESpecialite_custom!="Economics" & ESpecialite_custom!="Management"], aes(x=Annee_Bibliographique_Source, y=share_years_mean, group=ESpecialite_custom, color=ESpecialite_custom)) +
-  geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.4)+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+
+ggplot(disc_ref_year[ESpecialite_custom!="Economics"], aes(x=as.numeric(Annee_Bibliographique_Source), y=share_years_mean, group=ESpecialite_custom, color=ESpecialite_custom, weight=weight)) +
+  geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.75)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.75)) +
   scale_x_continuous("Years") +
   scale_y_continuous("Share of Disciplines in References") +
   coord_cartesian(ylim = c(0,NA), xlim = c(NA, 2022)) +
   scale_color_discrete(guide = FALSE) +
-  geom_label_repel(aes(label = ESpecialite_custom), data = disc_ref_year[ESpecialite_custom!="Economics" & ESpecialite_custom!="Management"][Annee_Bibliographique_Source==2019], nudge_x = 1, segment.color = NA) 
-  # ggsave("Graphs/disc_ref_time.png", scale = 1)
+  geom_label_repel(aes(label = ESpecialite_custom), data = disc_ref_year[ESpecialite_custom!="Economics"][Annee_Bibliographique_Source==2019], nudge_x = 1, segment.color = NA) +
+  theme_minimal() +
+  ggsave("EER/Graphs/disc_ref_time.png", width=30, height=20, units = "cm")
 
-ggplot(disc_ref_year[ESpecialite_custom!="Economics" & ESpecialite_custom!="Management"], aes(x=Annee_Bibliographique_Source, y=share_years_mean, group=ESpecialite_custom, color=ESpecialite_custom)) +
-  geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.4)+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
-  scale_x_continuous("Years") +
-  scale_y_continuous("Share of Disciplines in References") +
-  coord_cartesian(ylim = c(0,0.04), xlim = c(NA, 2022)) +
-  scale_color_discrete(guide = FALSE) +
-  geom_label_repel(aes(label = ESpecialite_custom), data = disc_ref_year[ESpecialite_custom!="Economics" & ESpecialite_custom!="Management"][Annee_Bibliographique_Source==2019], nudge_x = 1, segment.color = NA) 
-  # ggsave("Graphs/disc_ref_time.png", scale = 1)
+
 
                    
 ```
 
-# Networks
+
+# Dynamics Networks
+
+```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
+source("/home/alexandre/functions_dynamics_networks.R")
+set.seed(500)
+alluv_dt <- readRDS(file = "EER/2_Raw_Networks_and_Alluv/alluv_dt.rds")
+filter_to_keep <- "share_leiden_max>=0.1 & n_years>=5"
+filter_to_drop <- "share_leiden_max<0.1 & n_years<5"
+
+
+alluv_dt <- minimize_crossing(alluv_dt)
+alluv_dt <- meta_grouping(alluv_dt, treshold_meta_groups=0.35)
+
+```
 
 ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
 
-make_into_coupling_tbl <- function(nodes, edges, time_window_variable, time_window, weight_treshold_value=1)
-{  
-  #' function for edges of bibliographic coupling
-  #' 
-  #' This function creates the cosine normalized edges of the bibliographic coupling network, from a direct
-  #' citation data frame.
-  #' 
-  #' @param dt
-  #' The table with citing and cited documents.
-  
-  nb_cit <- Edges[decade==time_window, .N, ItemID_Ref_Target]
-  
-  colnames(nb_cit)[colnames(nb_cit) == "N"] <- "size"
-  
-  Edges_coupling <- coupling_strength_bibliographic_coupling(Edges[decade==time_window], "ID_Art_Source", "ItemID_Ref_Target", 
-                                            normalized_weight_only = TRUE, weight_threshold = weight_treshold_value, output_in_character = TRUE)
-  
-  Nodes_coupling <- Nodes_coupling[ID_Art %in% Edges_coupling$from | ID_Art %in% Edges_coupling$to]
-  
-  Nodes_coupling <- merge(Nodes_coupling, nb_cit, by.x = "ItemID_Ref", by.y = "ItemID_Ref_Target", all.x = TRUE)
-  
-  Nodes_coupling[is.na(size),size:=0]
-  
-  tbl <- tbl_graph(nodes = Nodes_coupling, edges = Edges_coupling, directed = FALSE, node_key = "Id")
+##### Labels
+label <- copy(alluv_dt)
+label <- label[,.N,.(new_Id_com, share_leiden_max)][order(share_leiden_max)]
+label[,Label_com:=new_Id_com]
 
-  return (tbl)
+```
 
+
+```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
+library(RColorBrewer)
+require(viridis)
+##### Colors
+# Palette for individual colors of community 
+n_colors_groups <- alluv_dt[,.N,new_Id_com][order(-N)][,.N]
+individuals_colors <- viridis(n_colors_groups)
+
+unique_ids_color <- data.table(
+  new_Id_com = as.character(alluv_dt[,.N,new_Id_com][order(new_Id_com)]$new_Id_com), 
+  individuals_colors = individuals_colors)
+
+
+# Main palette
+color <- brewer.pal(8, name = "Dark2") %>% as.data.table()
+color2 <- brewer.pal(12, name = "Paired") %>% as.data.table()
+color3 <- brewer.pal(12, name = "Set3") %>% as.data.table()
+main_colors <- rbind(color,color2,color3)
+n_colors_metagroups <- alluv_dt[,.N,meta_group][,.N]
+
+main_colors_table <- data.table(
+  meta_group = as.character(alluv_dt[,.N,meta_group]$meta_group), 
+  main_colors = main_colors$.[head(1:n_colors_metagroups)])
+
+
+# Add meta groups and meta colors
+unique_ids_color <- merge(unique_ids_color, alluv_dt[,.N, .(new_Id_com,meta_group)], by ="new_Id_com", all.x = TRUE)
+unique_ids_color <- merge(unique_ids_color, main_colors_table, by ="meta_group", all.x = TRUE)
+
+# Add grey for smaller community
+big_com <- as.character(alluv_dt[n_years>3 & share_leiden_max>=0.05,.N,new_Id_com]$new_Id_com) %>% as.data.table()
+
+unique_ids_color[new_Id_com %in% big_com$., color_with_grey:= individuals_colors]
+unique_ids_color[is.na(color_with_grey),color_with_grey:="grey"]
+
+# Mix colors
+unique_ids_color[,color:=MixColor(individuals_colors, main_colors, amount1 = 0.4)]
+# If no clear group is found, grey or original color
+unique_ids_color[str_detect(meta_group, "0"),color:=color_with_grey]
+
+# Add colors to main dt
+alluv_dt_graph <- merge(alluv_dt, unique_ids_color[,.(new_Id_com, color)], by="new_Id_com", all.x = TRUE)
+# alluv_dt_graph[new_Id_com %notin% big_com$., color:="grey"]
+
+```
+
+
+```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
+
+##### Keep only one label per community as the average year
+label_mean <- merge(alluv_dt, label[,.(new_Id_com, Label_com)], by="new_Id_com", all.x = TRUE)
+label_mean <- copy(label_mean)
+label_mean <- label_mean[,Window:=round(mean(as.numeric(Window))),new_Id_com][, head(.SD, 1), .(new_Id_com)]
+alluv_dt_graph <- merge(alluv_dt_graph,label_mean[,.(new_Id_com,Window,Label_com)], by = c("new_Id_com","Window"), all.x = TRUE )
+alluv_dt_graph <- alluv_dt_graph %>% rename(Label_com_unique = Label_com)
+
+# Keep a column with communities as label
+alluv_dt_graph <- merge(alluv_dt_graph, label[,.(new_Id_com, Label_com)], by = "new_Id_com", all.x = TRUE) %>% as.data.table()
+alluv_dt_graph <- alluv_dt_graph %>% rename(com_as_label = Label_com)
+alluv_dt_graph[is.na(com_as_label),com_as_label:=new_Id_com]
+
+alluv_dt_graph$new_Id_com <- fct_reorder(alluv_dt_graph$new_Id_com, alluv_dt_graph$order,min, .desc = TRUE)
+
+`%notin%` <- Negate(`%in%`)
+alluv_dt_graph[new_Id_com %notin% big_com$., Label_com_unique:=NA]
+
+
+
+ggplot(alluv_dt_graph, aes(x = Window, y=share, stratum = new_Id_com, alluvium = Id, fill = color, label = new_Id_com)) +
+  geom_stratum(alpha =1, size=1/10) +
+  geom_flow() +
+  theme(legend.position = "none") +
+  theme_minimal() +
+  scale_fill_identity() +
+  ggtitle("") +
+  geom_label_repel(stat = "stratum", size = 5, aes(label = Label_com_unique)) +
+  ggsave("EER/Graphs/Intertemporal_communities2.png", width=30, height=20, units = "cm")
+
+
+```
+
+
+
+## tf-idf of communities over time
+
+```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%', fig.dim = c(10, 10)}
+
+tf_idf_table <- copy(alluv_dt)
+tf_idf_table <- tf_idf_table[,share_leiden:=share_leiden_max]
+tf_idf_table <- merge(tf_idf_table, label, by = "new_Id_com", all.x = TRUE) %>% as.data.table()
+tf_idf_table[,Leiden1:=Label_com]
+tf_idf_table[is.na(Label_com),Leiden1:=new_Id_com]
+tf_idf_table <- tbl_graph(tf_idf_table)
+
+tf_idf_color <- copy(unique_ids_color)
+tf_idf_color <- merge(tf_idf_color, label, by = "new_Id_com", all.x = TRUE) %>% as.data.table()
+tf_idf_color[,Leiden1:=Label_com]
+tf_idf_color[is.na(Label_com),Leiden1:=new_Id_com]
+
+tf_idf_results <- tf_idf(tf_idf_table, tf_idf_color, 15, 4, treshold_com = 0.1, size_title_wrap=10, unstemming = FALSE)
+
+tf_idf_results$plot
+
+```
+
+```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
+nb_cit <- Refs[, .N, ItemID_Ref_Target]
+colnames(nb_cit)[colnames(nb_cit) == "N"] <- "size"
+nb_cit_all <- merge(Corpus, nb_cit, by.x = "ItemID_Ref", by.y = "ItemID_Ref_Target", all.x = TRUE)
+nb_cit_all[is.na(size),size:=0]
+
+alluv_dt_as_nodes <- copy(alluv_dt_graph)
+alluv_dt_as_nodes[,nodes_n_time_com := .N, .(new_Id_com,Id)]
+alluv_dt_as_nodes <- merge(alluv_dt_as_nodes, nb_cit_all[,.(size, Id, Annee_Bibliographique, Label)], by="Id", all.x = TRUE)
+
+most_influential_nodes <- copy(alluv_dt_as_nodes)
+most_influential_nodes[,weighted_size:=size*nodes_n_time_com]
+most_influential_nodes <- most_influential_nodes[, head(.SD, 1), .(new_Id_com,Id)]
+most_influential_nodes <- most_influential_nodes[order(-weighted_size)]
+
+com_to_inspect <- alluv_dt_as_nodes[new_Id_com %in% big_com$., .N, com_as_label][order(-N)]$com_as_label
+
+
+
+```
+
+# A Look at Dynamic Communities
+
+```{r,results = "asis", eval=TRUE, echo=FALSE}
+for (com in com_to_inspect) {
+  ####################### Preparing the data to put in the template
+  # restricting alluv_dt to the community at stake
+  alluv_com  <- alluv_dt_as_nodes[com_as_label  == paste0(com)]
+  
+  most_influential_nodes_com  <- most_influential_nodes[com_as_label  == com]
+  
+  jel_macro_share <- merge(alluv_com, Corpus[,.(Id,JEL_id)], by="Id",all.x = TRUE)
+  jel_macro_share <- jel_macro_share[,mean(JEL_id), new_Id_com] %>% rename(mean_jel_macro=V1)
+  
+  n_nodes_com <- most_influential_nodes_com[,.N]
+  
+  most_influential_refs_com <- merge(most_influential_nodes_com[,.(Id,weighted_size)], Refs, by="Id")
+  most_influential_refs_com <- most_influential_refs_com[ItemID_Ref_Target!="NULL"]
+  most_influential_refs_com[,n_cit_ref:=.N, ItemID_Ref_Target]
+  most_influential_refs_com[,n_nodes:=n_nodes_com]
+  most_influential_refs_com[,share:=n_cit_ref/n_nodes*100]
+  most_influential_refs_com <- most_influential_refs_com[order(-share), head(.SD, 1), .(ItemID_Ref_Target)]
+  
+  most_cited_refs_outside <- merge(most_influential_nodes_com[,.(Id,weighted_size)], Refs, by="Id")
+  most_cited_refs_outside <- most_cited_refs_outside[ItemID_Ref_Target!="NULL" & ESpecialite_custom!="Economics" & ESpecialite_custom!="Management"]
+  most_cited_refs_outside[,n_cit_ref:=.N, ItemID_Ref_Target]
+  most_cited_refs_outside[,n_nodes:=n_nodes_com]
+  most_cited_refs_outside[,share:=n_cit_ref/n_nodes*100]
+  most_cited_refs_outside <- most_cited_refs_outside[order(-share), head(.SD, 1), .(ItemID_Ref_Target)]
+  
+  most_influential_disciplines <- merge(most_influential_nodes_com[,.(Id,weighted_size)], Refs, by="Id")
+  most_influential_disciplines <- most_influential_disciplines[ESpecialite_custom!="NULL"]
+  most_influential_disciplines[,n_cit_disc:=.N, ESpecialite_custom]
+  most_influential_disciplines[,n_refs:=.N]
+  most_influential_disciplines[,share:=n_cit_disc/n_refs*100]
+  most_influential_disciplines <- most_influential_disciplines[order(-share), head(.SD, 1), .(ESpecialite_custom)]
+  
+  most_productive_authors <- merge(alluv_com[,.(Id)], Authors, by.x= "Id", by.y= "ID_Art")
+  most_productive_authors <- most_productive_authors[,.N, Nom_ISI]
+  most_productive_authors <- most_productive_authors[order(-N)]
+  
+  most_productive_institutions <- merge(alluv_com[,.(Id)], Institutions[,.(ID_Art, Institution)], by.x= "Id", by.y= "ID_Art")
+  most_productive_institutions <- most_productive_institutions[,.N, Institution]
+  most_productive_institutions <- most_productive_institutions[order(-N)]
+
+  # extracting the first year and last year of the community
+  window <- as.integer(c(min(unique(alluv_com$Window)), as.integer(max(unique(alluv_com$Window))) + (time_window - 1)))
+ 
+  
+  ################ Beginning of the template ######################
+  cat("##","Community:", com, "\n")
+  cat(paste0("  \nThe community exists from ", window[1]," to ", window[2],". \n"))
+  cat("It's most distinctive words are: ",tf_idf_results$list_words[Leiden1==paste0(com)]$term)
+  cat("\n\n")
+  cat("We find that",jel_macro_share$mean_jel_macro*100,"% of articles are tagged as macro by JEL")
+  
+  cat("The most influential nodes of the community:")
+  cat("\n\n")
+  print(kable(most_influential_nodes_com[,.(Label, Titre, weighted_size)][, head(.SD, 20)]) %>% 
+          kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+  cat("\n\n")
+  
+  cat("The most common refs:")
+  cat("\n\n")
+  print(kable(most_influential_refs_com[,.(Label_Target,Titre, ESpecialite_custom, share)][, head(.SD, 20)]) %>% 
+          kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+  cat("\n\n")
+  
+  cat("The most common refs that are not in econ:")
+  cat("\n\n")
+  print(kable(most_cited_refs_outside[,.(Label_Target,Titre, ESpecialite_custom, share)][, head(.SD, 10)]) %>% 
+          kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+  cat("\n\n")
+  
+  cat("The most influential disciplines:")
+  cat("\n\n")
+  print(kable(most_influential_disciplines[,.(ESpecialite_custom, share)][, head(.SD, 10)]) %>% 
+          kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+  cat("\n\n")
+  
+  cat("The most productive authors of the community:")
+  cat("\n\n")
+  print(kable(most_productive_authors[,.(Nom_ISI, N)][, head(.SD, 10)]) %>% 
+          kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+  cat("\n\n")
+  
+  cat("The most productive Institutions of the community:")
+  cat("\n\n")
+  print(kable(most_productive_institutions[,.(Institution, N)][, head(.SD, 10)]) %>% 
+          kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+  cat("\n\n")
+  
+  # cat(sprintf("  \n## Community %s (`%s`) \n\n", unique(alluv_com[com_as_label  == com]$com_as_label ),com))
+  
+  cat("  \n")
 }
 
 ```
 
+# All Networks
+
 ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-######################### Nodes Coupling **********************
-Nodes_coupling <- Corpus
+list_networks <- readRDS(file = "EER/2_Raw_Networks_and_Alluv/list_networks.rds")
 
-######################### Nodes Cocit **********************
-Nodes_cocit <- refs
-Nodes_cocit %>%  rename(Label = Label_Target)
+color <- unique_ids_color
 
-######################### Direct Citation Edges **********************
-Edges <- refs
-Edges[,ID_Art_Source:=as.character(ID_Art_Source)]
-Edges <- Edges[ItemID_Ref_Target!="NULL",.(ID_Art_Source, ItemID_Ref_Target, decade)]
+list_graph_position2 <- lapply(list_networks, color_tbl)
 
-setkey(Nodes_coupling, Annee_Bibliographique)
-Nodes_coupling <- Nodes_coupling[order(Annee_Bibliographique)]
+list_ggplot <- list()
+for (Year in all_years) {
+    label_com <- list_graph_position2[[paste0(Year)]] %>% activate(nodes) %>% as.data.table()
+    label_com <- label_com[,mean_coord_x:=mean(x), Leiden1]
+    label_com <- label_com[,mean_coord_y:=mean(y), Leiden1]
+    label_com <- label_com[color!="grey"][, head(.SD, 1), Leiden1]
+    label_com <- merge(label_com, label[,.(new_Id_com, Label_com)], all.x = TRUE)
+    network_size <- label_com[,mean((mean_coord_x+mean_coord_y)/2)]
 
-setkey(Nodes_cocit, Annee_Bibliographique_Source)
-Nodes_cocit <- Nodes_cocit[order(Annee_Bibliographique_Source)]
 
-setkey(Edges, decade)
-Edges <- Edges[order(decade)]
+  list_ggplot[[as.character(Year)]] <- ggraph(list_graph_position2[[paste0(Year)]], "manual", x = x, y = y) +
+    geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
+    geom_node_point(aes(fill = color, size = size), pch=21) +
+    scale_edge_width_continuous(range = c(0.5, 1)) +
+    theme_void() +
+    geom_label_repel(data = label_com, aes(x = mean_coord_x, y = mean_coord_y, label = as.character(Label_com), fill = color)) +
+    theme(legend.position = "none") +
+    scale_fill_identity() +
+    scale_edge_colour_identity() +
+    labs(title = paste0(as.character(Year),"-",as.character(Year+time_window-1)))
+  # ggsave("Networks/coup_2000.png", width=30, height=20, units = "cm")
 
-tbl_coup_list <- list()
-for (variable_time_window in Nodes_coupling[,.N,decade]$decade) { 
-tbl_coup_list[[variable_time_window]] <- make_into_coupling_tbl(Nodes_coupling, Edges, decade, variable_time_window)
 }
 
 
+require(ggpubr)
+g <- ggarrange(plotlist=list_ggplot, common.legend = TRUE, legend="none")
+ggsave(plot=g, "EER/Graphs/all_networksv2.png", width=50, height=50, units = "cm")
 
-```
-
-
-## Coupling `r names(tbl_coup_list[1])`
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-set.seed(2000)
-source("/home/alexandre/functions_networks.R")
-
-tbl_list <- make_a_graph(tbl_coup_list[[1]], color, 1, "RBConfigurationVertexPartition", treshold_color=0.1, 0.02,layout_graph = "TRUE", 10000,2000)
-tbl_list$components
-
-tbl <- tbl_list$tbl
-
-label_com <- tbl %>% activate(nodes) %>% as.data.table()
-label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1]
-nodes_1 <- tbl %>% activate(nodes) %>% as.data.table()
-
-ggraph(tbl, "manual", x = x, y = y) +
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
-  geom_node_point(aes(fill = color, size = size), pch=21) +
-  scale_edge_width_continuous(range = c(0.5, 1)) +
-  theme_void() +
-  geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 0.1, fill = color)) +
-  theme(legend.position = "none") +
-  scale_fill_identity() +
-  scale_edge_colour_identity() 
-  # ggsave("networks/coupling_kw.png", width=30, height=30, units = "cm")
-
-tbl_sec <- tbl_list$tbl_sec
-
-label_com <- tbl_sec %>% activate(nodes) %>% as.data.table()
-label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1]
-
-ggraph(tbl_sec, "manual", x = x, y = y) +
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
-  geom_node_point(aes(fill = color, size = size), pch=21) +
-  scale_edge_width_continuous(range = c(0.5, 1)) +
-  theme_void() +
-  geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 0.1, fill = color)) +
-  theme(legend.position = "none") +
-  scale_fill_identity() +
-  scale_edge_colour_identity() 
-
-
-```
-
-### tf-idf 1970
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-tf_idf_results <- tf_idf(tbl, color, 10, 4, 0.1)
-tf_idf_results$plot
-```
-
-### Overview of Communities
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-
-tfidf_table <- tf_idf_results$list_words[, .(tf_idf = toString(term)), Leiden1]
-
-most_cited_nodes <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_nodes <- most_cited_nodes[order(-size), head(.SD, 5), Leiden1][,  .(Most_Cited_Nodes = toString(Label)), Leiden1]
-
-most_cited_refs <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_refs <- merge(most_cited_refs[,.(ID_Art, Leiden1)], refs[,.(ID_Art_Source, Label_Target, ItemID_Ref_Target)], by.x = "ID_Art", by.y = "ID_Art_Source")
-most_cited_refs <- most_cited_refs[ItemID_Ref_Target!="NULL"]
-most_cited_refs <- most_cited_refs[,n_cit_ref:=.N, .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[,n_tot_com:=.N, .(Leiden1)]
-most_cited_refs <- most_cited_refs[,share:=n_cit_ref/n_tot_com*100, .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[order(-n_cit_ref), head(.SD, 1), .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[order(-n_cit_ref), head(.SD, 5), Leiden1]
-most_cited_refs <- most_cited_refs[,n_cit_ref_with_share := paste0(Label_Target,"(", round(share),"%",")"), .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[,.(Most_Cited_Refs = toString(n_cit_ref_with_share)), Leiden1]
-
-most_cited_disc <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_disc <- merge(most_cited_disc, refs[,.(ID_Art_Source, ESpecialite_custom)], by.x = "ID_Art", by.y = "ID_Art_Source")
-most_cited_disc <- most_cited_disc[ESpecialite_custom!="NULL"]
-most_cited_disc <- most_cited_disc[,n_cit_disc:=.N, .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[,n_tot_com:=.N, .(Leiden1)]
-most_cited_disc <- most_cited_disc[,share:=n_cit_disc/n_tot_com*100, .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[order(-n_cit_disc), head(.SD, 1), .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[order(-n_cit_disc), head(.SD, 5), Leiden1]
-most_cited_disc <- most_cited_disc[,disc_with_share := paste0(ESpecialite_custom,"(", round(share),"%",")"), .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[,.(Most_Cited_Disc = toString(disc_with_share)), Leiden1]
-
-most_prod_journal <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_journal <- most_prod_journal[,.N, .(Leiden1, Revue)][order(-N), head(.SD, 5), Leiden1][,  .(Most_Productive_Journals = toString(Revue)), Leiden1]
-
-most_prod_author <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_author <- merge(most_prod_author, Authors[,.(ID_Art, Nom_ISI)], by = "ID_Art")
-most_prod_author <- most_prod_author[,n_cit_aut:=.N, .(Leiden1, Nom_ISI.y)]
-most_prod_author <- most_prod_author[order(-n_cit_aut), head(.SD, 1), .(Leiden1, Nom_ISI.y)]
-most_prod_author <- most_prod_author[order(-n_cit_aut), head(.SD, 5), Leiden1]
-most_prod_author <- most_prod_author[,.(Most_Productive_Authors = toString(Nom_ISI.y)), Leiden1]
-
-most_prod_institutions <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_institutions <- merge(most_prod_institutions, Institutions[,.(ID_Art, Institution)], by = "ID_Art")
-most_prod_institutions <- most_prod_institutions[Institution!="NULL"]
-most_prod_institutions <- most_prod_institutions[,n_cit_inst:=.N, .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[,n_tot_com:=.N, .(Leiden1)]
-most_prod_institutions <- most_prod_institutions[,share:=n_cit_inst/n_tot_com*100, .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[order(-n_cit_inst), head(.SD, 1), .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[order(-n_cit_inst), head(.SD, 5), Leiden1]
-most_prod_institutions <- most_prod_institutions[,inst_with_share := paste0(Institution,"(", round(share),"%",")"), .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[,.(Most_Productive_Institutions = toString(inst_with_share)), Leiden1]
-
-collaborations <- tbl %>% activate(nodes) %>% as.data.table()
-collaborations <- merge(collaborations, Institutions[,.(ID_Art, EU_US_collab)], by = "ID_Art")
-collaborations <- collaborations[EU_US_collab!="NULL"]
-collaborations <- collaborations[,n_cit_inst:=.N, .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[,n_tot_com:=.N, .(Leiden1)]
-collaborations <- collaborations[,share:=n_cit_inst/n_tot_com*100, .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[order(-n_cit_inst), head(.SD, 1), .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[order(-n_cit_inst), head(.SD, 5), Leiden1]
-collaborations <- collaborations[,inst_with_share := paste0(EU_US_collab,"(", round(share),"%",")"), .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[,.(Collaborations = toString(inst_with_share)), Leiden1]
-
-most_prod_countries <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_countries <- merge(most_prod_countries, Institutions[,.(ID_Art, Pays)], by = "ID_Art")
-most_prod_countries <- most_prod_countries[Pays!="NULL"]
-most_prod_countries <- most_prod_countries[,n_cit_count:=.N, .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[,n_tot_com:=.N, .(Leiden1)]
-most_prod_countries <- most_prod_countries[,share:=n_cit_count/n_tot_com*100, .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[order(-n_cit_count), head(.SD, 1), .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[order(-n_cit_count), head(.SD, 5), Leiden1]
-most_prod_countries <- most_prod_countries[,count_with_share := paste0(Pays,"(", round(share),"%",")"), .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[,.(Most_Productive_Countries = toString(count_with_share)), Leiden1]
-
-summary <- Reduce(merge, list(tfidf_table, most_cited_nodes, most_cited_refs, most_cited_disc, most_prod_journal, most_prod_author, most_prod_institutions, most_prod_countries, collaborations))
-
-
-pander(summary)
+# knitr::include_graphics("EER/Graphs/all_networksv2.png")
 
 ```
 
 
 
 
-
-## Coupling `r names(tbl_coup_list[2])`
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-set.seed(2000)
-source("/home/alexandre/functions_networks.R")
-
-tbl_list <- make_a_graph(tbl_coup_list[[2]], color, 1, "RBConfigurationVertexPartition", treshold_color=0.05, 0.02, layout_graph = "TRUE", 10000,2000, name_leiden = name_coup_2)
-tbl_list$components
-
-tbl <- tbl_list$tbl
-
-nodes_2 <- tbl %>% activate(nodes) %>% as.data.table()
-
-
-label_com <- tbl %>% activate(nodes) %>% as.data.table()
-label_com <- label_com[color!="#c0c0c0"][order(betweenness)][, head(.SD, 1), Leiden1]
-label_com$Leiden1 <- str_wrap(label_com$Leiden1, width = 20)
-label_com[Leiden_num==6, x:=x-200][Leiden_num==6, y:=y-100]
-label_com[Leiden_num==2, x:=x-300][Leiden_num==2, y:=y-100]
-label_com[Leiden_num==3, x:=x][Leiden_num==3, y:=y-150]
-label_com[Leiden_num==4, x:=x+150][Leiden_num==4, y:=y+100]
-label_com[Leiden_num==1, x:=x+150][Leiden_num==1, y:=y+50]
-
-
-ggraph(tbl, "manual", x = x, y = y) +
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
-  geom_node_point(aes(fill = color, size = size), pch=21) +
-  scale_edge_width_continuous(range = c(0.5, 1)) +
-  theme_void() +
-  geom_label_repel(data = label_com, aes(x = x, y = y, label = paste0(Leiden_num, "-", as.character(Leiden1)), size = 0.5, fill = color), alpha = 0.9, vjust=1) +
-  theme(legend.position = "none") +
-  scale_fill_identity() +
-  scale_edge_colour_identity() 
-  # ggsave("networks/coupling_kw.png", width=30, height=30, units = "cm")
-
-tbl_sec <- tbl_list$tbl_sec
-
-label_com <- tbl_sec %>% activate(nodes) %>% as.data.table()
-label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 1), Leiden1]
-
-ggraph(tbl_sec, "manual", x = x, y = y) +
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
-  geom_node_point(aes(fill = color, size = size), pch=21) +
-  scale_edge_width_continuous(range = c(0.5, 1)) +
-  theme_void() +
-  geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Leiden1), size = 0.1, fill = color)) +
-  theme(legend.position = "none") +
-  scale_fill_identity() +
-  scale_edge_colour_identity()
-
-
-
-```
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-source("/home/alexandre/functions_networks.R")
-library(sigmajs)
-
-sigma_it(tbl)
-```
-
-### tf-idf
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-tf_idf_results <- tf_idf(tbl, color, 10, 4, 0.05)
-tf_idf_results$plot
-```
-
-### Overview of Communities
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-
-tfidf_table <- tf_idf_results$list_words[, .(tf_idf = toString(term)), Leiden1]
-
-most_cited_nodes <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_nodes <- most_cited_nodes[order(-size), head(.SD, 5), Leiden1][,  .(Most_Cited_Nodes = toString(Label)), Leiden1]
-
-most_cited_refs <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_refs <- merge(most_cited_refs[,.(ID_Art, Leiden1)], refs[,.(ID_Art_Source, Label_Target, ItemID_Ref_Target)], by.x = "ID_Art", by.y = "ID_Art_Source")
-most_cited_refs <- most_cited_refs[ItemID_Ref_Target!="NULL"]
-most_cited_refs <- most_cited_refs[,n_cit_ref:=.N, .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[,n_tot_com:=.N, .(Leiden1)]
-most_cited_refs <- most_cited_refs[,share:=n_cit_ref/n_tot_com*100, .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[order(-n_cit_ref), head(.SD, 1), .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[order(-n_cit_ref), head(.SD, 5), Leiden1]
-most_cited_refs <- most_cited_refs[,n_cit_ref_with_share := paste0(Label_Target,"(", round(share),"%",")"), .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[,.(Most_Cited_Refs = toString(n_cit_ref_with_share)), Leiden1]
-
-most_cited_disc <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_disc <- merge(most_cited_disc, refs[,.(ID_Art_Source, ESpecialite_custom)], by.x = "ID_Art", by.y = "ID_Art_Source")
-most_cited_disc <- most_cited_disc[ESpecialite_custom!="NULL"]
-most_cited_disc <- most_cited_disc[,n_cit_disc:=.N, .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[,n_tot_com:=.N, .(Leiden1)]
-most_cited_disc <- most_cited_disc[,share:=n_cit_disc/n_tot_com*100, .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[order(-n_cit_disc), head(.SD, 1), .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[order(-n_cit_disc), head(.SD, 5), Leiden1]
-most_cited_disc <- most_cited_disc[,disc_with_share := paste0(ESpecialite_custom,"(", round(share),"%",")"), .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[,.(Most_Cited_Disc = toString(disc_with_share)), Leiden1]
-
-most_prod_journal <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_journal <- most_prod_journal[,.N, .(Leiden1, Revue)][order(-N), head(.SD, 5), Leiden1][,  .(Most_Productive_Journals = toString(Revue)), Leiden1]
-
-most_prod_author <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_author <- merge(most_prod_author, Authors[,.(ID_Art, Nom_ISI)], by = "ID_Art")
-most_prod_author <- most_prod_author[,n_cit_aut:=.N, .(Leiden1, Nom_ISI.y)]
-most_prod_author <- most_prod_author[order(-n_cit_aut), head(.SD, 1), .(Leiden1, Nom_ISI.y)]
-most_prod_author <- most_prod_author[order(-n_cit_aut), head(.SD, 5), Leiden1]
-most_prod_author <- most_prod_author[,.(Most_Productive_Authors = toString(Nom_ISI.y)), Leiden1]
-
-most_prod_institutions <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_institutions <- merge(most_prod_institutions, Institutions[,.(ID_Art, Institution)], by = "ID_Art")
-most_prod_institutions <- most_prod_institutions[Institution!="NULL"]
-most_prod_institutions <- most_prod_institutions[,n_cit_inst:=.N, .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[,n_tot_com:=.N, .(Leiden1)]
-most_prod_institutions <- most_prod_institutions[,share:=n_cit_inst/n_tot_com*100, .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[order(-n_cit_inst), head(.SD, 1), .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[order(-n_cit_inst), head(.SD, 5), Leiden1]
-most_prod_institutions <- most_prod_institutions[,inst_with_share := paste0(Institution,"(", round(share),"%",")"), .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[,.(Most_Productive_Institutions = toString(inst_with_share)), Leiden1]
-
-collaborations <- tbl %>% activate(nodes) %>% as.data.table()
-collaborations <- merge(collaborations, Institutions[,.(ID_Art, EU_US_collab)], by = "ID_Art")
-collaborations <- collaborations[EU_US_collab!="NULL"]
-collaborations <- collaborations[,n_cit_inst:=.N, .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[,n_tot_com:=.N, .(Leiden1)]
-collaborations <- collaborations[,share:=n_cit_inst/n_tot_com*100, .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[order(-n_cit_inst), head(.SD, 1), .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[order(-n_cit_inst), head(.SD, 5), Leiden1]
-collaborations <- collaborations[,inst_with_share := paste0(EU_US_collab,"(", round(share),"%",")"), .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[,.(Collaborations = toString(inst_with_share)), Leiden1]
-
-most_prod_countries <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_countries <- merge(most_prod_countries, Institutions[,.(ID_Art, Pays)], by = "ID_Art")
-most_prod_countries <- most_prod_countries[Pays!="NULL"]
-most_prod_countries <- most_prod_countries[,n_cit_count:=.N, .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[,n_tot_com:=.N, .(Leiden1)]
-most_prod_countries <- most_prod_countries[,share:=n_cit_count/n_tot_com*100, .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[order(-n_cit_count), head(.SD, 1), .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[order(-n_cit_count), head(.SD, 5), Leiden1]
-most_prod_countries <- most_prod_countries[,count_with_share := paste0(Pays,"(", round(share),"%",")"), .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[,.(Most_Productive_Countries = toString(count_with_share)), Leiden1]
-
-JEL <- readRDS("/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/Old_JEL_matched_corpus_nodes.rds")
-jel_nodes <- tbl %>% activate(nodes) %>% as.data.table()
-jel_nodes <- jel_nodes[,JEL_id:=0][ID_Art %in% JEL$ID_Art, JEL_id:=1]
-
-# write.csv(jel_nodes[JEL_id==0 & (Leiden_num == 10 | Leiden_num== 3 | Leiden_num== 2 | Leiden_num== 4 | Leiden_num== 6)],"EER/check_jel.csv", row.names = FALSE)
-# jel_nodes <- merge(jel_nodes, JEL[,.(ID_Art, JEL_id=1)], by.x = "ID_Art", all.x = TRUE)
-
-jel_nodes <- jel_nodes[,n_tot_com:=.N, .(Leiden1)]
-jel_nodes <- jel_nodes[,share:=sum(JEL_id)/n_tot_com*100, .(Leiden1)]
-jel_nodes <- jel_nodes[order(-share), head(.SD, 1), .(Leiden1)]
-jel_nodes <- jel_nodes[,count_with_share := paste0(Leiden1,"(", round(share),"%",")"), .(Leiden1)]
-jel_nodes <- jel_nodes[,.(Proportion_JEL_codes = toString(count_with_share)), Leiden1]
-
-summary <- Reduce(merge, list(tfidf_table, most_cited_nodes, most_cited_refs, most_cited_disc, most_prod_journal, most_prod_author, most_prod_institutions, most_prod_countries, collaborations, jel_nodes))
-
-
-pander(summary)
-
-```
-
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-
-nodes_long <- rbind(nodes_1[,head(.SD,1), ID_Art][,time_frame:=1][,.(ID_Art, x, y, time_frame, size, color, Label)], 
-                    nodes_2[,head(.SD,1), ID_Art][,time_frame:=2][,.(ID_Art, x, y, time_frame, size, color, Label)])
-
-nodes_long <- nodes_long[order(ID_Art)]
-
-nodes_long <- melt(nodes_long, id.vars=c("ID_Art", "x", "y", "size", "color", "Label"),  measure.vars=c("time_frame"))
-
-
-# nodes_long <- nodes_long[value==2,x:=x+(sample(50:250, 100))][value==2,y:=y+(sample(50:250, 100))]
-library(plotly)
-library(gapminder)
-
-df <- gapminder 
-fig <- nodes_long %>%
-  plot_ly(
-    x = ~x, 
-    y = ~y, 
-    size = ~size,
-    color = ~color,
-    frame = ~value, 
-    text = ~Label,
-    # hoverinfo = "text",
-    type = 'scatter',
-    mode = 'markers'
-  )
-fig <- fig %>% layout(
-    xaxis = list(
-      type = "log"
-    )
-  )
-
-fig
-
-```
-
-## Coupling `r names(tbl_coup_list[3])`
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-set.seed(2000)
-source("/home/alexandre/functions_networks.R")
-
-tbl_list <- make_a_graph(tbl_coup_list[[3]], color, 1, "RBConfigurationVertexPartition", treshold_color=0.05, 0.02, layout_graph = "TRUE", 10000,2000)
-tbl_list$components
-
-tbl <- tbl_list$tbl
-
-label_com <- tbl %>% activate(nodes) %>% as.data.table()
-label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1]
-
-ggraph(tbl, "manual", x = x, y = y) +
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
-  geom_node_point(aes(fill = color, size = size), pch=21) +
-  scale_edge_width_continuous(range = c(0.5, 1)) +
-  theme_void() +
-  geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 0.1, fill = color)) +
-  theme(legend.position = "none") +
-  scale_fill_identity() +
-  scale_edge_colour_identity() 
-  # ggsave("networks/coupling_kw.png", width=30, height=30, units = "cm")
-
-tbl_sec <- tbl_list$tbl_sec
-
-label_com <- tbl_sec %>% activate(nodes) %>% as.data.table()
-label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1]
-
-ggraph(tbl_sec, "manual", x = x, y = y) +
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
-  geom_node_point(aes(fill = color, size = size), pch=21) +
-  scale_edge_width_continuous(range = c(0.5, 1)) +
-  theme_void() +
-  geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 0.1, fill = color)) +
-  theme(legend.position = "none") +
-  scale_fill_identity() +
-  scale_edge_colour_identity() 
-
-
-```
-
-### tf-idf
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-tf_idf_results <- tf_idf(tbl, color, 10, 4, 0.05)
-tf_idf_results$plot
-```
-
-### Overview of Communities
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-
-tfidf_table <- tf_idf_results$list_words[, .(tf_idf = toString(term)), Leiden1]
-
-most_cited_nodes <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_nodes <- most_cited_nodes[order(-size), head(.SD, 5), Leiden1][,  .(Most_Cited_Nodes = toString(Label)), Leiden1]
-
-most_cited_refs <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_refs <- merge(most_cited_refs[,.(ID_Art, Leiden1)], refs[,.(ID_Art_Source, Label_Target, ItemID_Ref_Target)], by.x = "ID_Art", by.y = "ID_Art_Source")
-most_cited_refs <- most_cited_refs[ItemID_Ref_Target!="NULL"]
-most_cited_refs <- most_cited_refs[,n_cit_ref:=.N, .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[,n_tot_com:=.N, .(Leiden1)]
-most_cited_refs <- most_cited_refs[,share:=n_cit_ref/n_tot_com*100, .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[order(-n_cit_ref), head(.SD, 1), .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[order(-n_cit_ref), head(.SD, 5), Leiden1]
-most_cited_refs <- most_cited_refs[,n_cit_ref_with_share := paste0(Label_Target,"(", round(share),"%",")"), .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[,.(Most_Cited_Refs = toString(n_cit_ref_with_share)), Leiden1]
-
-most_cited_disc <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_disc <- merge(most_cited_disc, refs[,.(ID_Art_Source, ESpecialite_custom)], by.x = "ID_Art", by.y = "ID_Art_Source")
-most_cited_disc <- most_cited_disc[ESpecialite_custom!="NULL"]
-most_cited_disc <- most_cited_disc[,n_cit_disc:=.N, .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[,n_tot_com:=.N, .(Leiden1)]
-most_cited_disc <- most_cited_disc[,share:=n_cit_disc/n_tot_com*100, .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[order(-n_cit_disc), head(.SD, 1), .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[order(-n_cit_disc), head(.SD, 5), Leiden1]
-most_cited_disc <- most_cited_disc[,disc_with_share := paste0(ESpecialite_custom,"(", round(share),"%",")"), .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[,.(Most_Cited_Disc = toString(disc_with_share)), Leiden1]
-
-most_prod_journal <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_journal <- most_prod_journal[,.N, .(Leiden1, Revue)][order(-N), head(.SD, 5), Leiden1][,  .(Most_Productive_Journals = toString(Revue)), Leiden1]
-
-most_prod_author <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_author <- merge(most_prod_author, Authors[,.(ID_Art, Nom_ISI)], by = "ID_Art")
-most_prod_author <- most_prod_author[,n_cit_aut:=.N, .(Leiden1, Nom_ISI.y)]
-most_prod_author <- most_prod_author[order(-n_cit_aut), head(.SD, 1), .(Leiden1, Nom_ISI.y)]
-most_prod_author <- most_prod_author[order(-n_cit_aut), head(.SD, 5), Leiden1]
-most_prod_author <- most_prod_author[,.(Most_Productive_Authors = toString(Nom_ISI.y)), Leiden1]
-
-most_prod_institutions <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_institutions <- merge(most_prod_institutions, Institutions[,.(ID_Art, Institution)], by = "ID_Art")
-most_prod_institutions <- most_prod_institutions[Institution!="NULL"]
-most_prod_institutions <- most_prod_institutions[,n_cit_inst:=.N, .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[,n_tot_com:=.N, .(Leiden1)]
-most_prod_institutions <- most_prod_institutions[,share:=n_cit_inst/n_tot_com*100, .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[order(-n_cit_inst), head(.SD, 1), .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[order(-n_cit_inst), head(.SD, 5), Leiden1]
-most_prod_institutions <- most_prod_institutions[,inst_with_share := paste0(Institution,"(", round(share),"%",")"), .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[,.(Most_Productive_Institutions = toString(inst_with_share)), Leiden1]
-
-collaborations <- tbl %>% activate(nodes) %>% as.data.table()
-collaborations <- merge(collaborations, Institutions[,.(ID_Art, EU_US_collab)], by = "ID_Art")
-collaborations <- collaborations[EU_US_collab!="NULL"]
-collaborations <- collaborations[,n_cit_inst:=.N, .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[,n_tot_com:=.N, .(Leiden1)]
-collaborations <- collaborations[,share:=n_cit_inst/n_tot_com*100, .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[order(-n_cit_inst), head(.SD, 1), .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[order(-n_cit_inst), head(.SD, 5), Leiden1]
-collaborations <- collaborations[,inst_with_share := paste0(EU_US_collab,"(", round(share),"%",")"), .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[,.(Collaborations = toString(inst_with_share)), Leiden1]
-
-most_prod_countries <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_countries <- merge(most_prod_countries, Institutions[,.(ID_Art, Pays)], by = "ID_Art")
-most_prod_countries <- most_prod_countries[Pays!="NULL"]
-most_prod_countries <- most_prod_countries[,n_cit_count:=.N, .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[,n_tot_com:=.N, .(Leiden1)]
-most_prod_countries <- most_prod_countries[,share:=n_cit_count/n_tot_com*100, .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[order(-n_cit_count), head(.SD, 1), .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[order(-n_cit_count), head(.SD, 5), Leiden1]
-most_prod_countries <- most_prod_countries[,count_with_share := paste0(Pays,"(", round(share),"%",")"), .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[,.(Most_Productive_Countries = toString(count_with_share)), Leiden1]
-
-summary <- Reduce(merge, list(tfidf_table, most_cited_nodes, most_cited_refs, most_cited_disc, most_prod_journal, most_prod_author, most_prod_institutions, most_prod_countries, collaborations))
-
-
-pander(summary)
-
-```
-
-
-## Coupling `r names(tbl_coup_list[4])`
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-set.seed(2000)
-source("/home/alexandre/functions_networks.R")
-
-tbl_list <- make_a_graph(tbl_coup_list[[4]], color, 1, "RBConfigurationVertexPartition", treshold_color=0.05, 0.02, layout_graph = "TRUE", 10000,2000)
-tbl_list$components
-
-tbl <- tbl_list$tbl
-
-label_com <- tbl %>% activate(nodes) %>% as.data.table()
-label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1]
-
-ggraph(tbl, "manual", x = x, y = y) +
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
-  geom_node_point(aes(fill = color, size = size), pch=21) +
-  scale_edge_width_continuous(range = c(0.5, 1)) +
-  theme_void() +
-  geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 0.1, fill = color)) +
-  theme(legend.position = "none") +
-  scale_fill_identity() +
-  scale_edge_colour_identity() 
-  # ggsave("networks/coupling_kw.png", width=30, height=30, units = "cm")
-
-tbl_sec <- tbl_list$tbl_sec
-
-label_com <- tbl_sec %>% activate(nodes) %>% as.data.table()
-label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1]
-
-ggraph(tbl_sec, "manual", x = x, y = y) +
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
-  geom_node_point(aes(fill = color, size = size), pch=21) +
-  scale_edge_width_continuous(range = c(0.5, 1)) +
-  theme_void() +
-  geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 0.1, fill = color)) +
-  theme(legend.position = "none") +
-  scale_fill_identity() +
-  scale_edge_colour_identity() 
-
-
-```
-
-### tf-idf
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-tf_idf_results <- tf_idf(tbl, color, 10, 4)
-tf_idf_results$plot
-```
-
-### Overview of Communities
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-
-tfidf_table <- tf_idf_results$list_words[, .(tf_idf = toString(term)), Leiden1]
-
-most_cited_nodes <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_nodes <- most_cited_nodes[order(-size), head(.SD, 5), Leiden1][,  .(Most_Cited_Nodes = toString(Label)), Leiden1]
-
-most_cited_refs <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_refs <- merge(most_cited_refs[,.(ID_Art, Leiden1)], refs[,.(ID_Art_Source, Label_Target, ItemID_Ref_Target)], by.x = "ID_Art", by.y = "ID_Art_Source")
-most_cited_refs <- most_cited_refs[ItemID_Ref_Target!="NULL"]
-most_cited_refs <- most_cited_refs[,n_cit_ref:=.N, .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[,n_tot_com:=.N, .(Leiden1)]
-most_cited_refs <- most_cited_refs[,share:=n_cit_ref/n_tot_com*100, .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[order(-n_cit_ref), head(.SD, 1), .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[order(-n_cit_ref), head(.SD, 5), Leiden1]
-most_cited_refs <- most_cited_refs[,n_cit_ref_with_share := paste0(Label_Target,"(", round(share),"%",")"), .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[,.(Most_Cited_Refs = toString(n_cit_ref_with_share)), Leiden1]
-
-most_cited_disc <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_disc <- merge(most_cited_disc, refs[,.(ID_Art_Source, ESpecialite_custom)], by.x = "ID_Art", by.y = "ID_Art_Source")
-most_cited_disc <- most_cited_disc[ESpecialite_custom!="NULL"]
-most_cited_disc <- most_cited_disc[,n_cit_disc:=.N, .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[,n_tot_com:=.N, .(Leiden1)]
-most_cited_disc <- most_cited_disc[,share:=n_cit_disc/n_tot_com*100, .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[order(-n_cit_disc), head(.SD, 1), .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[order(-n_cit_disc), head(.SD, 5), Leiden1]
-most_cited_disc <- most_cited_disc[,disc_with_share := paste0(ESpecialite_custom,"(", round(share),"%",")"), .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[,.(Most_Cited_Disc = toString(disc_with_share)), Leiden1]
-
-most_prod_journal <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_journal <- most_prod_journal[,.N, .(Leiden1, Revue)][order(-N), head(.SD, 5), Leiden1][,  .(Most_Productive_Journals = toString(Revue)), Leiden1]
-
-most_prod_author <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_author <- merge(most_prod_author, Authors[,.(ID_Art, Nom_ISI)], by = "ID_Art")
-most_prod_author <- most_prod_author[,n_cit_aut:=.N, .(Leiden1, Nom_ISI.y)]
-most_prod_author <- most_prod_author[order(-n_cit_aut), head(.SD, 1), .(Leiden1, Nom_ISI.y)]
-most_prod_author <- most_prod_author[order(-n_cit_aut), head(.SD, 5), Leiden1]
-most_prod_author <- most_prod_author[,.(Most_Productive_Authors = toString(Nom_ISI.y)), Leiden1]
-
-most_prod_institutions <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_institutions <- merge(most_prod_institutions, Institutions[,.(ID_Art, Institution)], by = "ID_Art")
-most_prod_institutions <- most_prod_institutions[Institution!="NULL"]
-most_prod_institutions <- most_prod_institutions[,n_cit_inst:=.N, .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[,n_tot_com:=.N, .(Leiden1)]
-most_prod_institutions <- most_prod_institutions[,share:=n_cit_inst/n_tot_com*100, .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[order(-n_cit_inst), head(.SD, 1), .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[order(-n_cit_inst), head(.SD, 5), Leiden1]
-most_prod_institutions <- most_prod_institutions[,inst_with_share := paste0(Institution,"(", round(share),"%",")"), .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[,.(Most_Productive_Institutions = toString(inst_with_share)), Leiden1]
-
-collaborations <- tbl %>% activate(nodes) %>% as.data.table()
-collaborations <- merge(collaborations, Institutions[,.(ID_Art, EU_US_collab)], by = "ID_Art")
-collaborations <- collaborations[EU_US_collab!="NULL"]
-collaborations <- collaborations[,n_cit_inst:=.N, .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[,n_tot_com:=.N, .(Leiden1)]
-collaborations <- collaborations[,share:=n_cit_inst/n_tot_com*100, .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[order(-n_cit_inst), head(.SD, 1), .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[order(-n_cit_inst), head(.SD, 5), Leiden1]
-collaborations <- collaborations[,inst_with_share := paste0(EU_US_collab,"(", round(share),"%",")"), .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[,.(Collaborations = toString(inst_with_share)), Leiden1]
-
-most_prod_countries <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_countries <- merge(most_prod_countries, Institutions[,.(ID_Art, Pays)], by = "ID_Art")
-most_prod_countries <- most_prod_countries[Pays!="NULL"]
-most_prod_countries <- most_prod_countries[,n_cit_count:=.N, .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[,n_tot_com:=.N, .(Leiden1)]
-most_prod_countries <- most_prod_countries[,share:=n_cit_count/n_tot_com*100, .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[order(-n_cit_count), head(.SD, 1), .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[order(-n_cit_count), head(.SD, 5), Leiden1]
-most_prod_countries <- most_prod_countries[,count_with_share := paste0(Pays,"(", round(share),"%",")"), .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[,.(Most_Productive_Countries = toString(count_with_share)), Leiden1]
-
-summary <- Reduce(merge, list(tfidf_table, most_cited_nodes, most_cited_refs, most_cited_disc, most_prod_journal, most_prod_author, most_prod_institutions, most_prod_countries, collaborations))
-
-
-pander(summary)
-```
-
-
-## Coupling `r names(tbl_coup_list[5])`
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-set.seed(2000)
-
-
-tbl_list <- make_a_graph(tbl_coup_list[[5]], color, 1, "RBConfigurationVertexPartition", treshold_color=0.1, 0.02, layout_graph = "TRUE", 10000,2000)
-tbl_list$components
-tbl <- tbl_list$tbl
-
-label_com <- tbl %>% activate(nodes) %>% as.data.table()
-label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1]
-
-ggraph(tbl, "manual", x = x, y = y) +
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
-  geom_node_point(aes(fill = color, size = size), pch=21) +
-  scale_edge_width_continuous(range = c(0.5, 1)) +
-  theme_void() +
-  geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 0.1, fill = color)) +
-  theme(legend.position = "none") +
-  scale_fill_identity() +
-  scale_edge_colour_identity() 
-  # ggsave("networks/coupling_kw.png", width=30, height=30, units = "cm")
-
-tbl_sec <- tbl_list$tbl_sec
-
-label_com <- tbl_sec %>% activate(nodes) %>% as.data.table()
-label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1]
-
-ggraph(tbl_sec, "manual", x = x, y = y) +
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
-  geom_node_point(aes(fill = color, size = size), pch=21) +
-  scale_edge_width_continuous(range = c(0.5, 1)) +
-  theme_void() +
-  geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 0.1, fill = color)) +
-  theme(legend.position = "none") +
-  scale_fill_identity() +
-  scale_edge_colour_identity() 
-
-```
-
-### tf-idf
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-source("/home/alexandre/functions_networks.R")
-
-
-tf_idf_results <- tf_idf(tbl, color, 10, 4)
-tf_idf_results$plot
-
-
-```
-
-### Overview of Communities
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-
-tfidf_table <- tf_idf_results$list_words[, .(tf_idf = toString(term)), Leiden1]
-
-most_cited_nodes <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_nodes <- most_cited_nodes[order(-size), head(.SD, 5), Leiden1][,  .(Most_Cited_Nodes = toString(Label)), Leiden1]
-
-most_cited_refs <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_refs <- merge(most_cited_refs[,.(ID_Art, Leiden1)], refs[,.(ID_Art_Source, Label_Target, ItemID_Ref_Target)], by.x = "ID_Art", by.y = "ID_Art_Source")
-most_cited_refs <- most_cited_refs[ItemID_Ref_Target!="NULL"]
-most_cited_refs <- most_cited_refs[,n_cit_ref:=.N, .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[,n_tot_com:=.N, .(Leiden1)]
-most_cited_refs <- most_cited_refs[,share:=n_cit_ref/n_tot_com*100, .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[order(-n_cit_ref), head(.SD, 1), .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[order(-n_cit_ref), head(.SD, 5), Leiden1]
-most_cited_refs <- most_cited_refs[,n_cit_ref_with_share := paste0(Label_Target,"(", round(share),"%",")"), .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[,.(Most_Cited_Refs = toString(n_cit_ref_with_share)), Leiden1]
-
-most_cited_disc <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_disc <- merge(most_cited_disc, refs[,.(ID_Art_Source, ESpecialite_custom)], by.x = "ID_Art", by.y = "ID_Art_Source")
-most_cited_disc <- most_cited_disc[ESpecialite_custom!="NULL"]
-most_cited_disc <- most_cited_disc[,n_cit_disc:=.N, .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[,n_tot_com:=.N, .(Leiden1)]
-most_cited_disc <- most_cited_disc[,share:=n_cit_disc/n_tot_com*100, .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[order(-n_cit_disc), head(.SD, 1), .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[order(-n_cit_disc), head(.SD, 5), Leiden1]
-most_cited_disc <- most_cited_disc[,disc_with_share := paste0(ESpecialite_custom,"(", round(share),"%",")"), .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[,.(Most_Cited_Disc = toString(disc_with_share)), Leiden1]
-
-most_prod_journal <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_journal <- most_prod_journal[,.N, .(Leiden1, Revue)][order(-N), head(.SD, 5), Leiden1][,  .(Most_Productive_Journals = toString(Revue)), Leiden1]
-
-most_prod_author <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_author <- merge(most_prod_author, Authors[,.(ID_Art, Nom_ISI)], by = "ID_Art")
-most_prod_author <- most_prod_author[,n_cit_aut:=.N, .(Leiden1, Nom_ISI.y)]
-most_prod_author <- most_prod_author[order(-n_cit_aut), head(.SD, 1), .(Leiden1, Nom_ISI.y)]
-most_prod_author <- most_prod_author[order(-n_cit_aut), head(.SD, 5), Leiden1]
-most_prod_author <- most_prod_author[,.(Most_Productive_Authors = toString(Nom_ISI.y)), Leiden1]
-
-most_prod_institutions <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_institutions <- merge(most_prod_institutions, Institutions[,.(ID_Art, Institution)], by = "ID_Art")
-most_prod_institutions <- most_prod_institutions[Institution!="NULL"]
-most_prod_institutions <- most_prod_institutions[,n_cit_inst:=.N, .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[,n_tot_com:=.N, .(Leiden1)]
-most_prod_institutions <- most_prod_institutions[,share:=n_cit_inst/n_tot_com*100, .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[order(-n_cit_inst), head(.SD, 1), .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[order(-n_cit_inst), head(.SD, 5), Leiden1]
-most_prod_institutions <- most_prod_institutions[,inst_with_share := paste0(Institution,"(", round(share),"%",")"), .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[,.(Most_Productive_Institutions = toString(inst_with_share)), Leiden1]
-
-collaborations <- tbl %>% activate(nodes) %>% as.data.table()
-collaborations <- merge(collaborations, Institutions[,.(ID_Art, EU_US_collab)], by = "ID_Art")
-collaborations <- collaborations[EU_US_collab!="NULL"]
-collaborations <- collaborations[,n_cit_inst:=.N, .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[,n_tot_com:=.N, .(Leiden1)]
-collaborations <- collaborations[,share:=n_cit_inst/n_tot_com*100, .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[order(-n_cit_inst), head(.SD, 1), .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[order(-n_cit_inst), head(.SD, 5), Leiden1]
-collaborations <- collaborations[,inst_with_share := paste0(EU_US_collab,"(", round(share),"%",")"), .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[,.(Collaborations = toString(inst_with_share)), Leiden1]
-
-most_prod_countries <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_countries <- merge(most_prod_countries, Institutions[,.(ID_Art, Pays)], by = "ID_Art")
-most_prod_countries <- most_prod_countries[Pays!="NULL"]
-most_prod_countries <- most_prod_countries[,n_cit_count:=.N, .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[,n_tot_com:=.N, .(Leiden1)]
-most_prod_countries <- most_prod_countries[,share:=n_cit_count/n_tot_com*100, .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[order(-n_cit_count), head(.SD, 1), .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[order(-n_cit_count), head(.SD, 5), Leiden1]
-most_prod_countries <- most_prod_countries[,count_with_share := paste0(Pays,"(", round(share),"%",")"), .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[,.(Most_Productive_Countries = toString(count_with_share)), Leiden1]
-
-summary <- Reduce(merge, list(tfidf_table, most_cited_nodes, most_cited_refs, most_cited_disc, most_prod_journal, most_prod_author, most_prod_institutions, most_prod_countries, collaborations))
-
-
-pander(summary)
-
-```
-
-
-## Coupling `r names(tbl_coup_list[6])`
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-set.seed(2000)
-
-
-tbl_list <- make_a_graph(tbl_coup_list[[6]], color, 1, "RBConfigurationVertexPartition", treshold_color=0.1, 0.02, layout_graph = "TRUE", 10000,2000)
-tbl_list$components
-tbl <- tbl_list$tbl
-
-label_com <- tbl %>% activate(nodes) %>% as.data.table()
-label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1]
-
-ggraph(tbl, "manual", x = x, y = y) +
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
-  geom_node_point(aes(fill = color, size = size), pch=21) +
-  scale_edge_width_continuous(range = c(0.5, 1)) +
-  theme_void() +
-  geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 0.1, fill = color)) +
-  theme(legend.position = "none") +
-  scale_fill_identity() +
-  scale_edge_colour_identity() 
-  # ggsave("networks/coupling_kw.png", width=30, height=30, units = "cm")
-
-tbl_sec <- tbl_list$tbl_sec
-
-label_com <- tbl_sec %>% activate(nodes) %>% as.data.table()
-label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1]
-
-ggraph(tbl_sec, "manual", x = x, y = y) +
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
-  geom_node_point(aes(fill = color, size = size), pch=21) +
-  scale_edge_width_continuous(range = c(0.5, 1)) +
-  theme_void() +
-  geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 0.1, fill = color)) +
-  theme(legend.position = "none") +
-  scale_fill_identity() +
-  scale_edge_colour_identity() 
-
-```
-
-### tf-idf
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-source("/home/alexandre/functions_networks.R")
-
-
-tf_idf_results <- tf_idf(tbl, color, 10, 4)
-tf_idf_results$plot
-
-
-```
-
-### Overview of Communities
-
-```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-
-tfidf_table <- tf_idf_results$list_words[, .(tf_idf = toString(term)), Leiden1]
-
-most_cited_nodes <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_nodes <- most_cited_nodes[order(-size), head(.SD, 5), Leiden1][,  .(Most_Cited_Nodes = toString(Label)), Leiden1]
-
-most_cited_refs <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_refs <- merge(most_cited_refs[,.(ID_Art, Leiden1)], refs[,.(ID_Art_Source, Label_Target, ItemID_Ref_Target)], by.x = "ID_Art", by.y = "ID_Art_Source")
-most_cited_refs <- most_cited_refs[ItemID_Ref_Target!="NULL"]
-most_cited_refs <- most_cited_refs[,n_cit_ref:=.N, .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[,n_tot_com:=.N, .(Leiden1)]
-most_cited_refs <- most_cited_refs[,share:=n_cit_ref/n_tot_com*100, .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[order(-n_cit_ref), head(.SD, 1), .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[order(-n_cit_ref), head(.SD, 5), Leiden1]
-most_cited_refs <- most_cited_refs[,n_cit_ref_with_share := paste0(Label_Target,"(", round(share),"%",")"), .(Leiden1, ItemID_Ref_Target)]
-most_cited_refs <- most_cited_refs[,.(Most_Cited_Refs = toString(n_cit_ref_with_share)), Leiden1]
-
-most_cited_disc <- tbl %>% activate(nodes) %>% as.data.table()
-most_cited_disc <- merge(most_cited_disc, refs[,.(ID_Art_Source, ESpecialite_custom)], by.x = "ID_Art", by.y = "ID_Art_Source")
-most_cited_disc <- most_cited_disc[ESpecialite_custom!="NULL"]
-most_cited_disc <- most_cited_disc[,n_cit_disc:=.N, .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[,n_tot_com:=.N, .(Leiden1)]
-most_cited_disc <- most_cited_disc[,share:=n_cit_disc/n_tot_com*100, .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[order(-n_cit_disc), head(.SD, 1), .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[order(-n_cit_disc), head(.SD, 5), Leiden1]
-most_cited_disc <- most_cited_disc[,disc_with_share := paste0(ESpecialite_custom,"(", round(share),"%",")"), .(Leiden1, ESpecialite_custom)]
-most_cited_disc <- most_cited_disc[,.(Most_Cited_Disc = toString(disc_with_share)), Leiden1]
-
-most_prod_journal <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_journal <- most_prod_journal[,.N, .(Leiden1, Revue)][order(-N), head(.SD, 5), Leiden1][,  .(Most_Productive_Journals = toString(Revue)), Leiden1]
-
-most_prod_author <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_author <- merge(most_prod_author, Authors[,.(ID_Art, Nom_ISI)], by = "ID_Art")
-most_prod_author <- most_prod_author[,n_cit_aut:=.N, .(Leiden1, Nom_ISI.y)]
-most_prod_author <- most_prod_author[order(-n_cit_aut), head(.SD, 1), .(Leiden1, Nom_ISI.y)]
-most_prod_author <- most_prod_author[order(-n_cit_aut), head(.SD, 5), Leiden1]
-most_prod_author <- most_prod_author[,.(Most_Productive_Authors = toString(Nom_ISI.y)), Leiden1]
-
-most_prod_institutions <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_institutions <- merge(most_prod_institutions, Institutions[,.(ID_Art, Institution)], by = "ID_Art")
-most_prod_institutions <- most_prod_institutions[Institution!="NULL"]
-most_prod_institutions <- most_prod_institutions[,n_cit_inst:=.N, .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[,n_tot_com:=.N, .(Leiden1)]
-most_prod_institutions <- most_prod_institutions[,share:=n_cit_inst/n_tot_com*100, .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[order(-n_cit_inst), head(.SD, 1), .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[order(-n_cit_inst), head(.SD, 5), Leiden1]
-most_prod_institutions <- most_prod_institutions[,inst_with_share := paste0(Institution,"(", round(share),"%",")"), .(Leiden1, Institution)]
-most_prod_institutions <- most_prod_institutions[,.(Most_Productive_Institutions = toString(inst_with_share)), Leiden1]
-
-collaborations <- tbl %>% activate(nodes) %>% as.data.table()
-collaborations <- merge(collaborations, Institutions[,.(ID_Art, EU_US_collab)], by = "ID_Art")
-collaborations <- collaborations[EU_US_collab!="NULL"]
-collaborations <- collaborations[,n_cit_inst:=.N, .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[,n_tot_com:=.N, .(Leiden1)]
-collaborations <- collaborations[,share:=n_cit_inst/n_tot_com*100, .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[order(-n_cit_inst), head(.SD, 1), .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[order(-n_cit_inst), head(.SD, 5), Leiden1]
-collaborations <- collaborations[,inst_with_share := paste0(EU_US_collab,"(", round(share),"%",")"), .(Leiden1, EU_US_collab)]
-collaborations <- collaborations[,.(Collaborations = toString(inst_with_share)), Leiden1]
-
-most_prod_countries <- tbl %>% activate(nodes) %>% as.data.table()
-most_prod_countries <- merge(most_prod_countries, Institutions[,.(ID_Art, Pays)], by = "ID_Art")
-most_prod_countries <- most_prod_countries[Pays!="NULL"]
-most_prod_countries <- most_prod_countries[,n_cit_count:=.N, .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[,n_tot_com:=.N, .(Leiden1)]
-most_prod_countries <- most_prod_countries[,share:=n_cit_count/n_tot_com*100, .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[order(-n_cit_count), head(.SD, 1), .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[order(-n_cit_count), head(.SD, 5), Leiden1]
-most_prod_countries <- most_prod_countries[,count_with_share := paste0(Pays,"(", round(share),"%",")"), .(Leiden1, Pays)]
-most_prod_countries <- most_prod_countries[,.(Most_Productive_Countries = toString(count_with_share)), Leiden1]
-
-summary <- Reduce(merge, list(tfidf_table, most_cited_nodes, most_cited_refs, most_cited_disc, most_prod_journal, most_prod_author, most_prod_institutions, most_prod_countries, collaborations))
-
-
-pander(summary)
-
-```
-
-
-
-
-<!-- ## Cocitation 1980 -->
-
-<!-- ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'} -->
-<!-- tbl_list <- make_a_graph(tbl_cocit_80, color, 1, "RBConfigurationVertexPartition", treshold_color=0.1, 0, 10000,2000) -->
-<!-- tbl_list$components -->
-<!-- tbl <- tbl_list$tbl -->
-
-<!-- label_com <- tbl %>% activate(nodes) %>% as.data.table() -->
-<!-- label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1] -->
-
-<!-- ggraph(tbl, "manual", x = x, y = y) + -->
-<!--   geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) + -->
-<!--   geom_node_point(aes(fill = color, size = size), pch=21) + -->
-<!--   scale_edge_width_continuous(range = c(0.5, 1)) + -->
-<!--   theme_void() + -->
-<!--   geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 10, fill = color)) + -->
-<!--   theme(legend.position = "none") + -->
-<!--   scale_fill_identity() + -->
-<!--   scale_edge_colour_identity()  -->
-<!--   # ggsave("networks/coupling_kw.png", width=30, height=30, units = "cm") -->
-
-<!-- tbl_sec <- tbl_list$tbl_sec -->
-
-<!-- label_com <- tbl_sec %>% activate(nodes) %>% as.data.table() -->
-<!-- label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1] -->
-
-<!-- ggraph(tbl_sec, "manual", x = x, y = y) + -->
-<!--   geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) + -->
-<!--   geom_node_point(aes(fill = color, size = size), pch=21) + -->
-<!--   scale_edge_width_continuous(range = c(0.5, 1)) + -->
-<!--   theme_void() + -->
-<!--   geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 10, fill = color)) + -->
-<!--   theme(legend.position = "none") + -->
-<!--   scale_fill_identity() + -->
-<!--   scale_edge_colour_identity()  -->
-
-<!-- ``` -->
-
-<!-- ### tf-idf 1980 -->
-
-<!-- ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'} -->
-<!-- tf_idf_results <- tf_idf(tbl, color, 10, 4) -->
-<!-- tf_idf_results$plot -->
-
-
-<!-- ``` -->
-
-<!-- ### Overview of Communities -->
-
-<!-- ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'} -->
-
-<!-- tfidf_table <- tf_idf_results$list_words[, .(tf_idf = toString(term)), Leiden1] -->
-
-<!-- most_cited_nodes <- tbl %>% activate(nodes) %>% as.data.table() -->
-<!-- most_cited_nodes <- most_cited_nodes[order(-size), head(.SD, 5), Leiden1][,  .(Most_Cited_Nodes = toString(Label)), Leiden1] -->
-
-<!-- most_cited_disc <- tbl %>% activate(nodes) %>% as.data.table() -->
-<!-- most_cited_disc <- most_cited_disc[ESpecialite_custom!="NULL"] -->
-<!-- most_cited_disc <- most_cited_disc[,n_cit_disc:=.N, .(Leiden1, ESpecialite_custom)] -->
-<!-- most_cited_disc <- most_cited_disc[,n_tot_com:=.N, .(Leiden1)] -->
-<!-- most_cited_disc <- most_cited_disc[,share:=n_cit_disc/n_tot_com*100, .(Leiden1, ESpecialite_custom)] -->
-<!-- most_cited_disc <- most_cited_disc[order(-share), head(.SD, 1), .(Leiden1, ESpecialite_custom)] -->
-<!-- most_cited_disc <- most_cited_disc[order(-share), head(.SD, 5), Leiden1] -->
-<!-- most_cited_disc <- most_cited_disc[,disc_with_share := paste(ESpecialite_custom,"(", round(share),")"), .(Leiden1, ESpecialite_custom)] -->
-<!-- most_cited_disc <- most_cited_disc[,.(Most_Cited_Disc = toString(disc_with_share)), Leiden1] -->
-
-<!-- most_cited_journals <- tbl %>% activate(nodes) %>% as.data.table() -->
-<!-- most_cited_journals <- most_cited_journals[is.na(Revue)==FALSE][,.N, .(Leiden1, Revue)][order(-N), head(.SD, 2), Leiden1][,  .(Most_Cited_Journals = toString(Revue)), Leiden1] -->
-
-<!-- summary <- Reduce(merge, list(tfidf_table, most_cited_nodes, most_cited_disc, most_cited_journals)) -->
-
-<!-- pander(summary) -->
-<!-- ``` -->
-
-<!-- ## Cocitation 1990 -->
-
-<!-- ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'} -->
-<!-- tbl_list <- make_a_graph(tbl_cocit_90, color, 1, "RBConfigurationVertexPartition", treshold_color=0.1, 0, 10000,2000) -->
-<!-- tbl_list$components -->
-<!-- tbl <- tbl_list$tbl -->
-
-<!-- label_com <- tbl %>% activate(nodes) %>% as.data.table() -->
-<!-- label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1] -->
-
-<!-- ggraph(tbl, "manual", x = x, y = y) + -->
-<!--   geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) + -->
-<!--   geom_node_point(aes(fill = color, size = size), pch=21) + -->
-<!--   scale_edge_width_continuous(range = c(0.5, 1)) + -->
-<!--   theme_void() + -->
-<!--   geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 10, fill = color)) + -->
-<!--   theme(legend.position = "none") + -->
-<!--   scale_fill_identity() + -->
-<!--   scale_edge_colour_identity()  -->
-<!--   # ggsave("networks/coupling_kw.png", width=30, height=30, units = "cm") -->
-
-<!-- tbl_sec <- tbl_list$tbl_sec -->
-
-<!-- label_com <- tbl_sec %>% activate(nodes) %>% as.data.table() -->
-<!-- label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1] -->
-
-<!-- ggraph(tbl_sec, "manual", x = x, y = y) + -->
-<!--   geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) + -->
-<!--   geom_node_point(aes(fill = color, size = size), pch=21) + -->
-<!--   scale_edge_width_continuous(range = c(0.5, 1)) + -->
-<!--   theme_void() + -->
-<!--   geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 10, fill = color)) + -->
-<!--   theme(legend.position = "none") + -->
-<!--   scale_fill_identity() + -->
-<!--   scale_edge_colour_identity()  -->
-
-<!-- ``` -->
-
-<!-- ### tf-idf 1990 -->
-
-<!-- ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'} -->
-<!-- tf_idf_results <- tf_idf(tbl, color, 10, 4) -->
-<!-- tf_idf_results$plot -->
-
-
-<!-- ``` -->
-
-<!-- ### Overview of Communities -->
-
-<!-- ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'} -->
-
-<!-- tfidf_table <- tf_idf_results$list_words[, .(tf_idf = toString(term)), Leiden1] -->
-
-<!-- most_cited_nodes <- tbl %>% activate(nodes) %>% as.data.table() -->
-<!-- most_cited_nodes <- most_cited_nodes[order(-size), head(.SD, 5), Leiden1][,  .(Most_Cited_Nodes = toString(Label)), Leiden1] -->
-
-<!-- most_cited_disc <- tbl %>% activate(nodes) %>% as.data.table() -->
-<!-- most_cited_disc <- most_cited_disc[ESpecialite_custom!="NULL"] -->
-<!-- most_cited_disc <- most_cited_disc[,n_cit_disc:=.N, .(Leiden1, ESpecialite_custom)] -->
-<!-- most_cited_disc <- most_cited_disc[,n_tot_com:=.N, .(Leiden1)] -->
-<!-- most_cited_disc <- most_cited_disc[,share:=n_cit_disc/n_tot_com*100, .(Leiden1, ESpecialite_custom)] -->
-<!-- most_cited_disc <- most_cited_disc[order(-share), head(.SD, 1), .(Leiden1, ESpecialite_custom)] -->
-<!-- most_cited_disc <- most_cited_disc[order(-share), head(.SD, 5), Leiden1] -->
-<!-- most_cited_disc <- most_cited_disc[,disc_with_share := paste(ESpecialite_custom,"(", round(share),")"), .(Leiden1, ESpecialite_custom)] -->
-<!-- most_cited_disc <- most_cited_disc[,.(Most_Cited_Disc = toString(disc_with_share)), Leiden1] -->
-
-<!-- most_cited_journals <- tbl %>% activate(nodes) %>% as.data.table() -->
-<!-- most_cited_journals <- most_cited_journals[is.na(Revue)==FALSE][,.N, .(Leiden1, Revue)][order(-N), head(.SD, 2), Leiden1][,  .(Most_Cited_Journals = toString(Revue)), Leiden1] -->
-
-<!-- summary <- Reduce(merge, list(tfidf_table, most_cited_nodes, most_cited_disc, most_cited_journals)) -->
-
-<!-- pander(summary) -->
-<!-- ``` -->
-
-<!-- ## Cocitation 2000 -->
-
-<!-- ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'} -->
-<!-- tbl_list <- make_a_graph(tbl_cocit_00, color, 1, "RBConfigurationVertexPartition", treshold_color=0.1, 0, 10000,2000) -->
-<!-- tbl_list$components -->
-<!-- tbl <- tbl_list$tbl -->
-
-<!-- label_com <- tbl %>% activate(nodes) %>% as.data.table() -->
-<!-- label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1] -->
-
-<!-- ggraph(tbl, "manual", x = x, y = y) + -->
-<!--   geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) + -->
-<!--   geom_node_point(aes(fill = color, size = size), pch=21) + -->
-<!--   scale_edge_width_continuous(range = c(0.5, 1)) + -->
-<!--   theme_void() + -->
-<!--   geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 10, fill = color)) + -->
-<!--   theme(legend.position = "none") + -->
-<!--   scale_fill_identity() + -->
-<!--   scale_edge_colour_identity()  -->
-<!--   # ggsave("networks/coupling_kw.png", width=30, height=30, units = "cm") -->
-
-<!-- tbl_sec <- tbl_list$tbl_sec -->
-
-<!-- label_com <- tbl_sec %>% activate(nodes) %>% as.data.table() -->
-<!-- label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1] -->
-
-<!-- ggraph(tbl_sec, "manual", x = x, y = y) + -->
-<!--   geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) + -->
-<!--   geom_node_point(aes(fill = color, size = size), pch=21) + -->
-<!--   scale_edge_width_continuous(range = c(0.5, 1)) + -->
-<!--   theme_void() + -->
-<!--   geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 10, fill = color)) + -->
-<!--   theme(legend.position = "none") + -->
-<!--   scale_fill_identity() + -->
-<!--   scale_edge_colour_identity()  -->
-
-<!-- ``` -->
-
-<!-- ### tf-idf 2000 -->
-
-<!-- ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'} -->
-<!-- tf_idf_results <- tf_idf(tbl, color, 10, 4) -->
-<!-- tf_idf_results$plot -->
-
-
-<!-- ``` -->
-
-<!-- ### Overview of Communities -->
-
-<!-- ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'} -->
-
-<!-- tfidf_table <- tf_idf_results$list_words[, .(tf_idf = toString(term)), Leiden1] -->
-
-<!-- most_cited_nodes <- tbl %>% activate(nodes) %>% as.data.table() -->
-<!-- most_cited_nodes <- most_cited_nodes[order(-size), head(.SD, 5), Leiden1][,  .(Most_Cited_Nodes = toString(Label)), Leiden1] -->
-
-<!-- most_cited_disc <- tbl %>% activate(nodes) %>% as.data.table() -->
-<!-- most_cited_disc <- most_cited_disc[ESpecialite_custom!="NULL"] -->
-<!-- most_cited_disc <- most_cited_disc[,n_cit_disc:=.N, .(Leiden1, ESpecialite_custom)] -->
-<!-- most_cited_disc <- most_cited_disc[,n_tot_com:=.N, .(Leiden1)] -->
-<!-- most_cited_disc <- most_cited_disc[,share:=n_cit_disc/n_tot_com*100, .(Leiden1, ESpecialite_custom)] -->
-<!-- most_cited_disc <- most_cited_disc[order(-share), head(.SD, 1), .(Leiden1, ESpecialite_custom)] -->
-<!-- most_cited_disc <- most_cited_disc[order(-share), head(.SD, 5), Leiden1] -->
-<!-- most_cited_disc <- most_cited_disc[,disc_with_share := paste(ESpecialite_custom,"(", round(share),")"), .(Leiden1, ESpecialite_custom)] -->
-<!-- most_cited_disc <- most_cited_disc[,.(Most_Cited_Disc = toString(disc_with_share)), Leiden1] -->
-
-<!-- most_cited_journals <- tbl %>% activate(nodes) %>% as.data.table() -->
-<!-- most_cited_journals <- most_cited_journals[is.na(Revue)==FALSE][,.N, .(Leiden1, Revue)][order(-N), head(.SD, 2), Leiden1][,  .(Most_Cited_Journals = toString(Revue)), Leiden1] -->
-
-<!-- summary <- Reduce(merge, list(tfidf_table, most_cited_nodes, most_cited_disc, most_cited_journals)) -->
-
-<!-- pander(summary) -->
-<!-- ``` -->
-
-<!-- ## Cocitation 2010 -->
-
-<!-- ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'} -->
-
-<!-- tbl_list <- make_a_graph(tbl_cocit_10, color, 1, "RBConfigurationVertexPartition", treshold_color=0.1, 0, 10000,2000) -->
-<!-- tbl_list$components -->
-<!-- tbl <- tbl_list$tbl -->
-
-<!-- label_com <- tbl %>% activate(nodes) %>% as.data.table() -->
-<!-- label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1] -->
-
-<!-- ggraph(tbl, "manual", x = x, y = y) + -->
-<!--   geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) + -->
-<!--   geom_node_point(aes(fill = color, size = size), pch=21) + -->
-<!--   scale_edge_width_continuous(range = c(0.5, 1)) + -->
-<!--   theme_void() + -->
-<!--   geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 10, fill = color)) + -->
-<!--   theme(legend.position = "none") + -->
-<!--   scale_fill_identity() + -->
-<!--   scale_edge_colour_identity()  -->
-<!--   # ggsave("networks/coupling_kw.png", width=30, height=30, units = "cm") -->
-
-<!-- tbl_sec <- tbl_list$tbl_sec -->
-
-<!-- label_com <- tbl_sec %>% activate(nodes) %>% as.data.table() -->
-<!-- label_com <- label_com[color!="#c0c0c0"][order(-size)][, head(.SD, 3), Leiden1] -->
-
-<!-- ggraph(tbl_sec, "manual", x = x, y = y) + -->
-<!--   geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) + -->
-<!--   geom_node_point(aes(fill = color, size = size), pch=21) + -->
-<!--   scale_edge_width_continuous(range = c(0.5, 1)) + -->
-<!--   theme_void() + -->
-<!--   geom_label_repel(data = label_com, aes(x = x, y = y, label = as.character(Label), size = 10, fill = color)) + -->
-<!--   theme(legend.position = "none") + -->
-<!--   scale_fill_identity() + -->
-<!--   scale_edge_colour_identity()  -->
-
-<!-- ``` -->
-
-
-<!-- ### tf-idf 2010 -->
-
-<!-- ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'} -->
-<!-- tf_idf_results <- tf_idf(tbl, color, 10, 4) -->
-<!-- tf_idf_results$plot -->
-
-
-<!-- ``` -->
-
-<!-- ### Overview of Communities -->
-
-<!-- ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'} -->
-
-<!-- tfidf_table <- tf_idf_results$list_words[, .(tf_idf = toString(term)), Leiden1] -->
-
-<!-- most_cited_nodes <- tbl %>% activate(nodes) %>% as.data.table() -->
-<!-- most_cited_nodes <- most_cited_nodes[order(-size), head(.SD, 5), Leiden1][,  .(Most_Cited_Nodes = toString(Label)), Leiden1] -->
-
-<!-- most_cited_disc <- tbl %>% activate(nodes) %>% as.data.table() -->
-<!-- most_cited_disc <- most_cited_disc[ESpecialite_custom!="NULL"] -->
-<!-- most_cited_disc <- most_cited_disc[,n_cit_disc:=.N, .(Leiden1, ESpecialite_custom)] -->
-<!-- most_cited_disc <- most_cited_disc[,n_tot_com:=.N, .(Leiden1)] -->
-<!-- most_cited_disc <- most_cited_disc[,share:=n_cit_disc/n_tot_com*100, .(Leiden1, ESpecialite_custom)] -->
-<!-- most_cited_disc <- most_cited_disc[order(-share), head(.SD, 1), .(Leiden1, ESpecialite_custom)] -->
-<!-- most_cited_disc <- most_cited_disc[order(-share), head(.SD, 5), Leiden1] -->
-<!-- most_cited_disc <- most_cited_disc[,disc_with_share := paste(ESpecialite_custom,"(", round(share),")"), .(Leiden1, ESpecialite_custom)] -->
-<!-- most_cited_disc <- most_cited_disc[,.(Most_Cited_Disc = toString(disc_with_share)), Leiden1] -->
-
-<!-- most_cited_journals <- tbl %>% activate(nodes) %>% as.data.table() -->
-<!-- most_cited_journals <- most_cited_journals[is.na(Revue)==FALSE][,.N, .(Leiden1, Revue)][order(-N), head(.SD, 2), Leiden1][,  .(Most_Cited_Journals = toString(Revue)), Leiden1] -->
-
-<!-- summary <- Reduce(merge, list(tfidf_table, most_cited_nodes, most_cited_disc, most_cited_journals)) -->
-
-<!-- pander(summary) -->
-<!-- ``` -->
-
-
-```{r echo=FALSE, out.width='100%'}
-# ## Get list of packages in the NLP/Machine Learning Task Views
-# library(ctv)
-# pkgs <- available.views()
-# names(pkgs) <- sapply(pkgs, FUN=function(x) x$name)
-# pkgs <- c(pkgs$NaturalLanguageProcessing$packagelist$name, pkgs$MachineLearning$packagelist$name)
-# ## Get package descriptions of these packages
-# library(tools)
-# x <- CRAN_package_db()
-# x <- x[, c("Package", "Title", "Description")]
-# x$doc_id <- x$Package
-# x$text   <- tolower(paste(x$Title, x$Description, sep = "\n"))
-# x$text   <- gsub("'", "", x$text)
-# x$text   <- gsub("<.+>", "", x$text)
-# x        <- subset(x, Package %in% pkgs)
-# 
-# 
-# 
-# library(udpipe)
-# library(data.table)
-# library(stopwords)
-# anno    <- udpipe(x, "english", trace = 10)
-# biterms <- as.data.table(anno)
-# biterms <- biterms[, cooccurrence(x = lemma,
-#                                   relevant = upos %in% c("NOUN", "ADJ", "VERB") & 
-#                                              nchar(lemma) > 2 & !lemma %in% stopwords("en"),
-#                                   skipgram = 3),
-#                    by = list(doc_id)]
-# 
-# 
-# 
-# library(BTM)
-# set.seed(123456)
-# traindata <- subset(anno, upos %in% c("NOUN", "ADJ", "VERB") & !lemma %in% stopwords("en") & nchar(lemma) > 2)
-# traindata <- traindata[, c("doc_id", "lemma")]
-# model     <- BTM(traindata, biterms = biterms, k = 9, iter = 2000, background = TRUE, trace = 100)
-# 
-# 
-# library(textplot)
-# library(ggraph)
-# plot(model, top_n = 10,
-#      title = "BTM model", subtitle = "R packages in the NLP/Machine Learning task views",
-#      labels = c("Garbage", "Neural Nets / Deep Learning", "Topic modelling", 
-#                 "Regression/Classification Trees/Forests", "Gradient Descent/Boosting", 
-#                 "GLM/GAM/Penalised Models", "NLP / Tokenisation",
-#                 "Text Mining Frameworks / API's", "Variable Selection in High Dimensions"))
-```
-
-```{python}
+```{r results = "asis", eval=TRUE, echo=FALSE}
+list_years <- c("1975", "2000", "2010")
+for (years in list_years) {
+  
+  tbl <- list_networks[[paste0(years)]]
+  plot_network_year <- list_ggplot[[paste0(years)]]
+  
+  nodes <- tbl %>% activate(nodes) %>% as.data.table()
+  # get name of communities
+  nodes <- merge(nodes, label[,.(new_Id_com,Label_com)], by = "new_Id_com", all.x = TRUE) %>% as.data.table()
+  nodes <- nodes[,com_as_label := Label_com]
+  nodes[is.na(com_as_label),com_as_label:=new_Id_com]
+  nodes <- nodes[,share_leiden:= .N/nodes[,.N], Leiden1]
+  
+  com_to_inspect <- nodes[share_leiden>=0.05, .N, com_as_label][order(-N)]$com_as_label
+  
+  cat("#","Network", years, "\n")
+  
+  cat("##","The Network:", "\n")
+  
+  cat("\n\n")
+  plot(plot_network_year)
+  cat("\n\n")
+  
+  
+  ## tf-idf
+  tf_idf_leiden <- nodes[,Leiden1:=com_as_label]
+  
+  tbl <- tbl %>% activate(nodes) %>% select(-c(Leiden1))  %>% left_join(tf_idf_leiden[,.(Id,ID_Art, Leiden1)]) 
+  tf_idf_results <- tf_idf(tbl, tf_idf_color, 15, 4, treshold_com = 0.05, unstemming = TRUE)
+  
+  cat("\n\n")
+  cat("##","tf-idf:", "\n")
+  cat("\n\n")
+  
+  cat("\n\n")
+  plot(tf_idf_results$plot)
+  cat("\n\n")
+  
+  
+  
+  
+  cat("##","## Informations about Communities:", "\n")
+  
+  cat("\n\n")
+  print(kable(nodes[,.N,.(com_as_label, share_leiden)][order(-share_leiden)]) %>% 
+          kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+  cat("\n\n")
+  
+  
+  
+  for (com in com_to_inspect) {
+    ####################### Preparing the data to put in the template
+    
+    # restricting alluv_dt to the community at stake
+    nodes_com  <- nodes[com_as_label  == paste0(com)]
+    
+    # jel_macro_share <- nodes_com[,mean(JEL_id)] %>% rename(mean_jel_macro=V1)
+    
+    most_influential_nodes_com  <- nodes_com[order(-size)]
+    
+    n_nodes_com <- most_influential_nodes_com[,.N]
+    
+    most_influential_refs_com <- merge(most_influential_nodes_com[,.(Id, size)], Refs, by="Id")
+    most_influential_refs_com <- most_influential_refs_com[ItemID_Ref_Target!="NULL"]
+    most_influential_refs_com[,n_cit_ref:=.N, ItemID_Ref_Target]
+    most_influential_refs_com[,n_nodes:=n_nodes_com]
+    most_influential_refs_com[,share:=n_cit_ref/n_nodes*100]
+    most_influential_refs_com <- most_influential_refs_com[order(-share), head(.SD, 1), .(ItemID_Ref_Target)]
+    
+    most_cited_refs_outside <- merge(most_influential_nodes_com[,.(Id, size)], Refs, by="Id")
+    most_cited_refs_outside <- most_cited_refs_outside[ItemID_Ref_Target!="NULL" & ESpecialite_custom!="Economics" & ESpecialite_custom!="Management"]
+    most_cited_refs_outside[,n_cit_ref:=.N, ItemID_Ref_Target]
+    most_cited_refs_outside[,n_nodes:=n_nodes_com]
+    most_cited_refs_outside[,share:=n_cit_ref/n_nodes*100]
+    most_cited_refs_outside <- most_cited_refs_outside[order(-share), head(.SD, 1), .(ItemID_Ref_Target)]
+    
+    most_influential_disciplines <- merge(most_influential_nodes_com[,.(Id, size)], Refs, by="Id")
+    most_influential_disciplines <- most_influential_disciplines[ESpecialite_custom!="NULL"]
+    most_influential_disciplines[,n_cit_disc:=.N, ESpecialite_custom]
+    most_influential_disciplines[,n_refs:=.N]
+    most_influential_disciplines[,share:=n_cit_disc/n_refs*100]
+    most_influential_disciplines <- most_influential_disciplines[order(-share), head(.SD, 1), .(ESpecialite_custom)]
+    
+    most_productive_authors <- merge(nodes_com[,.(Id)], Authors, by.x= "Id", by.y= "ID_Art")
+    most_productive_authors <- most_productive_authors[,.N, Nom_ISI]
+    most_productive_authors <- most_productive_authors[order(-N)]
+    
+    most_productive_institutions <- merge(nodes_com[,.(Id)], Institutions[,.(ID_Art, Institution)], by.x= "Id", by.y= "ID_Art")
+    most_productive_institutions <- most_productive_institutions[,.N, Institution]
+    most_productive_institutions <- most_productive_institutions[order(-N)]
+    
+    
+    ################ Beginning of the template ######################
+    cat("###","Community:", com, "\n")
+    cat("It's most distinctive words are: ",tf_idf_results$list_words[Leiden1==paste0(com)]$term)
+    cat("\n\n")
+    # cat("We find that",jel_macro_share$mean_jel_macro*100,"% of articles are tagged as macro by JEL")
+    cat("\n\n")
+
+    cat("The most influential nodes of the community:")
+    cat("\n\n")
+    print(kable(most_influential_nodes_com[,.(Label, Titre, size)][, head(.SD, 20)]) %>% 
+            kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+    cat("\n\n")
+    
+    cat("The most common refs:")
+    cat("\n\n")
+    print(kable(most_influential_refs_com[,.(Label_Target,Titre, ESpecialite_custom, share)][, head(.SD, 20)]) %>% 
+            kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+    cat("\n\n")
+    
+    cat("The most common refs that are not in econ:")
+    cat("\n\n")
+    print(kable(most_cited_refs_outside[,.(Label_Target,Titre, ESpecialite_custom, share)][, head(.SD, 10)]) %>% 
+            kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+    cat("\n\n")
+    
+    cat("The most influential disciplines:")
+    cat("\n\n")
+    print(kable(most_influential_disciplines[,.(ESpecialite_custom, share)][, head(.SD, 10)]) %>% 
+            kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+    cat("\n\n")
+    
+    cat("The most productive authors of the community:")
+    cat("\n\n")
+    print(kable(most_productive_authors[,.(Nom_ISI, N)][, head(.SD, 10)]) %>% 
+            kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+    cat("\n\n")
+    
+    cat("The most productive Institutions of the community:")
+    cat("\n\n")
+    print(kable(most_productive_institutions[,.(Institution, N)][, head(.SD, 10)]) %>% 
+            kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+    cat("\n\n")
+    
+    cat("  \n")
+  }
+}
 
 ```
