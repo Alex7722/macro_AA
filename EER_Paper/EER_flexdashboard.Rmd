@@ -1,0 +1,212 @@
+---
+title: "EER publications by seven-year periods"
+output: 
+  flexdashboard::flex_dashboard:
+    vertical_layout: scroll
+    orientation: rows
+    always_allow_html: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, eval = TRUE, include = TRUE)
+```
+
+```{r source-and-packages, eval = TRUE}
+library(flexdashboard)
+source("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R")
+source("~/macro_AA/functions/functions_for_network_analysis.R")
+
+institutions <- fread(paste0(data_path,"EER/Corpus_EER/EER_INST_XP.csv", quote="")) %>% data.table
+list_graph <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/list_networks.rds"))
+alluv_dt <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/alluv_dt.rds"))
+alluv_dt <- alluv_dt[share_leiden_max >=0.05 & n_years >= 3][,c("Leiden1","Window","Id")]
+```
+
+```{r prepare-data, eval = TRUE}
+
+list_graph <- lapply(list_graph, function(tbl)(tbl %>% activate(nodes) %>% mutate(size = replace(size, size == 0, 1))))
+list_graph <- lapply(list_graph, function(tbl) (tbl %>% activate(nodes) %>% mutate(x = rescale(x, to = c(0,1000)), y = rescale(y, to = c(0,1000)))))
+
+# creating a table with the data for nodes and edges for each window
+
+nodes_lf <- lapply(list_graph, function(tbl) (tbl %>% activate(nodes) %>% as.data.table()))
+nodes_lf <- lapply(nodes_lf, function(dt) (dt[, .(ID_Art, x, y, size, Label, Titre, Nom_ISI)]))
+nodes_lf <- rbindlist(nodes_lf, idcol = "window")
+nodes <- merge(nodes_lf, alluv_dt, by.x = c("ID_Art","window"), by.y = c("Id","Window"), all.x = TRUE) 
+
+nodes <- nodes[, window := paste0(window, "-", as.integer(window) + (time_window-1))][order(ID_Art, window)]
+
+nodes <- nodes %>% 
+  mutate(Leiden1 = replace(Leiden1, is.na(Leiden1), "small communities"))
+
+color <- c("#808080",scico(n = length(unique(nodes$Leiden1)) - 1, palette = "roma") %>% 
+  sample())
+
+nodes$Leiden1 <- factor(nodes$Leiden1, levels = c(unique(nodes[Leiden1 == "small communities"]$Leiden1), unique(nodes[Leiden1 != "small communities"]$Leiden1)))
+```
+
+# Page 1
+
+Graphs {data-height=650}
+-------------------------------------
+
+### Chart 1
+
+```{r graphs, eval = TRUE}
+plot_ly(nodes, 
+        x = ~x, 
+        y = ~y,
+        type = "scatter",
+        mode = "markers",
+        text = ~paste('</br>', Label,
+                      '</br>', str_wrap(Titre, width = 30),
+                      '</br> Community:', Leiden1),
+        hoverinfo = "text",
+        size = ~log(size),
+        sizes = c(30,300),
+        frame = ~window,
+        ids = ~ID_Art,
+        color = ~Leiden1,
+        colors = color,
+        showlegend = TRUE) %>% 
+  add_trace(alpha = 0.8) %>% 
+  layout(yaxis = list(zeroline = FALSE,
+                      showgrid = FALSE),
+         xaxis = list(zeroline = FALSE,
+                      showgrid = FALSE)) %>% 
+  config(scrollZoom = TRUE) %>% 
+  # highlight(on = "plotly_selected", 
+  #          selectize = TRUE, 
+  #         persistent = TRUE) %>% 
+  animation_opts(frame = 2000,
+                 transition = 1000,
+                 redraw = TRUE,
+                 mode = "next") 
+
+#htmlwidgets::saveWidget(graphs,paste0(picture_path,"moving_graphs.html"), selfcontained = FALSE)
+```
+
+Tables {data-height=650}
+-------------------------------------
+
+### Chart 2
+
+```{r institutions, eval = TRUE}
+inst_by_window <- merge(nodes_lf[, c("ID_Art","window")],
+                      institutions[, ID_Art := as.character(ID_Art)][, c("ID_Art","Institution","Pays","Ordre")], 
+                      by = "ID_Art", allow.cartesian = TRUE)
+
+inst_by_window[, window := paste0(window, "-", as.integer(window) + 6)]
+
+inst_by_window[, `:=` (n = .N), by = "window"] %>% 
+  .[Institution != "NULL", n_inst := round(.N/n,2), by = c("window","Institution")] %>% 
+  .[Pays != "NULL", n_country := round(.N/n,2), by = c("window","Pays")] 
+
+n_inst <- inst_by_window %>% 
+  select(Institution,window,n_inst) %>% 
+  unique() %>% 
+  group_by(window) %>% 
+  arrange(window,desc(n_inst)) %>% 
+  top_n(5) %>% 
+  mutate(type = "Institution") %>% 
+  rename("entity" = Institution,
+         "frequency" = n_inst)
+
+n_country <- inst_by_window %>% 
+  select(Pays,window,n_country) %>% 
+  unique() %>% 
+  group_by(window) %>% 
+  arrange(window, desc(n_country)) %>% 
+  top_n(5) %>% 
+  mutate(type = "Country") %>% 
+  rename("entity" = Pays,
+         "frequency" = n_country)
+
+inst_by_window <- rbind(n_inst,n_country) %>% as.data.table()
+
+# Wrap data frame in SharedData
+sd <- SharedData$new(inst_by_window)
+
+# Create a filter input
+bscols(widths = c(4,NA),
+  list(filter_checkbox(id = "window", label = "Window", sharedData = sd, group = ~window, columns = 3),
+  filter_checkbox("type", "Institution or Country", sd, ~type, columns = 2)),
+  datatable(sd, extensions="Scroller", width="100%", class = "compact",
+            options=list(deferRender=TRUE, scrollY=600, scroller=TRUE))
+)
+
+```
+
+# Page 2
+
+Sigma{.tabset}
+-------------------------------------
+
+```{r ggraph-project, include = TRUE, eval = FALSE, results='asis'}
+color_com <- data.table("Leiden1" = levels(nodes$Leiden1),"color" = color)
+color_com <- merge(nodes[,c("Leiden1","ID_Art","window")], color_com, by = "Leiden1")
+color_com[color == "gray"]$color <- "#808080"
+
+for(i in seq_along(unique(nodes[order(window)]$window))){
+  cat(sprintf("  \n### Network %s \n\n", unique(nodes[order(window)]$window)[i]))
+  cat('\n', '<br>', '\n\n')
+
+list_graph[[i]] <- list_graph[[i]] %>% activate(nodes) %>% left_join(color_com[window == unique(color_com[order(window)]$window)[i]])
+
+x <- ggraph(list_graph[[i]], "manual", x = x, y = y) + 
+  geom_edge_arc(aes(width = weight), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
+  scale_edge_width_continuous(range = c(0.1,2)) +
+  geom_point(aes(x = x, y = y, size = size, fill = color), pch = 21, alpha = 0.9, show.legend = FALSE) +
+  scale_size_continuous(range = c(1,13)) +
+  scale_fill_identity() +
+  new_scale("size") +
+ # geom_text(data=top_nodes, aes(x=x, y=y, label = Author_date), size = 3, fontface="bold", alpha = 1, show.legend = FALSE) +
+  scale_size_continuous(range = c(0.5,5)) +
+  theme_void()
+
+plot(x)
+
+}
+```
+
+
+
+```{r sigma-projection, eval = FALSE, results='asis', include= TRUE}
+# NOT WORKING: the chunk is working but the results are not projected (even if projected if we do it one by one)
+
+color_com <- data.table("Leiden1" = levels(nodes$Leiden1),"color" = color)
+nodes <- merge(nodes, color_com, by = "Leiden1")
+setnames(nodes, c("ID_Art","Label"),c("id","label"))
+
+edges <- lapply(list_graph, function(tbl) (tbl %>% activate(edges) %>% as.data.table()))
+edges <- lapply(edges, function(dt) (dt[, .(Source,Target,weight)]))
+edges <- rbindlist(edges, idcol = "window") %>% 
+  .[, `:=` (id = 1:.N, window = paste0(window, "-", as.integer(window) + (time_window-1)))] %>% 
+  .[window %in% nodes$window[1:3]]
+setnames(edges, c("Source","Target","weight"),c("source","target","size"))
+
+# every identifier in character format for projection
+nodes$id <- as.character(nodes$id)
+edges$source <- as.character(edges$source)
+edges$target <- as.character(edges$target)
+edges$id <- as.character(edges$id)
+
+
+for(i in seq_along(unique(nodes$window))){
+  cat(sprintf("  \n### Network %s \n\n", unique(nodes$window)[i]))
+  cat('\n', '<br>', '\n\n')
+  
+x <- sigmajs() %>% # initialise
+      sg_nodes(nodes[window == nodes$window[i]], id, label, size, color, x, y) %>% # add nodes
+      sg_edges(edges[window == nodes$window[i]], id, source, target, size) %>% # add edges
+      sg_settings(drawLabels = FALSE, drawEdgeLabels = FALSE, 
+                 defaultEdgeType = "curve", minNodeSize = 2, maxNodeSize = 8, 
+                minEdgeSize = 0.5, maxEdgeSize = 3,
+                 borderSize = 0.5, labelHoverBGColor = "node", singleHover = TRUE,
+                 hideEdgesOnMove = TRUE, zoomMin = 0.4, zoomMax = 1.2) %>% 
+      sg_neighbors()
+
+}
+```   
+
+ 
