@@ -9,7 +9,8 @@ package_list <- c(
   "quanteda", "tidytext", "ggraph", "tidygraph",
   "leidenAlg", "reshape2", "scales","RMySQL",
   "ggforce", "directlabels", "patchwork", "DescTools", "DT", 
-  "grid", "ggdendro", "readtext", "pander","RColorBrewer")
+  "grid", "ggdendro", "readtext", "pander","RColorBrewer",
+  "scico","plotly","crosstalk","widgetframe","sigmajs")
 for (p in package_list) {
   if (p %in% installed.packages() == FALSE) {
     install.packages(p, dependencies = TRUE)
@@ -36,3 +37,7 @@ eer_nodes <- fread(paste0(eer_data,"EER_NODES_XP.csv")) %>% as.data.table()
 eer_ref <- fread(paste0(eer_data,"EER_REFS_XP.csv")) %>% as.data.table()
 eer_inst <- fread(paste0(eer_data,"EER_INST_XP.csv")) %>% as.data.table()
 eer_aut <- fread(paste0(eer_data,"EER_AUT_XP.csv")) %>% as.data.table()
+
+########################## Fixing the time_window for all the project ########################
+
+time_window <- 7
