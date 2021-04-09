@@ -32,3 +32,4 @@ library(docstring)
 remove_space <- function(x, replacement = "") str_replace_all(x, " ",replacement) # function to remove white space
 remove_punct <- function(x) str_replace_all(x, "[:punct:]","") # function to remove punctuation
 extract_year <- function(x) str_remove_all(str_extract(x, "\\([:digit:]{4}\\)"), "[\\(\\)]") # extracting the year of a reference when the year is between brackets, then removing the brackets.
+extract_college <- function(x, univ) str_remove(x[str_detect(x, univ)], univ)

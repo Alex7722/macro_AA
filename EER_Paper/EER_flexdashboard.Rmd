@@ -1,5 +1,7 @@
 ---
-title: "EER publications by seven-year periods"
+title: "EER Corpus Dashboard"
+author: "Aurélien Goutsmedt and Alexandre Truc"
+date: "Last compiled on `r format(Sys.Date())`"
 output: 
   flexdashboard::flex_dashboard:
     vertical_layout: scroll
@@ -11,12 +13,32 @@ output:
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, eval = TRUE, include = TRUE)
 ```
 
+```{css zoom-lib-src, echo = FALSE}
+# Follows the css and js script used for allow zooming in graphs
+script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"
+```
+
+```{js zoom-jquery, echo = FALSE}
+ $(document).ready(function() {
+    $('body').prepend('<div class=\"zoomDiv\"><img src=\"\" class=\"zoomImg\"></div>');
+    // onClick function for all plots (img's)
+    $('img:not(.zoomImg)').click(function() {
+      $('.zoomImg').attr('src', $(this).attr('src')).css({width: '100%'});
+      $('.zoomDiv').css({opacity: '1', width: 'auto', border: '1px solid white', borderRadius: '5px', position: 'fixed', top: '50%', left: '50%', marginRight: '-50%', transform: 'translate(-50%, -50%)', boxShadow: '0px 0px 50px #888888', zIndex: '50', overflow: 'auto', maxHeight: '100%'});
+    });
+    // onClick function for zoomImg
+    $('img.zoomImg').click(function() {
+      $('.zoomDiv').css({opacity: '0', width: '0%'}); 
+    });
+  });
+```
+
 ```{r source-and-packages, eval = TRUE}
 library(flexdashboard)
 source("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R")
 source("~/macro_AA/functions/functions_for_network_analysis.R")
 
-institutions <- fread(paste0(data_path,"EER/Corpus_EER/EER_INST_XP.csv", quote="")) %>% data.table
+institutions <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Institutions_cleaned.rds")) %>% data.table
 list_graph <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/list_networks.rds"))
 alluv_dt <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/alluv_dt.rds"))
 alluv_dt <- alluv_dt[share_leiden_max >=0.05 & n_years >= 3][,c("Leiden1","Window","Id")]
@@ -45,12 +67,12 @@ color <- c("#808080",scico(n = length(unique(nodes$Leiden1)) - 1, palette = "rom
 nodes$Leiden1 <- factor(nodes$Leiden1, levels = c(unique(nodes[Leiden1 == "small communities"]$Leiden1), unique(nodes[Leiden1 != "small communities"]$Leiden1)))
 ```
 
-# Page 1
+# Information on the EER corpus
 
-Graphs {data-height=650}
+Graphs {data-height=1000}
 -------------------------------------
 
-### Chart 1
+### Evolution of the networks and the communities over time
 
 ```{r graphs, eval = TRUE}
 plot_ly(nodes, 
@@ -73,7 +95,9 @@ plot_ly(nodes,
   layout(yaxis = list(zeroline = FALSE,
                       showgrid = FALSE),
          xaxis = list(zeroline = FALSE,
-                      showgrid = FALSE)) %>% 
+                      showgrid = FALSE),
+         paper_bgcolor = "black",
+         plot_bgcolor = "black") %>% 
   config(scrollZoom = TRUE) %>% 
   # highlight(on = "plotly_selected", 
   #          selectize = TRUE, 
@@ -86,14 +110,168 @@ plot_ly(nodes,
 #htmlwidgets::saveWidget(graphs,paste0(picture_path,"moving_graphs.html"), selfcontained = FALSE)
 ```
 
-Tables {data-height=650}
+Graphs {.tabset .tabset-pill data-height=1000}
 -------------------------------------
 
-### Chart 2
+### Most recurrent affiliations
+
+```{r top_inst, eval = TRUE, include = TRUE, fig.height= 12}
+
+big_inst_year <- institutions[, `:=` (n = .N), by = "Annee_Bibliographique"] %>% 
+  .[Institution != "NULL", frequency := round(.N/n,2), by = c("Annee_Bibliographique","Institution")] %>% 
+  select(Institution,Annee_Bibliographique,frequency,Type) %>% 
+  filter(Annee_Bibliographique > 1971) %>% # We have some missing data for 1970 and 1971 for now
+  mutate(Annee_Bibliographique = as.numeric(Annee_Bibliographique)) %>%  # useful for plotting later
+  unique()
+
+big_inst <- big_inst_year %>% 
+  group_by(Annee_Bibliographique) %>% 
+  arrange(Annee_Bibliographique,desc(frequency)) %>% 
+  slice(1:2) %>% 
+  select(Institution) %>% 
+  unique()
+
+big_inst_year <- big_inst_year %>% 
+  filter(Institution %in% big_inst$Institution)
+
+ref_table <- data.table("Institution" = rep(unique(big_inst_year$Institution), length(1971:2019)), "Annee_Bibliographique" = rep(1971:2019, each = length(unique(big_inst_year$Institution))))
+big_inst_year <- merge(big_inst_year, ref_table, by = c("Institution","Annee_Bibliographique"), all.y = TRUE) %>% 
+  mutate(frequency = replace(frequency, is.na(frequency), 0))
+big_inst_year <- merge(big_inst_year[,c("Institution","Annee_Bibliographique","frequency")], unique(big_inst_year[!is.na(Type),c("Institution","Type")]), by = "Institution", all.x = TRUE)
+
+big_inst_year <- highlight_key(big_inst_year, ~Type)
+#type_filter <- filter_select(
+#  "Type", "Type of Institution", 
+#  big_inst_year, ~Type
+#)
+
+x <- ggplot(big_inst_year, aes(Annee_Bibliographique, frequency, color = Institution)) +
+#  geom_point() +
+  geom_smooth(se = FALSE, span = 0.3, size = 1.5, alpha = 0.6) +
+  scale_color_scico_d(palette = "roma") +
+  dark_theme_classic()
+
+#bscols(type_filter, highlight(ggplotly(x), "plotly_click"), widths = c(6,6))
+
+type_inst <- institutions[, `:=` (n = .N), by = "Annee_Bibliographique"] %>% 
+  .[Institution != "NULL", frequency := round(.N/n,2), by = c("Annee_Bibliographique","Type")] %>% 
+  select(Annee_Bibliographique,frequency,Type) %>% 
+  filter(Annee_Bibliographique > 1971 & !is.na(Type) & Type != "NA") %>% # We have some missing data for 1970 and 1971 for now
+  mutate(Annee_Bibliographique = as.numeric(Annee_Bibliographique)) %>%  # useful for plotting later
+  unique()
+
+ref_table <- data.table("Type" = rep(unique(type_inst$Type), length(1971:2019)), "Annee_Bibliographique" = rep(1971:2019, each = length(unique(type_inst$Type))))
+type_inst <- merge(type_inst, ref_table, by = c("Type","Annee_Bibliographique"), all.y = TRUE) %>% 
+  mutate(frequency = replace(frequency, is.na(frequency), 0))
+
+type_inst <- highlight_key(type_inst, ~Type)
+
+y <- ggplot(type_inst, aes(Annee_Bibliographique, frequency, color = Type)) +
+#  geom_point() +
+  geom_smooth(se = FALSE, span = 0.3, size = 1.5, alpha = 0.6, show.legend = FALSE) +
+  scale_color_scico_d(palette = "vik", begin = 0.1) +
+  dark_theme_classic()
+
+#ggplotly(y)
+
+subplot(style(highlight(ggplotly(y), "plotly_click"), showlegend = FALSE),highlight(ggplotly(x), "plotly_click"), nrows = 2)
+```
+
+### Authors' country affiliation
+
+```{r top_country-1, eval = TRUE}
+# We calculate here the share of authors for the biggest countries
+
+count_year <- institutions[,n_inst_tot:=.N, Pays][order(-n_inst_tot)]
+count_year <- count_year[n_inst_tot<200, Pays:="OTHER"]
+count_year <- count_year[, nb_aut_country:=.N, .(Annee_Bibliographique, Pays)]
+count_year <- count_year %>% 
+  mutate(Annee_Bibliographique = as.numeric(Annee_Bibliographique),
+         Pays = fct_rev(fct_infreq(Pays)))
+
+count_year <- highlight_key(count_year, ~Countries_grouped)
+x <- ggplot(count_year, aes(Annee_Bibliographique, after_stat(count), fill = Pays)) +
+  geom_density(position = "fill") +
+  labs(fill = "Countries (Top 7)") +
+  scale_x_continuous("Years") +
+  scale_y_continuous("Countries Identified by Unique Institution by Paper") +
+  scale_fill_scico_d(palette = "hawaii", end = 1, direction = 1) +
+  dark_theme_classic()
+
+# We calculate here the share of authors for different grouped countries (EUROPE, USA and OTHER)
+count_year_group <- institutions[,n_inst_tot:=.N, Countries_grouped][order(-n_inst_tot)]
+count_year_group <- count_year_group[n_inst_tot<300, Countries_grouped:="OTHER"]
+count_year_group <- count_year_group[, nb_aut_country:=.N, .(Annee_Bibliographique, Countries_grouped)]
+count_year_group <- count_year_group %>% 
+  mutate(Annee_Bibliographique = as.numeric(Annee_Bibliographique),
+         Countries_grouped = fct_rev(fct_infreq(Countries_grouped)))
+
+count_year_group <- highlight_key(count_year_group, ~Countries_grouped)
+y <- ggplot(count_year_group, aes(Annee_Bibliographique, after_stat(count), fill = Countries_grouped)) +
+  geom_density(position = "fill") +
+  labs(fill = "Countries (Grouped)") +
+  scale_x_continuous("Years") +
+  scale_y_continuous("Countries Identified by Unique Institution by Paper") +
+  scale_fill_scico_d(palette = "lapaz", end = 0.9, direction = -1) +
+  dark_theme_classic()
+
+subplot(highlight(ggplotly(y), "plotly_click"),highlight(ggplotly(x), "plotly_click"))
+
+```
+
+# Window-network information
+
+Sigma{.tabset .tabset-pill .tabset-fade data-height=1100}
+-------------------------------------
+
+```{r ggraph-project, include = TRUE, eval = FALSE, results='asis'}
+# adding window value directly within graphs
+for(i in seq_along(list_graph)){
+list_graph[[i]] <- list_graph[[i]] %>% activate(nodes) %>% mutate(window = paste0(names(list_graph[i]),"-",as.integer(names(list_graph[i])) + (time_window-1)))
+}
+
+color_com <- data.table("Leiden1" = levels(nodes$Leiden1),"color" = color)
+color_com <- merge(nodes[,c("Leiden1","ID_Art","window")], color_com, by = "Leiden1")
+color_com[color == "gray"]$color <- "#808080"
+
+for(i in seq_along(list_graph)){
+list_graph[[i]] <- list_graph[[i]] %>% activate(nodes) %>% left_join(color_com[window == unique(color_com[order(window)]$window)[i]])
+list_graph[[i]] <- list_graph[[i]] %>% activate(nodes) %>% mutate(color = replace(color, is.na(color), "gray"))
+
+x <- ggraph(list_graph[[i]], "manual", x = x, y = y) + 
+  geom_edge_arc(aes(width = weight, color = node1.color), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
+  scale_edge_color_identity() +
+  scale_edge_width_continuous(range = c(0.1,2)) +
+  geom_point(aes(x = x, y = y, size = size, fill = color), pch = 21, alpha = 0.9, show.legend = FALSE) +
+  scale_size_continuous(range = c(0.5,5)) +
+  scale_fill_identity() +
+  #new_scale("size") +
+ # geom_text(data=top_nodes, aes(x=x, y=y, label = Author_date), size = 3, fontface="bold", alpha = 1, show.legend = FALSE) +
+  #scale_size_continuous(range = c(0.5,5)) +
+  dark_theme_void() +
+  ggsave(paste0(picture_path,"graph_", unique(V(list_graph[[i]])$window),".png"), height = 8, width = 11, units = "cm")
+}
+```
+
+
+```{r include-graph, eval = TRUE, include = TRUE, results = "asis"}
+#picture_path <- "/home/aurelien/macro_AA/EER_Paper/Pictures/"
+for(i in unique(nodes[order(window)]$window)){
+  cat(sprintf("  \n### %s \n\n", i))
+  cat('\n', '<br>', '\n\n')
+  
+  cat(paste0("<div style=\"width:100px; height:80px; text-align:center\">\n![](", picture_path, "graph_", i,".png)\n</div>"), "\n")
+}
+```
+
+Tables {.tabset .tabset-pill .tabset-fade data-height=550}
+-------------------------------------
+
+### Most recurrent institutions and countries
 
 ```{r institutions, eval = TRUE}
 inst_by_window <- merge(nodes_lf[, c("ID_Art","window")],
-                      institutions[, ID_Art := as.character(ID_Art)][, c("ID_Art","Institution","Pays","Ordre")], 
+                      institutions[, ID_Art := as.character(ID_Art)][, c("ID_Art","Institution","Pays")], 
                       by = "ID_Art", allow.cartesian = TRUE)
 
 inst_by_window[, window := paste0(window, "-", as.integer(window) + 6)]
@@ -128,48 +306,20 @@ inst_by_window <- rbind(n_inst,n_country) %>% as.data.table()
 sd <- SharedData$new(inst_by_window)
 
 # Create a filter input
-bscols(widths = c(4,NA),
-  list(filter_checkbox(id = "window", label = "Window", sharedData = sd, group = ~window, columns = 3),
-  filter_checkbox("type", "Institution or Country", sd, ~type, columns = 2)),
+bscols(widths = c(3,NA),
+  list(filter_select("window", "Window", sd, ~window),
+  filter_select("type", "Institution or Country", sd, ~type),
+  filter_select("entity", "Institution or Country Name", sd, ~entity),
+  filter_slider("frequency","Share over all affiliations", sd, ~frequency)),
   datatable(sd, extensions="Scroller", width="100%", class = "compact",
-            options=list(deferRender=TRUE, scrollY=600, scroller=TRUE))
+            options=list(deferRender=TRUE, scrollY=500, scroller=TRUE))
 )
 
 ```
 
-# Page 2
-
-Sigma{.tabset}
--------------------------------------
-
-```{r ggraph-project, include = TRUE, eval = FALSE, results='asis'}
-color_com <- data.table("Leiden1" = levels(nodes$Leiden1),"color" = color)
-color_com <- merge(nodes[,c("Leiden1","ID_Art","window")], color_com, by = "Leiden1")
-color_com[color == "gray"]$color <- "#808080"
-
-for(i in seq_along(unique(nodes[order(window)]$window))){
-  cat(sprintf("  \n### Network %s \n\n", unique(nodes[order(window)]$window)[i]))
-  cat('\n', '<br>', '\n\n')
-
-list_graph[[i]] <- list_graph[[i]] %>% activate(nodes) %>% left_join(color_com[window == unique(color_com[order(window)]$window)[i]])
-
-x <- ggraph(list_graph[[i]], "manual", x = x, y = y) + 
-  geom_edge_arc(aes(width = weight), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
-  scale_edge_width_continuous(range = c(0.1,2)) +
-  geom_point(aes(x = x, y = y, size = size, fill = color), pch = 21, alpha = 0.9, show.legend = FALSE) +
-  scale_size_continuous(range = c(1,13)) +
-  scale_fill_identity() +
-  new_scale("size") +
- # geom_text(data=top_nodes, aes(x=x, y=y, label = Author_date), size = 3, fontface="bold", alpha = 1, show.legend = FALSE) +
-  scale_size_continuous(range = c(0.5,5)) +
-  theme_void()
-
-plot(x)
-
-}
-```
 
 
+# Information on communities
 
 ```{r sigma-projection, eval = FALSE, results='asis', include= TRUE}
 # NOT WORKING: the chunk is working but the results are not projected (even if projected if we do it one by one)
@@ -209,4 +359,3 @@ x <- sigmajs() %>% # initialise
 }
 ```   
 
- 
