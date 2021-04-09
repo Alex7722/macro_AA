@@ -10,7 +10,8 @@ package_list <- c(
   "leidenAlg", "reshape2", "scales","RMySQL",
   "ggforce", "directlabels", "patchwork", "DescTools", "DT", 
   "grid", "ggdendro", "readtext", "pander","RColorBrewer",
-  "scico","plotly","crosstalk","widgetframe","sigmajs")
+  "scico","plotly","crosstalk","widgetframe","sigmajs",
+  "ggdark")
 for (p in package_list) {
   if (p %in% installed.packages() == FALSE) {
     install.packages(p, dependencies = TRUE)
