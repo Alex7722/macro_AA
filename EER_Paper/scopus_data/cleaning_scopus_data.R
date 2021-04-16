@@ -237,8 +237,6 @@ scopus_art %<>%
 #' 
 #' 
 
-saveRDS(scopus_art[,c("temp_id","author","order")], paste0(eer_data,"scopus_authors.RDS"))
-
 scopus_inst <- scopus_art[order == 1][,c("temp_id","affiliation.affiliation")]
 scopus_art <- scopus_art[order == 1][, -c("id","order","affiliation.affiliation")]
  
@@ -255,6 +253,9 @@ scopus_art[, `:=` (title = toupper(title), # useful for later
             Number = str_extract(info, "([:digit:]{1})"),
             Pages = str_remove(str_remove(str_extract(info, "pp.*"), "pp. "), "\\."))] # We first extract the number following pp., then we remove pp. and the final point.
 
+# removing doublons for 1970 (actually they are in WoS)
+scopus_art_1970 <- scopus_art[Annee_Bibliographique == 1970]$temp_id
+scopus_art <- scopus_art[Annee_Bibliographique != 1970]
 #' The `scopus_art` is now clean, and we can save it !
 saveRDS(scopus_art[,-"info"], paste0(eer_data,"scopus_articles.RDS"))
 
@@ -702,5 +703,6 @@ scopus_ref[author == "Belassa"]$author <- "Balassa"
 #' - One with all the authors (just in case)
 #' - One with just the first author, as we have in WoS.
 
+scopus_ref <- scopus_ref[! temp_id %in% scopus_art_1970]
 saveRDS(scopus_ref, paste0(eer_data,"scopus_references_extended.RDS"))
 saveRDS(scopus_ref[order == 1], paste0(eer_data,"scopus_references.RDS"))

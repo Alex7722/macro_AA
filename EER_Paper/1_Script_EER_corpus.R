@@ -19,11 +19,8 @@
 #+ r setup, include = FALSE
 knitr::opts_chunk$set(eval = FALSE)
 
-library(data.table)
-library(magrittr)
 library(RMySQL)
-library(dplyr)
-library(stringr)
+source("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R")
 pswd = 'alex55Truc!1epistemo'
 usr = 'alexandre'
 ESH <- dbConnect(MySQL(), user=usr, password=pswd, dbname='OST_Expanded_SciHum',
@@ -278,3 +275,30 @@ saveRDS(Institutions, file = "EER/1_Corpus_Prepped_and_Merged/Institutions.rds")
 saveRDS(Authors, file = "EER/1_Corpus_Prepped_and_Merged/Authors.rds")
 saveRDS(refs, file = "EER/1_Corpus_Prepped_and_Merged/Refs.rds")
 
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Last steps of cleaning ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+#' We need to remove the doublons between WoS and scopus articles. We first load 
+#' WoS articles and check for the dates
+#' 
+
+
+Corpus <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpus.rds"))
+remove_id <- Corpus[Annee_Bibliographique == 1970 & str_detect(ID_Art, "S")]$ID_Art
+Corpus <- Corpus[!ID_Art %in% remove_id]
+
+refs <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Refs.rds")) %>% 
+  mutate(Titre = toupper(Titre)) %>% 
+  as.data.table()
+refs <- refs[!ID_Art_Source %in% remove_id]
+
+Authors <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Authors.rds"))
+Authors <- Authors[!ID_Art %in% remove_id]
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Saving bis ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+saveRDS(Corpus, file = paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpus.rds"))
+saveRDS(Authors, file = paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Authors.rds"))
+saveRDS(refs, file = paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Refs.rds"))
