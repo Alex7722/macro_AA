@@ -39,6 +39,16 @@ eer_ref <- fread(paste0(eer_data,"EER_REFS_XP.csv")) %>% as.data.table()
 eer_inst <- fread(paste0(eer_data,"EER_INST_XP.csv")) %>% as.data.table()
 eer_aut <- fread(paste0(eer_data,"EER_AUT_XP.csv")) %>% as.data.table()
 
+nodes_JEL <- readRDS(paste0(data_path, "Corpus_Econlit_Matched_WoS/JEL_matched_corpus_nodes.rds"))
+nodes_old_JEL <- readRDS(paste0(data_path, "Corpus_Econlit_Matched_WoS/Old_JEL_matched_corpus_nodes.rds"))
+nodes_JEL <- rbind(nodes_JEL, nodes_old_JEL)
+rm("nodes_old_JEL")
+
+edges_JEL <- readRDS(paste0(data_path, "Corpus_Econlit_Matched_WoS/JEL_matched_corpus_edges.rds"))
+edges_old_JEL <- readRDS(paste0(data_path, "Corpus_Econlit_Matched_WoS/Old_JEL_matched_corpus_edges.rds"))
+edges_JEL <- rbind(edges_JEL, edges_old_JEL)
+rm("edges_old_JEL")
+
 ########################## Fixing the time_window for all the project ########################
 
 time_window <- 7
