@@ -36,37 +36,25 @@ scopus <- read_delim(paste0(eer_data,"EER_scopus_abstract.txt"), "\t", escape_do
 #' ## Cleaning the .txt file
 #' We need first to extract the relevant lines to put them in a data frame (authors, title, volume, number, pages, year, abstracts).
 #' 
-#' ### removing useless lines.
-#' 
-#' This step is not absolutely necessary, but it helps us to have a cleaner text, and to focus on the relevant information
-remove_lines <- c("ISSN",
-                  "LANGUAGE OF",
-                  "ABBREVIATED SOURCE",
-                  "DOCUMENT TYPE",
-                  "PUBLICATION STAGE",
-                  "DOI",
-                  "SOURCE",
-                  "OPEN ACCESS",
-                  "https:",
-                  "CORRESPONDENCE ADDRESS",
-                  "FUNDING ",
-                  "INDEX KEYWORDS")
-
-delete <- which(str_detect(scopus$Scopus, pattern = paste0(remove_lines, collapse = "|")))
-scopus <- scopus[-delete]
-
-#' ### identifying the relevant information to put them in a data frame
-#' 
-#' This data frame will be the list of our scopus articles for the four missing years.
 #' 
 #' #### Identifying ids
-scopus$id <- str_detect(scopus$Scopus, pattern = "^[:digit:]{8,}") # We need this to identify the name then
+#' Each time you find a series of number, you add one to a column name `temp_id`, what allows you 
+#' to identify each article (you just need to move it one row above to integrate the name of authors
+#' which is above the serie of numbers).
+
+temp_id <- scopus %>% 
+  mutate(temp_id = cumsum(str_detect(scopus$Scopus, pattern = "^[:digit:]{8,}"))) %>% 
+  select(temp_id)
+  
+scopus <- scopus %>% 
+  mutate(temp_id = c(temp_id[-1]$temp_id,max(temp_id)))
 
 #' #### Identifying authors
+scopus$id <- str_detect(scopus$Scopus, pattern = "^[:digit:]{8,}") # We need this to identify the authors then
 name <- which(scopus$id == TRUE) - 1 # this saves the position in the text of authors names (one line above the id)
 
-scopus$author <- FALSE # useful later for abstracts
-scopus[name]$author <- TRUE
+#scopus$author <- FALSE # useful later for abstracts
+#scopus[name]$author <- TRUE
 #' #### identifying title
 titre <- which(scopus$id == TRUE) + 1
 
@@ -75,44 +63,24 @@ info <- which(scopus$id == TRUE) + 2
 
 #' #### Extracting abstracts
 #' 
-#' All the abstracts are one unique line, which makes it simple. But the problem is that not all
-#' articles have an abstract. We should thus detect article with and without abstract. We only keep
-#' the lines of authors and the line of abstract. The strategy is simple: we take a line with authors and
-#' if the next line is not an abstract (meaning that is rather the authors of the next article), it means
-#' that the article has no abstract and we register that. At the end with have a data table with the name of authors
-#' of articles with an abstract, and the corresponding abstract.
+#' You don't have an abstract for each article, so we extract the id of the articles with an abstract,
+#' and the corresponding abstract, to merge them just after.
 
 abstract <- which(str_detect(scopus$Scopus, pattern = "ABSTRACT"))
-scopus[abstract, abstract_line := TRUE]
-scopus[is.na(abstract_line)]$abstract_line <- FALSE
+abstract_list <- data.table(temp_id = scopus[abstract]$temp_id, abstract = scopus[abstract]$Scopus)
 
-extract_abstract <- scopus[abstract_line == TRUE | author == TRUE, -c("id")]
-extract_abstract$abstract_check <- NA
-
-for(i in seq_along(extract_abstract$abstract_line)){
-  if(extract_abstract$author[i] == TRUE){
-    if(extract_abstract$abstract_line[i+1] == TRUE){
-      extract_abstract$abstract_check[i] <- TRUE
-    } else {
-      extract_abstract$abstract_check[i] <- FALSE
-    }
-  }
-}
-
-abstract_list <- data.table("author" = extract_abstract[abstract_check == TRUE]$Scopus,
-                            "abstract" = extract_abstract[abstract_line == TRUE]$Scopus)
 
 #' #### Creating the data frame of articles
 #' 
 #' We extract the information we need for each article and merge with the abstracts. As we are
 #' interest in abstract content, we don't take articles without abstracts. 
 
-scopus_art <- data.table("temp_id" = 1:length(scopus[id == TRUE]$Scopus),
+scopus_art <- data.table("temp_id" = unique(scopus$temp_id),
                          "author" = scopus[name]$Scopus, 
                          "title" = scopus[titre]$Scopus,
                          "info" = scopus[info]$Scopus)
 
-scopus_art <- merge(scopus_art,abstract_list, by = "author")
+scopus_art <- merge(scopus_art,abstract_list, by = "temp_id", all.x = TRUE)
 
 #' We remove the lines which are articles from the "European Economic Review of Economic History",
 #' and not from the EER.
@@ -150,22 +118,39 @@ if(length(test$surname_1) > 0){
   message("No missing values for initials")
 }
 
+scopus_art[surname_1 == test$surname_1]$initial_1  <- "S"
+scopus_art[surname_1 == test$surname_1]$surname_1  <- "Telphlluch"
+
 #' we now want to create authors column like in WoS
 # cleaning by removing space, punctuation, and fusioning surnames and initials
 scopus_art <- scopus_art %>% 
   select(temp_id, title, info, surname_1, initial_1, info, abstract) %>%
-  mutate(across(contains("surname"), ~ remove_space(.x, replacement = "-")),
+  mutate(across(contains("surname"), ~ remove_punct(remove_space(.x, replacement = "-"))),
          across(contains("initial"), ~ remove_punct(remove_space(.x))),
-         across(contains("surname"), ~ str_replace(.x,"^-",""))) %>% 
-  .[, author := paste0(surname_1,"-",initial_1)] %>% 
+         across(contains("surname"), ~ str_replace(.x,"^-","")),
+         across(contains("initial"), ~ str_extract(.x, "^[A-z]{1}"))) %>% 
+  .[, Nom_ISI := toupper(paste0(surname_1,"-",initial_1))] %>% 
   .[, -..name_column[1:2]]
+
+#' We need to replace special characters by "normal" characters, as in 
+#' WoS.
+#' 
+special_character <- c("Ø","Ó","Ö","Ä","È","É","Ñ","Í","Ü")
+normal_character <- c("O","O","O","A","E","E","N","I","U")
+
+for(i in seq_along(special_character)){
+scopus_art <- scopus_art %>% 
+  mutate(Nom_ISI, str_replace_all(Nom_ISI, special_character[i], normal_character[i]))
+}
+
+#' we now need to remove any punctuation character in the name.
 
 #' ### Cleaning `scopus_art`
 #' 
 #' We need to put the year, the Review (which is the same in our case), the volume, the number, and the 
 #' pages in separated columns, and delete the number of citations.
 
-scopus_art[, `:=` (title = toupper(title), # useful for later
+scopus_art[, `:=` (Titre = toupper(title), # useful for later
                    Annee_Bibliographique = extract_year(info),
                    Journal = "European Economic Review",
                    info = str_remove(str_remove(info, ".*Review, "), ". Cited .*"))] %>% 
@@ -173,5 +158,9 @@ scopus_art[, `:=` (title = toupper(title), # useful for later
             Issue = str_remove_all(str_extract(info, "\\([:digit:]{1,2}\\)|\\([:digit:]{1}-[:digit:]{1}\\)"),"[\\(\\)]"),
             Pages = str_remove(str_remove(str_extract(info, "pp.*"), "pp. "), "\\."))] # We first extract the number following pp., then we remove pp. and the final point.
 
+#' Removing what are not articles
+not_article <- c("TREASURER","COMMITTEE","SECRETARY","CHAIRMAN","EDITORS","PRESIDENT")
+scopus_art <- scopus_art[!(str_detect(Titre, "REPORT") & str_detect(Titre, paste0(not_article, collapse = "|")))]
+
 #' The `scopus_art` is now clean, and we can save it !
-saveRDS(scopus_art[,c("temp_id","author","Annee_Bibliographique","Journal","Volume","Issue","Pages","abstract")], paste0(eer_data,"scopus_abstract.RDS"))
+saveRDS(scopus_art[,c("temp_id","Nom_ISI","Annee_Bibliographique","Titre","Journal","Volume","Issue","Pages","abstract")], paste0(eer_data,"scopus_abstract.RDS"))

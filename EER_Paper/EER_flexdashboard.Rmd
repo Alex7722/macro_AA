@@ -39,6 +39,8 @@ library(flexdashboard)
 source("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R")
 source("~/macro_AA/functions/functions_for_network_analysis.R")
 
+generate_png = TRUE # choosing if you want to recreate the png of the different graphs or just use those already created
+
 institutions <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Institutions_cleaned.rds")) %>% data.table
 list_graph <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/list_networks.rds"))
 Corpus <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpus.rds"))
@@ -302,7 +304,7 @@ plot_ly(ref_over_time,
 network png {.tabset .tabset-pill .tabset-fade data-height=1100}
 -------------------------------------
 
-```{r ggraph-project, include = TRUE, eval = FALSE, results='asis'}
+```{r ggraph-png, include = TRUE, eval = generate_png, results='asis'}
 # adding window value directly within graphs
 for(i in seq_along(list_graph)){
 list_graph[[i]] <- list_graph[[i]] %>% activate(nodes) %>% mutate(window = paste0(names(list_graph[i]),"-",as.integer(names(list_graph[i])) + (time_window-1)))

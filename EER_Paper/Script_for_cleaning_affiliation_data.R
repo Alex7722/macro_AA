@@ -428,7 +428,8 @@ network <- c("CEPR",
              "OFCE",
              "CIRANO",
              "NESTPAR",
-             "RAND-CORP")
+             "RAND-CORP",
+             "CTR-PLANNING-&-ECON-RES")
 
 inst_type[(str_detect(Institution, "INST|FDN-|-FDN") |
             Institution %in% network) &

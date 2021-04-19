@@ -1,17 +1,22 @@
 Script for extracting abstracts of EER articles from scopus
 ================
 Aurélien Goutsmedt
-/ Last compiled on 2021-04-01
+/ Last compiled on 2021-04-16
 
   - [1 What is this script for?](#what-is-this-script-for)
   - [2 Loading packages, paths and
     data](#loading-packages-paths-and-data)
   - [3 Cleaning scopus data](#cleaning-scopus-data)
       - [3.1 Cleaning the .txt file](#cleaning-the-txt-file)
-          - [3.1.1 removing useless lines.](#removing-useless-lines)
-          - [3.1.2 identifying the relevant information to put them in a
-            data
-            frame](#identifying-the-relevant-information-to-put-them-in-a-data-frame)
+          - [3.1.0.1 Identifying ids](#identifying-ids)
+          - [3.1.0.2 Identifying authors](#identifying-authors)
+          - [3.1.0.3 identifying title](#identifying-title)
+          - [3.1.0.4 Identifying informations on the article (journal,
+            volume,
+            etc.)](#identifying-informations-on-the-article-journal-volume-etc)
+          - [3.1.0.5 Extracting abstracts](#extracting-abstracts)
+          - [3.1.0.6 Creating the data frame of
+            articles](#creating-the-data-frame-of-articles)
       - [3.2 Cleaning the corpus](#cleaning-the-corpus)
           - [3.2.1 Cleaning `author`](#cleaning-author)
           - [3.2.2 Cleaning `scopus_art`](#cleaning-scopus_art)
@@ -45,108 +50,68 @@ scopus <- read_delim(paste0(eer_data,"EER_scopus_abstract.txt"), "\t", escape_do
 We need first to extract the relevant lines to put them in a data frame
 (authors, title, volume, number, pages, year, abstracts).
 
-### 3.1.1 removing useless lines.
+#### 3.1.0.1 Identifying ids
 
-This step is not absolutely necessary, but it helps us to have a cleaner
-text, and to focus on the relevant information
+Each time you find a series of number, you add one to a column name
+`temp_id`, what allows you to identify each article (you just need to
+move it one row above to integrate the name of authors which is above
+the serie of numbers).
 
 ``` r
-remove_lines <- c("ISSN",
-                  "LANGUAGE OF",
-                  "ABBREVIATED SOURCE",
-                  "DOCUMENT TYPE",
-                  "PUBLICATION STAGE",
-                  "DOI",
-                  "SOURCE",
-                  "OPEN ACCESS",
-                  "https:",
-                  "CORRESPONDENCE ADDRESS",
-                  "FUNDING ",
-                  "INDEX KEYWORDS")
-
-delete <- which(str_detect(scopus$Scopus, pattern = paste0(remove_lines, collapse = "|")))
-scopus <- scopus[-delete]
+temp_id <- scopus %>% 
+  mutate(temp_id = cumsum(str_detect(scopus$Scopus, pattern = "^[:digit:]{8,}"))) %>% 
+  select(temp_id)
+  
+scopus <- scopus %>% 
+  mutate(temp_id = c(temp_id[-1]$temp_id,max(temp_id)))
 ```
 
-### 3.1.2 identifying the relevant information to put them in a data frame
-
-This data frame will be the list of our scopus articles for the four
-missing years.
-
-#### 3.1.2.1 Identifying ids
+#### 3.1.0.2 Identifying authors
 
 ``` r
-scopus$id <- str_detect(scopus$Scopus, pattern = "^[:digit:]{8,}") # We need this to identify the name then
-```
-
-#### 3.1.2.2 Identifying authors
-
-``` r
+scopus$id <- str_detect(scopus$Scopus, pattern = "^[:digit:]{8,}") # We need this to identify the authors then
 name <- which(scopus$id == TRUE) - 1 # this saves the position in the text of authors names (one line above the id)
 
-scopus$author <- FALSE # useful later for abstracts
-scopus[name]$author <- TRUE
+#scopus$author <- FALSE # useful later for abstracts
+#scopus[name]$author <- TRUE
 ```
 
-#### 3.1.2.3 identifying title
+#### 3.1.0.3 identifying title
 
 ``` r
 titre <- which(scopus$id == TRUE) + 1
 ```
 
-#### 3.1.2.4 Identifying informations on the article (journal, volume, etc.)
+#### 3.1.0.4 Identifying informations on the article (journal, volume, etc.)
 
 ``` r
 info <- which(scopus$id == TRUE) + 2
 ```
 
-#### 3.1.2.5 Extracting abstracts
+#### 3.1.0.5 Extracting abstracts
 
-All the abstracts are one unique line, which makes it simple. But the
-problem is that not all articles have an abstract. We should thus detect
-article with and without abstract. We only keep the lines of authors and
-the line of abstract. The strategy is simple: we take a line with
-authors and if the next line is not an abstract (meaning that is rather
-the authors of the next article), it means that the article has no
-abstract and we register that. At the end with have a data table with
-the name of authors of articles with an abstract, and the corresponding
-abstract.
+You don’t have an abstract for each article, so we extract the id of the
+articles with an abstract, and the corresponding abstract, to merge them
+just after.
 
 ``` r
 abstract <- which(str_detect(scopus$Scopus, pattern = "ABSTRACT"))
-scopus[abstract, abstract_line := TRUE]
-scopus[is.na(abstract_line)]$abstract_line <- FALSE
-
-extract_abstract <- scopus[abstract_line == TRUE | author == TRUE, -c("id")]
-extract_abstract$abstract_check <- NA
-
-for(i in seq_along(extract_abstract$abstract_line)){
-  if(extract_abstract$author[i] == TRUE){
-    if(extract_abstract$abstract_line[i+1] == TRUE){
-      extract_abstract$abstract_check[i] <- TRUE
-    } else {
-      extract_abstract$abstract_check[i] <- FALSE
-    }
-  }
-}
-
-abstract_list <- data.table("author" = extract_abstract[abstract_check == TRUE]$Scopus,
-                            "abstract" = extract_abstract[abstract_line == TRUE]$Scopus)
+abstract_list <- data.table(temp_id = scopus[abstract]$temp_id, abstract = scopus[abstract]$Scopus)
 ```
 
-#### 3.1.2.6 Creating the data frame of articles
+#### 3.1.0.6 Creating the data frame of articles
 
 We extract the information we need for each article and merge with the
 abstracts. As we are interest in abstract content, we don’t take
 articles without abstracts.
 
 ``` r
-scopus_art <- data.table("temp_id" = 1:length(scopus[id == TRUE]$Scopus),
+scopus_art <- data.table("temp_id" = unique(scopus$temp_id),
                          "author" = scopus[name]$Scopus, 
                          "title" = scopus[titre]$Scopus,
                          "info" = scopus[info]$Scopus)
 
-scopus_art <- merge(scopus_art,abstract_list, by = "author")
+scopus_art <- merge(scopus_art,abstract_list, by = "temp_id", all.x = TRUE)
 ```
 
 We remove the lines which are articles from the “European Economic
@@ -226,5 +191,5 @@ scopus_art[, `:=` (title = toupper(title), # useful for later
 The `scopus_art` is now clean, and we can save it \!
 
 ``` r
-saveRDS(scopus_art[,c("temp_id","author","Annee_Bibliographique","Journal","Volume","Issue","Pages","abstract")], paste0(eer_data,"scopus_abstract.RDS"))
+saveRDS(scopus_art[,c("temp_id","author","Annee_Bibliographique","title","Journal","Volume","Issue","Pages","abstract")], paste0(eer_data,"scopus_abstract.RDS"))
 ```
