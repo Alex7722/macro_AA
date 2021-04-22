@@ -416,3 +416,4 @@ Corpus <- merge(Corpus, merge_corpus, by = "ID_Art", all.x = TRUE)
 saveRDS(Corpus, file = paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpus.rds"))
 saveRDS(Authors, file = paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Authors.rds"))
 saveRDS(refs, file = paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Refs.rds"))
+

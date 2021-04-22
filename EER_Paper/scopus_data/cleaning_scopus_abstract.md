@@ -1,7 +1,7 @@
 Script for extracting abstracts of EER articles from scopus
 ================
 Aurélien Goutsmedt
-/ Last compiled on 2021-04-16
+/ Last compiled on 2021-04-20
 
   - [1 What is this script for?](#what-is-this-script-for)
   - [2 Loading packages, paths and
@@ -19,7 +19,6 @@ Aurélien Goutsmedt
             articles](#creating-the-data-frame-of-articles)
       - [3.2 Cleaning the corpus](#cleaning-the-corpus)
           - [3.2.1 Cleaning `author`](#cleaning-author)
-          - [3.2.2 Cleaning `scopus_art`](#cleaning-scopus_art)
 
 # 1 What is this script for?
 
@@ -157,6 +156,9 @@ if(length(test$surname_1) > 0){
 } else {
   message("No missing values for initials")
 }
+
+scopus_art[surname_1 == test$surname_1]$initial_1  <- "S"
+scopus_art[surname_1 == test$surname_1]$surname_1  <- "Telphlluch"
 ```
 
 we now want to create authors column like in WoS
@@ -165,21 +167,35 @@ we now want to create authors column like in WoS
 # cleaning by removing space, punctuation, and fusioning surnames and initials
 scopus_art <- scopus_art %>% 
   select(temp_id, title, info, surname_1, initial_1, info, abstract) %>%
-  mutate(across(contains("surname"), ~ remove_space(.x, replacement = "-")),
+  mutate(across(contains("surname"), ~ remove_punct(remove_space(.x, replacement = "-"))),
          across(contains("initial"), ~ remove_punct(remove_space(.x))),
-         across(contains("surname"), ~ str_replace(.x,"^-",""))) %>% 
-  .[, author := paste0(surname_1,"-",initial_1)] %>% 
+         across(contains("surname"), ~ str_replace(.x,"^-","")),
+         across(contains("initial"), ~ str_extract(.x, "^[A-z]{1}"))) %>% 
+  .[, Nom_ISI := toupper(paste0(surname_1,"-",initial_1))] %>% 
   .[, -..name_column[1:2]]
 ```
 
-### 3.2.2 Cleaning `scopus_art`
+We need to replace special characters by “normal” characters, as in WoS.
+
+``` r
+special_character <- c("Ø","Ó","Ö","Ä","È","É","Ç","Ñ","Í","Ü")
+normal_character <- c("O","O","O","A","E","E","C","N","I","U")
+
+for(i in seq_along(special_character)){
+scopus_art <- scopus_art %>% 
+  mutate(Nom_ISI = str_replace_all(Nom_ISI, special_character[i], normal_character[i]))
+}
+```
+
+we now need to remove any punctuation character in the name. \#\#\#
+Cleaning `scopus_art`
 
 We need to put the year, the Review (which is the same in our case), the
 volume, the number, and the pages in separated columns, and delete the
 number of citations.
 
 ``` r
-scopus_art[, `:=` (title = toupper(title), # useful for later
+scopus_art[, `:=` (Titre = toupper(title), # useful for later
                    Annee_Bibliographique = extract_year(info),
                    Journal = "European Economic Review",
                    info = str_remove(str_remove(info, ".*Review, "), ". Cited .*"))] %>% 
@@ -188,8 +204,15 @@ scopus_art[, `:=` (title = toupper(title), # useful for later
             Pages = str_remove(str_remove(str_extract(info, "pp.*"), "pp. "), "\\."))] # We first extract the number following pp., then we remove pp. and the final point.
 ```
 
+Removing what are not articles
+
+``` r
+not_article <- c("TREASURER","COMMITTEE","SECRETARY","CHAIRMAN","EDITORS","PRESIDENT")
+scopus_art <- scopus_art[!(str_detect(Titre, "REPORT") & str_detect(Titre, paste0(not_article, collapse = "|")))]
+```
+
 The `scopus_art` is now clean, and we can save it \!
 
 ``` r
-saveRDS(scopus_art[,c("temp_id","author","Annee_Bibliographique","title","Journal","Volume","Issue","Pages","abstract")], paste0(eer_data,"scopus_abstract.RDS"))
+saveRDS(scopus_art[,c("temp_id","Nom_ISI","Annee_Bibliographique","Titre","Journal","Volume","Issue","Pages","abstract")], paste0(eer_data,"scopus_abstract.RDS"))
 ```

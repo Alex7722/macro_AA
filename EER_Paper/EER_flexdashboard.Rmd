@@ -39,7 +39,7 @@ library(flexdashboard)
 source("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R")
 source("~/macro_AA/functions/functions_for_network_analysis.R")
 
-generate_png = TRUE # choosing if you want to recreate the png of the different graphs or just use those already created
+generate_png = FALSE # choosing if you want to recreate the png of the different graphs or just use those already created
 
 institutions <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Institutions_cleaned.rds")) %>% data.table
 list_graph <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/list_networks.rds"))
@@ -49,7 +49,11 @@ Refs <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Refs.rds")) %>
   mutate(Titre = toupper(Titre)) %>% 
   as.data.table()
 alluv_dt <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/alluv_dt.rds"))
+alluv_with_abstract <- merge(alluv_dt, Corpus[, c("Id","abstract")], by = "Id") %>% 
+  .[share_leiden_max >=0.05 & n_years >= 3] %>%
+  unite("words", Titre, abstract, sep = " ")
 alluv_dt <- alluv_dt[share_leiden_max >=0.05 & n_years >= 3][,c("Leiden1","Window","Id")]
+
 ```
 
 ```{r prepare-data, eval = TRUE}
@@ -298,6 +302,65 @@ plot_ly(ref_over_time,
 
 ```
 
+### Most recurrent words
+
+```{r words, eval = TRUE}
+words_over_time <- alluv_with_abstract %>%
+  select(Id, Window, words) %>% 
+  unique() %>% 
+  unnest_tokens(word, words) %>% 
+  anti_join(stop_words) %>% 
+  as.data.table()
+
+words_over_time <- words_over_time[, word := textstem::lemmatize_words(word)] %>% 
+  .[, total_window := .N, by = "Window"] %>% 
+  .[, proportion := round(.N/total_window,5), by = c("Window","word")] %>% 
+  .[, -"Id"] %>% 
+  .[order(Window,-proportion)]%>% 
+  .[, head(.SD,1), by = c("Window","word")]
+
+too_common_words <- c("economy",
+                      "model",
+                      "result",
+                      "paper",
+                      "country",
+                      "price",
+                      "function",
+                      "effect",
+                      "rate",
+                      "increase",
+                      "estimate",
+                      "datum",
+                      "evidence",
+                      "level",
+                      "study")
+words_over_time <- words_over_time[! word %in% too_common_words]
+  
+top_word <- words_over_time %>% 
+  group_by(Window) %>% 
+  slice_max(proportion, n = 5, with_ties = TRUE) %>% 
+  ungroup() %>% 
+  select(-Window, -total_window, -proportion) %>% 
+  unique()
+
+words_over_time <- words_over_time[word %in% top_word$word] %>% 
+  complete(word, Window, fill = list(proportion = 0)) %>% 
+  select(word, Window, proportion) %>% 
+  left_join(top_word)
+
+plot_ly(words_over_time, 
+        text = ~word,
+        hoverinfo = "text") %>% 
+  add_lines(x = ~Window, 
+        y = ~proportion,
+        color = ~word) %>% 
+  add_trace(alpha = 0.8) %>% 
+  layout(paper_bgcolor = "black",
+         plot_bgcolor = "black") %>% 
+  config(scrollZoom = TRUE)
+
+```
+
 
 # Window-network information
 
@@ -430,6 +493,33 @@ bscols(widths = c(3,NA),
 )
 ```
 
+tf-idf by window{.tabset .tabset-pill .tabset-fade data-height=700}
+----------------------------------
+
+```{r tfidf-window, eval = TRUE, results = "asis"}
+
+tf_idf_window <- readRDS(paste0(data_path, "EER/2_Raw_Networks_and_Alluv/tf_idf_windows.rds"))
+
+for(i in unique(tf_idf_window$list_words[order(Community_name)]$Community_name)){
+  cat(sprintf("  \n### %s \n\n", i))
+  cat('\n', '<br>', '\n\n')
+  plot(ggplot(tf_idf_window$list_words[Community_name == i], aes(reorder_within(word, tf_idf, color), tf_idf, fill = color)) +
+    geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
+    labs(
+      title = "Highest tf-idf",
+      x = "Words", y = "tf-idf"
+    ) +
+    scale_fill_identity() +
+    scale_x_reordered() +
+    coord_flip() +
+    theme_minimal())
+  
+  cat("  \n")
+ 
+}
+
+```
+
 
 # Information on communities
 
@@ -534,6 +624,34 @@ bscols(widths = c(3,NA),
 
 
 ```
+
+tf-idf by communities{.tabset .tabset-pill .tabset-fade data-height=700}
+----------------------------------
+
+```{r tfidf-community, eval = TRUE, results = "asis"}
+
+tf_idf_com <- readRDS(paste0(data_path, "EER/2_Raw_Networks_and_Alluv/tf_idf_communities.rds"))
+
+for(i in unique(tf_idf_com$list_words[order(Community_name)]$Community_name)){
+  cat(sprintf("  \n### %s \n\n", i))
+  cat('\n', '<br>', '\n\n')
+  plot(ggplot(tf_idf_com$list_words[Community_name == i], aes(reorder_within(word, tf_idf, color), tf_idf, fill = color)) +
+    geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
+    labs(
+      title = "Highest tf-idf",
+      x = "Words", y = "tf-idf"
+    ) +
+    scale_fill_identity() +
+    scale_x_reordered() +
+    coord_flip() +
+    theme_minimal())
+  
+  cat("  \n")
+ 
+}
+
+```
+
 
 # Analysis of macro articles
 
@@ -743,8 +861,131 @@ plot_ly(sd,
 
 ```
 
+### Most recurrent words
 
-Graphs{.tabset .tabset-pill .tabset-fade data-height=700}
+```{r words-macro, eval = TRUE}
+words_over_time <- merge(alluv_with_abstract, Corpus[JEL_id == 1, "Id"], by = "Id") %>%
+  select(Id, Window, words) %>% 
+  unique() %>% 
+  unnest_tokens(word, words) %>% 
+  anti_join(stop_words) %>% 
+  as.data.table()
+
+words_over_time <- words_over_time[, word := textstem::lemmatize_words(word)] %>% 
+  .[, total_window := .N, by = "Window"] %>% 
+  .[, proportion := round(.N/total_window,5), by = c("Window","word")] %>% 
+  .[, -"Id"] %>% 
+  .[order(Window,-proportion)]%>% 
+  .[, head(.SD,1), by = c("Window","word")]
+
+too_common_words <- c("economy",
+                      "model",
+                      "result",
+                      "paper",
+                      "country",
+                      "price",
+                      "function",
+                      "effect",
+                      "rate",
+                      "increase",
+                      "datum",
+                      "evidence",
+                      "level",
+                      "study",
+                      "traditional",
+                      "macroeconomic",
+                      "assume",
+                      "introduce",
+                      "explicitly",
+                      "logical",
+                      "show",
+                      "substantially",
+                      "aggregate",
+                      "run",
+                      "simple",
+                      "sector",
+                      "standard")
+words_over_time <- words_over_time[! word %in% too_common_words]
+  
+top_word <- words_over_time %>% 
+  group_by(Window) %>% 
+  slice_max(proportion, n = 4, with_ties = TRUE) %>% 
+  ungroup() %>% 
+  select(-Window, -total_window, -proportion) %>% 
+  unique()
+
+words_over_time <- words_over_time[word %in% top_word$word] %>% 
+  complete(word, Window, fill = list(proportion = 0)) %>% 
+  select(word, Window, proportion) %>% 
+  left_join(top_word)
+
+plot_ly(words_over_time, 
+        text = ~word,
+        hoverinfo = "text") %>% 
+  add_lines(x = ~Window, 
+        y = ~proportion,
+        color = ~word) %>% 
+  add_trace(alpha = 0.8) %>% 
+  layout(paper_bgcolor = "black",
+         plot_bgcolor = "black") %>% 
+  config(scrollZoom = TRUE)
+
+```
+
+### Most recurrent bigrams
+
+```{r bigrams-macro, eval = TRUE}
+bigrams_over_time <- merge(alluv_with_abstract, Corpus[JEL_id == 1, "Id"], by = "Id") %>%
+  select(Id, Window, words) %>% 
+  unique() %>% 
+  unnest_tokens(bigram, words, token = "ngrams", n = 2) %>% 
+  separate(bigram, c("word1", "word2"), sep = " ") %>% 
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>% 
+  mutate(word1 = textstem::lemmatize_words(word1),
+         word2 = textstem::lemmatize_words(word2)) %>% 
+  unite(bigram, word1, word2, sep = " ") %>% 
+  as.data.table()
+
+bigrams_over_time <- bigrams_over_time[, total_window := .N, by = "Window"] %>% 
+  .[, proportion := round(.N/total_window,5), by = c("Window","bigram")] %>% 
+  .[, -"Id"] %>% 
+  .[order(Window,-proportion)]%>% 
+  .[, head(.SD,1), by = c("Window","bigram")]
+
+too_common_words <- c("explicitly introduced",
+                      "paper real",
+                      "logical consequence",
+                      "standard specifications",
+                      "traditional results")
+bigrams_over_time <- bigrams_over_time[! bigram %in% too_common_words]
+  
+top_bigram <- bigrams_over_time %>% 
+  group_by(Window) %>% 
+  slice_max(proportion, n = 3, with_ties = TRUE) %>% 
+  ungroup() %>% 
+  select(-Window, -total_window, -proportion) %>% 
+  unique()
+
+bigrams_over_time <- bigrams_over_time[bigram %in% top_bigram$bigram] %>% 
+  complete(bigram, Window, fill = list(proportion = 0)) %>% 
+  select(bigram, Window, proportion) %>% 
+  left_join(top_bigram)
+
+plot_ly(bigrams_over_time, 
+        text = ~bigram,
+        hoverinfo = "text") %>% 
+  add_lines(x = ~Window, 
+        y = ~proportion,
+        color = ~bigram) %>% 
+  add_trace(alpha = 0.8) %>% 
+  layout(paper_bgcolor = "black",
+         plot_bgcolor = "black") %>% 
+  config(scrollZoom = TRUE)
+
+```
+
+Comparison EER/JEL{.tabset .tabset-pill .tabset-fade data-height=700}
 -------------------------------------
 
 ### Comparing all macro articles refs with EER
@@ -873,9 +1114,6 @@ plot_ly(sd,
             persistent = TRUE,
             selectize = TRUE)
 ```
-
-
-
 
 
 ```{r sigma-projection, eval = FALSE, results='asis', include= TRUE}

@@ -6,7 +6,7 @@
 
 package_list <- c(
   "data.table", "tidyverse", "ggnewscale", "igraph",
-  "quanteda", "tidytext", "ggraph", "tidygraph",
+  "quanteda", "tm", "tidytext", "ggraph", "tidygraph",
   "leidenAlg", "reshape2", "scales","RMySQL",
   "ggforce", "directlabels", "patchwork", "DescTools", "DT", 
   "grid", "ggdendro", "readtext", "pander","RColorBrewer",

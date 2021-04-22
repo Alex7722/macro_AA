@@ -1722,12 +1722,11 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
   colnames(tf_idf_save)[colnames(tf_idf_save) == com_size_column] <- "Size_com"
   
   
-  
   # adding a color column attribute in case it doesn't exist
-  if (any(names(tf_idf_save) == color_column)) {
+  if (!any(names(tf_idf_save) == color_column)) {
     color <- data.table(
       Com_ID = 1:500,
-      color = mypalette
+      color = palette
     )
     color <- color %>%
       mutate(Com_ID = sprintf("%02d", Com_ID)) %>%
@@ -1765,8 +1764,6 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
   # applying tf-idf
   tf_idf_table <- tidytext::bind_tf_idf(tf_idf_table, word, Com_ID, count)
   tf_idf_table_uni <- tf_idf_table
-  
-  
   
   # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
   #### Bigram ####

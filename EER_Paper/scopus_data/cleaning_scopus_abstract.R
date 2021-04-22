@@ -135,12 +135,12 @@ scopus_art <- scopus_art %>%
 #' We need to replace special characters by "normal" characters, as in 
 #' WoS.
 #' 
-special_character <- c("Ø","Ó","Ö","Ä","È","É","Ñ","Í","Ü")
-normal_character <- c("O","O","O","A","E","E","N","I","U")
+special_character <- c("Ø","Ó","Ö","Ä","È","É","Ç","Ñ","Í","Ü")
+normal_character <- c("O","O","O","A","E","E","C","N","I","U")
 
 for(i in seq_along(special_character)){
 scopus_art <- scopus_art %>% 
-  mutate(Nom_ISI, str_replace_all(Nom_ISI, special_character[i], normal_character[i]))
+  mutate(Nom_ISI = str_replace_all(Nom_ISI, special_character[i], normal_character[i]))
 }
 
 #' we now need to remove any punctuation character in the name.
@@ -161,6 +161,15 @@ scopus_art[, `:=` (Titre = toupper(title), # useful for later
 #' Removing what are not articles
 not_article <- c("TREASURER","COMMITTEE","SECRETARY","CHAIRMAN","EDITORS","PRESIDENT")
 scopus_art <- scopus_art[!(str_detect(Titre, "REPORT") & str_detect(Titre, paste0(not_article, collapse = "|")))]
+
+#' ### Cleaning abstract
+#' 
+#' The first thing to clean is the title "ABSTRACT". Then, we have to remove what
+#' follows the copyright at the end of the abstract
+#' 
+
+scopus_art[, abstract := toupper(str_trim(str_remove_all(abstract, 
+                                                 "ABSTRACT:|Published by Elsevier B.V.|©.*|c 002.*|\\(C\\).*"),"both"))] 
 
 #' The `scopus_art` is now clean, and we can save it !
 saveRDS(scopus_art[,c("temp_id","Nom_ISI","Annee_Bibliographique","Titre","Journal","Volume","Issue","Pages","abstract")], paste0(eer_data,"scopus_abstract.RDS"))
