@@ -1,0 +1,40 @@
+---
+title: "Testing window graph projection for the platform"
+output: html_document
+author: "Aurélien Goutsmedt & Alexandre Truc"
+date: "/ Last compiled on `r format(Sys.Date())`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Using Plotly to project the graphs
+
+The goal of this .rmd is to use plotly to test different projection of the graph for the platform. It will be used to test the effect of rescaling the coordinates of nodes, as well as the size, and the possibility to rotate the graph, and avoid points being too far from the center.
+
+```{r source-and-packages, eval = TRUE}
+source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
+source("~/macro_AA/functions/functions_for_network_analysis.R")
+nodes <- fread(paste0(platform_data, "nodes_lf.csv")) %>% as.data.table()
+nodes_info <- fread(paste0(platform_data, "nodes_info.csv")) %>% as.data.table()
+nodes <- merge(nodes, nodes_info, by = "ID_Art")
+
+```
+
+```{r, eval = TRUE}
+#list_graph <- lapply(list_graph, function(tbl)(tbl %>% activate(nodes) %>% mutate(size = replace(size, size == 0, 1))))
+#list_graph <- lapply(list_graph, function(tbl) (tbl %>% activate(nodes) %>% mutate(x = rescale(x, to = c(0,1000)), y = rescale(y, to = c(0,1000)))))
+
+nodes <- nodes[, `:=` (size = rescale(size, to = c(1,100)),
+                       x = rescale(x, to = c(0, 1500)),
+                       y = rescale(y, to = c(0, 1000))),
+               by = "window"]
+
+p <- ggplot(nodes, aes(x, y, color = as.character(Com_ID))) +
+  geom_point(aes(frame = window, ids = ID_Art, size = size))
+
+test_graph <- ggplotly(p)
+htmlwidgets::saveWidget(test_graph, paste0(picture_path,"test_timeline_graphs_normalization.html"))
+```
+
