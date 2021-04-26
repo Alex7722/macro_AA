@@ -84,3 +84,169 @@ tf_idf_window <- tf_idf(nodes = alluv_window,  # we remove the color column for 
                      lemmatize_bigrams = FALSE)
 
 saveRDS(tf_idf_window, paste0(data_path, "EER/2_Raw_Networks_and_Alluv/tf_idf_windows.rds"))
+
+#' # Topic modelling on titles and abstracts
+#' 
+#' We will work with two different topic models: one with just the abstract + title of
+#' articles that have an abstract, using the standard
+#' LDA methods (working better for document with more than 50 words). We will then
+#' use the Gibbs sampling method for all the articles but with just the title.
+#' 
+#' ## LDA on abstracts
+
+remove_words <- tibble(word = c("paper",
+                          "datum")) # We remove the use of papers and of numbers that comes often in abstracts but are not informative
+
+corpus_dtm <- Corpus %>% 
+  filter(! is.na(abstract)) %>% 
+  unite("word", Titre, abstract, sep = " ") %>% 
+  select(ID_Art, word) %>% 
+  unnest_tokens(word, word) %>% 
+  anti_join(stop_words) %>% 
+  mutate(word = textstem::lemmatize_words(word)) %>% 
+  anti_join(remove_words) %>% 
+  count(ID_Art, word) %>% 
+  cast_dtm(ID_Art, word, n)
+
+#' Once we have our document term matrix, we can first test different number of topics
+#' and observe how documents are split in different topics. If for each topic, you have a 
+#' small number of documents with a high gamma, it means that you have a good diversity
+#' of topics with several articles clearly belonging to these topics.
+LDA_test_topic <- function(corpus, k = 10, ...){
+  topic_model <- LDA(corpus, k = k, ...)
+art_by_topics <- tidy(topic_model, matrix = "gamma") %>% 
+  as.data.table()
+
+ggplot(art_by_topics, aes(gamma, fill = as.factor(topic))) +
+  geom_histogram(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~ topic, ncol = 4) +
+  scale_y_log10() +
+  labs(title = "Distribution of probability for each topic",
+       y = "Number of documents", x = expression(gamma)) +
+  ggsave(paste0(picture_path,"test_",k,"_topics.png"), width = 40, height = 30, units = "cm")
+}
+
+for(i in seq(50, 60, 5)){
+topic_test <- LDA_test_topic(corpus_dtm, k = i) 
+}
+
+#' We test with 50 topics
+#' 
+
+topic_model <- LDA(corpus_dtm, k = 50, control = list(seed = 1234))
+
+topics <- tidy(topic_model, matrix = "beta") 
+saveRDS(topics, paste0(data_path, "topic_model_EER.rds"))
+
+top_terms <- topics %>%
+  group_by(topic) %>%
+  slice_max(beta, n = 15) %>% 
+  ungroup() %>%
+  arrange(topic, -beta)
+
+top_terms %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(beta, term, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  scale_y_reordered() +
+  ggsave(paste0(picture_path,"topic_model_EER50_topics.png"), width = 40, height = 30, units = "cm")
+
+#' We now extract the gamma values of the topic model to see which article are in which
+#' topics, and to observe the links between communities and topics
+#' 
+
+topic_gamma <- tidy(topic_model, matrix = "gamma") 
+saveRDS(topic_gamma, paste0(data_path, "topic_model_EER_50_gamma.rds"))
+
+topic_and_community <- merge(topic_gamma, 
+                             alluv_with_abstract[, c("Id","Leiden1")],
+                             by.x = "document",
+                             by.y = "Id") %>% 
+  as.data.table()
+topic_and_community <- topic_and_community[, mean_gamma := mean(gamma), 
+                                           by = c("Leiden1","topic")] %>% 
+  .[, c("Leiden1","topic","gamma")] %>% 
+  unique()
+
+topic_and_community %>%
+  mutate(Leiden1 = reorder(Leiden1, gamma * topic)) %>%
+  ggplot(aes(factor(topic), gamma, color = factor(topic), fill = factor(topic))) +
+  geom_boxplot(outlier.size = 0, show.legend = FALSE) +
+  facet_wrap(~ Leiden1) +
+  theme_minimal() +
+  labs(x = "topic", y = expression(gamma)) +
+  ggsave(paste0(picture_path,"topic_model_by_com.png"), width = 50, height = 40, units = "cm")
+
+#' ## Gibbs Sampling on title
+#' 
+#' We now do the same but only on title, and using a different topic modelling method.
+#' 
+
+title_dtm <- Corpus %>% 
+  select(ID_Art, Titre) %>% 
+  unnest_tokens(word, Titre) %>% 
+  anti_join(stop_words) %>% 
+  mutate(word = textstem::lemmatize_words(word)) %>% 
+  count(ID_Art, word) %>% 
+  cast_dtm(ID_Art, word, n)
+
+#' We now test which number of topics could be the best
+for(i in seq(55, 70, 5)){
+  topic_test <- LDA_test_topic(title_dtm, 
+                               k = i, 
+                               method = "Gibbs", 
+                               control = list(seed = 1234, burnin = 1000, thin = 100, iter = 1000)) 
+}
+
+#' Between 35 and 40 topics seems the best in the graphs generated above.
+#' But topics appear more relevant when we choose 40.
+#' 
+
+topic_model <- LDA(title_dtm,
+                   k = 40,
+                   method = "Gibbs",
+                   control = list(seed = 1234, burnin = 1000, thin = 100, iter = 1000))
+
+topics <- tidy(topic_model, matrix = "beta") 
+saveRDS(topics, paste0(data_path, "topic_model_EER_Title_40.rds"))
+
+top_terms <- topics %>%
+  group_by(topic) %>%
+  slice_max(beta, n = 15) %>% 
+  ungroup() %>%
+  arrange(topic, -beta)
+
+top_terms %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(beta, term, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  scale_y_reordered() +
+  ggsave(paste0(picture_path,"topic_model_EER_40_title_topics.png"), width = 40, height = 30, units = "cm")
+
+#' We now extract the gamma values of the topic model to see which article are in which
+#' topics, and to observe the links between communities and topics
+#' 
+
+topic_gamma <- tidy(topic_model, matrix = "gamma") 
+saveRDS(topic_gamma, paste0(data_path, "topic_model_EER_40_title_gamma.rds"))
+
+topic_and_community <- merge(topic_gamma, 
+                             alluv_with_abstract[, c("Id","Leiden1")],
+                             by.x = "document",
+                             by.y = "Id") %>% 
+  as.data.table()
+topic_and_community <- topic_and_community[, mean_gamma := mean(gamma), 
+                                           by = c("Leiden1","topic")] %>% 
+  .[, c("Leiden1","topic","gamma")] %>% 
+  unique()
+
+topic_and_community %>%
+  mutate(Leiden1 = reorder(Leiden1, gamma * topic)) %>%
+  ggplot(aes(factor(topic), gamma, color = factor(topic), fill = factor(topic))) +
+  geom_boxplot(outlier.size = 0.5, outlier.alpha = 0.5, show.legend = FALSE) +
+  facet_wrap(~ Leiden1) +
+  theme_minimal() +
+  labs(x = "topic", y = expression(gamma)) +
+  ggsave(paste0(picture_path,"topic_model_title_by_com.png"), width = 50, height = 40, units = "cm")
