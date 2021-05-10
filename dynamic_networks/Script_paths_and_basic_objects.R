@@ -10,7 +10,7 @@ cran_list <- c(
   "ggforce", "directlabels", "patchwork", "DescTools", "DT", "grid", "scico",
   "ggalluvial", "dplyr","gridExtra","readr","tm","stringr",
   "RColorBrewer","textstem","tidyr","tidytext","quanteda",
-  "plotly"
+  "plotly", "tidytext"
 )
 for (p in cran_list) {
   if (p %in% installed.packages() == FALSE) {
