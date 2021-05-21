@@ -130,6 +130,22 @@ tbl_coup_list <- dynamics_coupling_networks(corpus = Corpus,
                                              time_window = time_window, 
                                              weight_treshold_value = 1)
 
+#### Citations Total ####
+who_cites <- fread("EER/Corpus_EER/who_cites_EER.csv", quote="") %>% data.table
+who_cites[,ItemID_Ref:=as.character(ItemID_Ref)]
+who_cites[,ID_Art:=as.character(ID_Art)]
+tbl_coup_list <- lapply(tbl_coup_list, function(tbl){
+  Years <- tbl %>% activate(nodes) %>% as.data.table() %>% .[,Annee_Bibliographique]
+  max <- as.numeric(max(Years))
+  min <- as.numeric(min(Years))
+  citations_this_period <- who_cites[Annee_Bibliographique>=min & Annee_Bibliographique<=max]
+  nb_cit_wos <- citations_this_period[,.N,ItemID_Ref]
+  colnames(nb_cit_wos)[colnames(nb_cit_wos) == "N"] <- "nb_cit_wos"
+  tbl <- tbl %>% activate(nodes) %>% left_join(nb_cit_wos)
+  tbl <- tbl %>% activate(nodes) %>% mutate(nb_cit_wos = ifelse(is.na(nb_cit_wos)==TRUE,0,nb_cit_wos))
+})
+
+# Main components and com
 tbl_coup_list <- lapply(tbl_coup_list, main_components)
 tbl_coup_list <- lapply(tbl_coup_list, detect_leidenalg, niter = 10000)
 #' We name communities:
@@ -145,7 +161,9 @@ alluv_dt <- make_into_alluv_dt(tbl_coup_list)
 #### Positions ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 list_networks <- lapply(tbl_coup_list, function(tbl){tbl %>% activate(nodes) %>% mutate(Leiden1=new_Id_com)})
-list_networks <- lapply(list_networks, function(tbl){tbl %>% activate(nodes) %>% mutate(size=nb_cit)})
+list_networks <- lapply(list_networks, function(tbl){tbl %>% activate(nodes) %>% mutate(nb_cit=size)})
+#What will be computed as size
+list_networks <- lapply(list_networks, function(tbl){tbl %>% activate(nodes) %>% mutate(size=nb_cit_wos)})
 
 list_graph_position <- list()
 for (Year in all_years) {
