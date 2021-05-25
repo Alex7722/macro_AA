@@ -99,7 +99,7 @@ Corpus <- readRDS(file = "EER/1_Corpus_Prepped_and_Merged/Corpus.rds")
 Institutions <- readRDS(file = "EER/1_Corpus_Prepped_and_Merged/Institutions.rds")
 Authors <- readRDS("EER/1_Corpus_Prepped_and_Merged/Authors.rds")
 Refs <- readRDS("EER/1_Corpus_Prepped_and_Merged/Refs.rds")
-Refs[,Id:=ID_Art_Source] #To delete after the 05/04/2021
+# Refs[,Id:=ID_Art_Source] #To delete after the 05/04/2021
 
 time_window <- 7
 first_year <- as.numeric(Corpus[order(Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique)
@@ -250,14 +250,14 @@ kable(Refs[,.N, Revue][order(-N)]%>% top_n(50)) %>% kable_styling(bootstrap_opti
 ## Top References
 
 ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-kable(Refs[ItemID_Ref_Target!="NULL"][order(-nb_cit_tot)][, head(.SD, 1), .(Label_Target)][,.(Label_Target, Titre, nb_cit_tot)] %>% top_n(50)) %>% kable_styling(bootstrap_options = c("striped", "condensed", full_width = F))
+kable(Refs[ItemID_Ref_Target!="NULL" & ItemID_Ref_Target!=0][order(-nb_cit_tot)][, head(.SD, 1), .(Label_Target)][,.(Label_Target, Titre, nb_cit_tot)] %>% top_n(50)) %>% kable_styling(bootstrap_options = c("striped", "condensed", full_width = F))
 
 ```
 
 ## Top References by disciplines
 
 ```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
-kable(Refs[ItemID_Ref_Target!="NULL"][order(-nb_cit_tot)][, head(.SD, 1), .(Label_Target, ESpecialite_custom)][order(ESpecialite_custom), head(.SD, 5), .(ESpecialite_custom)][,.(ESpecialite_custom, Label_Target, Titre, nb_cit_tot)]) %>% kable_styling(bootstrap_options = c("striped", "condensed", full_width = F))
+kable(Refs[ItemID_Ref_Target!="NULL" & ItemID_Ref_Target!=0][order(-nb_cit_tot)][, head(.SD, 1), .(Label_Target, ESpecialite_custom)][order(ESpecialite_custom), head(.SD, 5), .(ESpecialite_custom)][,.(ESpecialite_custom, Label_Target, Titre, nb_cit_tot)]) %>% kable_styling(bootstrap_options = c("striped", "condensed", full_width = F))
 
 ```
 
@@ -310,6 +310,9 @@ weight <- Corpus[,.(weight=.N),Annee_Bibliographique]
 disc_ref_year <- merge(disc_ref_year, weight, by.x = "Annee_Bibliographique_Source", by.y = "Annee_Bibliographique")
 
 
+disc_ref_year <- disc_ref_year %>% mutate(label_graph = if_else(Annee_Bibliographique_Source == max(Annee_Bibliographique_Source), as.character(ESpecialite_custom), NA_character_))
+
+
 ggplot(disc_ref_year[ESpecialite_custom!="Economics"], aes(x=as.numeric(Annee_Bibliographique_Source), y=share_years_mean, group=ESpecialite_custom, color=ESpecialite_custom, weight=weight)) +
   geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.75)+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.75)) +
@@ -317,7 +320,7 @@ ggplot(disc_ref_year[ESpecialite_custom!="Economics"], aes(x=as.numeric(Annee_Bi
   scale_y_continuous("Share of Disciplines in References") +
   coord_cartesian(ylim = c(0,NA), xlim = c(NA, 2022)) +
   scale_color_discrete(guide = FALSE) +
-  geom_label_repel(aes(label = ESpecialite_custom), data = disc_ref_year[ESpecialite_custom!="Economics"][Annee_Bibliographique_Source==2019], nudge_x = 1, segment.color = NA) +
+  geom_label_repel(aes(label = label_graph), nudge_x = 1, segment.color = NA) +
   theme_minimal() +
   ggsave("EER/Graphs/disc_ref_time.png", width=30, height=20, units = "cm")
 
