@@ -628,9 +628,9 @@ for (Year in all_years) {
 }
 
 
-require(ggpubr)
-g <- ggarrange(plotlist=list_ggplot, common.legend = TRUE, legend="none")
-ggsave(plot=g, "EER/Graphs/all_networksv2.png", width=50, height=50, units = "cm")
+# require(ggpubr)
+# g <- ggarrange(plotlist=list_ggplot, common.legend = TRUE, legend="none")
+# ggsave(plot=g, "EER/Graphs/all_networksv2.png", width=50, height=50, units = "cm")
 
 # knitr::include_graphics("EER/Graphs/all_networksv2.png")
 
@@ -643,7 +643,7 @@ ggsave(plot=g, "EER/Graphs/all_networksv2.png", width=50, height=50, units = "cm
 list_years <- seq(1970, 2010, 3)
 list_years <- as.character(list_years)
 for (years in list_years) {
-  
+  print(years)
   tbl <- list_networks[[paste0(years)]]
   plot_network_year <- list_ggplot[[paste0(years)]]
   
@@ -697,7 +697,7 @@ for (years in list_years) {
     # restricting alluv_dt to the community at stake
     nodes_com  <- nodes[com_as_label  == paste0(com)]
     
-    # jel_macro_share <- nodes_com[,mean(JEL_id)] %>% rename(mean_jel_macro=V1)
+    jel_macro_share <- nodes_com[,mean(JEL_id), new_Id_com] %>% rename(mean_jel_macro=V1)
     
     most_influential_nodes_com  <- nodes_com[order(-size)]
     
@@ -737,7 +737,7 @@ for (years in list_years) {
     cat("###","Community:", com, "\n")
     cat("It's most distinctive words are: ",tf_idf_results$list_words[Leiden1==paste0(com)]$term)
     cat("\n\n")
-    # cat("We find that",jel_macro_share$mean_jel_macro*100,"% of articles are tagged as macro by JEL")
+    cat("We find that",jel_macro_share$mean_jel_macro*100,"% of articles are tagged as macro by JEL")
     cat("\n\n")
 
     cat("The most influential nodes of the community:")
