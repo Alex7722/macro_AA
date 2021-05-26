@@ -640,7 +640,7 @@ ggsave(plot=g, "EER/Graphs/all_networksv2.png", width=50, height=50, units = "cm
 
 
 ```{r results = "asis", eval=TRUE, echo=FALSE}
-list_years <- seq(1970, 2010, 5)
+list_years <- seq(1970, 2010, 3)
 list_years <- as.character(list_years)
 for (years in list_years) {
   

@@ -83,7 +83,7 @@ Corpus <- readRDS(file = paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpu
 Institutions <- readRDS(file = paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Institutions.rds"))
 Authors <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Authors.rds"))
 Refs <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Refs.rds"))
-
+Refs <- Refs[ItemID_Ref_Target!=0]
 #' # Creating the networks for each time windows
 #' 
 #' The first step is to build networks for different moving time window. You need to fix 
@@ -128,7 +128,7 @@ tbl_coup_list <- dynamics_coupling_networks(corpus = Corpus,
                                              target = "ItemID_Ref", 
                                              time_variable = Annee_Bibliographique,
                                              time_window = time_window, 
-                                             weight_treshold_value = 2)
+                                             weight_treshold_value = 1)
 
 #### Citations Total ####
 who_cites <- fread("EER/Corpus_EER/who_cites_EER.csv", quote="") %>% data.table
@@ -177,6 +177,7 @@ for (Year in all_years) {
     tbl <- list_networks[[paste0(Year)]] %>% activate(nodes) %>% left_join(past_position)
     
     list_graph_position[[paste0(Year)]] <- layout_fa2_java(tbl)
+    print(Year)
   }
 }
 

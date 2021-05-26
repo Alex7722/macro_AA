@@ -282,6 +282,9 @@ refs <- copy(refs_final)
 # remove institutionnal papers we now have 81 083
 refs <- refs[str_detect(Nom,"\\*")==FALSE]
 
+refs[Revue_Abbrege %like% "HDB EC GROW%"]
+write.csv(refs[ID_Art_Source %in% Corpus[Annee_Bibliographique<=1980]$ID_Art][ItemID_Ref_Target!=0,.N,.(ItemID_Ref_Target,Nom,Annee, Titre, Revue_Abbrege)][order(Nom,Annee,Revue_Abbrege,Titre)], "EER/Corpus_EER/explore_refs_last_check.csv")
+
 
 # refs[,n_aut_year:=NULL]
 refs_Claveau[ItemID_Ref_Target=="46322181"][,.N]
@@ -316,14 +319,19 @@ id_ref[, names_scopuslike:= str_replace(Nom, "\\-.*","")]
 # scopus_ItemID_Ref <- merge(refs_scopus_match[,.(matching_col,temp_idref)], id_ref_match[,.(matching_col,ItemID_Ref_Target)], by = "matching_col")
 # scopus_ItemID_Ref <- scopus_ItemID_Ref[,head(.SD, 1),matching_col]
 
-#### Give uniques IDs to the sames references that are not in WoS %%%
-refs_scopus <- merge(refs_scopus[,.(ID_Art, temp_idref, Nom, Annee, journal_scopus=journal, Titre_scopus=title)], scopus_ItemID_Ref[,.(temp_idref,ItemID_Ref_Target)], by = "temp_idref", all.x = TRUE)
-refs_to_give_unique_Ids <- refs_scopus[,find_scopus_ids:=.N,.(Nom,Annee)][order(find_scopus_ids)]
-write.csv(refs_to_give_unique_Ids[order(Nom,Annee)], "EER/Corpus_EER/refs_to_give_unique_Ids.csv")
+
+
+
+# #### Give uniques IDs to the sames references that are not in WoS %%%
+# refs_scopus <- merge(refs_scopus[,.(ID_Art, temp_idref, Nom, Annee, journal_scopus=journal, Titre_scopus=title)], scopus_ItemID_Ref[,.(temp_idref,ItemID_Ref_Target)], by = "temp_idref", all.x = TRUE)
+# refs_to_give_unique_Ids <- refs_scopus[,find_scopus_ids:=.N,.(Nom,Annee)][order(find_scopus_ids)]
+# write.csv(refs_to_give_unique_Ids[order(Nom,Annee)], "EER/Corpus_EER/refs_to_give_unique_Ids.csv")
 
 # Manually give them Ids
-match_list_manual <- id_ref[names_scopuslike %in% refs_to_give_unique_Ids$Nom & Annee %in% refs_to_give_unique_Ids$Annee][order(Nom, Annee)]
-write.csv(match_list_manual, "EER/Corpus_EER/manual_check.csv")
+# match_list_manual <- id_ref[names_scopuslike %in% refs_to_give_unique_Ids$Nom & Annee %in% refs_to_give_unique_Ids$Annee][order(Nom, Annee)]
+# write.csv(match_list_manual, "EER/Corpus_EER/manual_check.csv")
+refs_scopus <- refs_scopus %>% rename(journal_scopus = journal)
+refs_scopus <- refs_scopus %>% rename(Titre_scopus = title)
 
 refs_to_give_unique_Ids <- fread("EER/Corpus_EER/refs_to_give_unique_Ids_cleaned.csv", quote="") %>% data.table
 refs_to_give_unique_Ids <- refs_to_give_unique_Ids %>% rename(manual_ids = manual_id)
@@ -332,8 +340,9 @@ refs_to_give_unique_Ids <- refs_to_give_unique_Ids[manual_ids!=""]
 
 #### Scopus and bind %%%
 refs_scopus <- merge(refs_scopus, refs_to_give_unique_Ids[,.(temp_idref,manual_ids)], by="temp_idref", all.x = TRUE)
-refs_scopus[is.na(ItemID_Ref_Target)==TRUE, ItemID_Ref_Target:=manual_ids]
+refs_scopus[, ItemID_Ref_Target:=manual_ids]
 refs_scopus[is.na(ItemID_Ref_Target)==TRUE, ItemID_Ref_Target:=temp_idref]
+write.csv(refs_scopus, "EER/Corpus_EER/explore_refs_scopus_last_check.csv")
 
 refs <- rbind(refs, refs_scopus[,.(ID_Art_Source=ID_Art,ItemID_Ref_Target, Nom, Annee, journal_scopus,Titre_scopus)], fill=TRUE)
 refs[is.na(Titre), Titre:=toupper(Titre_scopus)]
