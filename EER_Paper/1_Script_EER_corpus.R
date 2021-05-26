@@ -207,7 +207,7 @@ Corpus_Claveau <-  dbGetQuery(ESH, paste0("SELECT ID_Art, Annee_Bibliographique,
                                    FROM OST_Expanded_SciHum.Articles
                                    WHERE Code_Revue=5200")) %>%  data.table
 
-# Infos about refs
+# Infos about refs (REF_RAW=83 174 with 59 286 unique id2 et 34 062 unique ItemID_Ref)
 refs_Claveau <- merge(all_ref, all_art[ItemID_Ref!=0], by="ItemID_Ref", all.x = TRUE) 
 
 # Infos about revues
@@ -217,8 +217,8 @@ refs_Claveau <- merge(refs_Claveau, revues[,Code_Revue:=as.integer(Code_Revue)][
 refs_Claveau <- refs_Claveau[,.(ID_Art_Source=ID_Art.x, ItemID_Ref_old_claveau=ItemID_Ref, New_id2, Nom, Annee, Code_Revue, Code_Discipline, Titre, Revue_Abbrege, Volume, Page)]
 refs_Claveau <- refs_Claveau[ID_Art_Source %in% Corpus$ID_Art]
 # Take unique observation when multiple refs for one article
-refs_Claveau_unique <- refs_Claveau[ItemID_Ref_old_claveau!="NULL", head(.SD, 1), .(ID_Art_Source,ItemID_Ref_old_claveau)]
-refs_Claveau <- rbind(refs_Claveau_unique,refs_Claveau[ItemID_Ref_old_claveau=="NULL"])
+refs_Claveau_unique <- refs_Claveau[ItemID_Ref_old_claveau!=0, head(.SD, 1), .(ID_Art_Source,ItemID_Ref_old_claveau)]
+refs_Claveau <- rbind(refs_Claveau_unique,refs_Claveau[ItemID_Ref_old_claveau==0])
 if(refs_Claveau[ItemID_Ref_old_claveau!="0",.N,.(ID_Art_Source,ItemID_Ref_old_claveau)][N>1][,.N]>1){print("ALERTE")}
 
 # ItemID_Ref as new_id2, excepted when there is no New_id2 but an ItemID_Ref
@@ -250,32 +250,45 @@ refs_Claveau[ItemID_Ref_old_claveau==0 & New_id2!=0,ItemID_Ref_Target:=paste0("c
 
 refs <- refs_Claveau[ID_Art_Source %in% Corpus$ID_Art]
 
+# put everything in place for cleaning, we now have 83 153 refs with 58 646 unique refs
 cleaning <- refs[ItemID_Ref_Target != 0, n_aut_year_couple:=.N,.(Nom,Annee)]
 cleaning <- refs[ItemID_Ref_Target != 0, n_cit:=.N,ItemID_Ref_Target]
 
 cleaning <- cleaning[ItemID_Ref_Target != 0][order(-n_aut_year_couple, Nom, Annee, ItemID_Ref_Target),.(n_aut_year_couple,n_cit, ItemID_Ref_Target, Nom, Annee, Titre, Revue_Abbrege)]
 cleaning <- cleaning[!duplicated(cleaning)]
 cleaning[,ItemID_Ref_Target:=as.character(ItemID_Ref_Target)]
+
+#export and import the cleaned version for [ItemID_Ref_Target != 0]
 write.csv(cleaning, "EER/Corpus_EER/cleaning_within_newid2.csv")
 cleaned_refs <- fread("EER/Corpus_EER/cleaning_within_newid2_cleaned.csv") %>% data.table
 cleaned_refs<- cleaned_refs[,.(New_ItemID_Ref_Target,ItemID_Ref_Target,New_Titre)][New_ItemID_Ref_Target!="" | New_Titre!=""]
 cleaned_refs<- cleaned_refs[!duplicated(cleaned_refs)]
 
-
 refs_final <- merge(refs, cleaned_refs, by = "ItemID_Ref_Target", all.x = TRUE, all.y = FALSE)
-
 refs_final[New_ItemID_Ref_Target!="", ItemID_Ref_Target:=New_ItemID_Ref_Target]
 refs_final[New_Titre!="", Titre:=New_Titre]
-
 refs <- copy(refs_final)
 
+#export and import the cleaned version for [ItemID_Ref_old_claveau==0 & New_id2!=0 & n_aut_year_couple>5]
+write.csv(refs[ItemID_Ref_old_claveau==0 & New_id2!=0 & n_aut_year_couple>5][order(Nom,Annee,ItemID_Ref_Target)], "EER/Corpus_EER/cleaning_within_newid2_step2.csv")
+cleaned_refs <- fread("EER/Corpus_EER/cleaning_within_newid2_step2_cleaned.csv") %>% data.table
+cleaned_refs<- cleaned_refs[,.(New_ItemID_Ref_Target,ItemID_Ref_Target)][New_ItemID_Ref_Target!=""]
+cleaned_refs<- cleaned_refs[!duplicated(cleaned_refs)]
+refs[,New_ItemID_Ref_Target:=NULL]
+refs_final <- merge(refs, cleaned_refs, by = "ItemID_Ref_Target", all.x = TRUE, all.y = FALSE)
+refs_final[is.na(New_ItemID_Ref_Target)==FALSE, ItemID_Ref_Target:=New_ItemID_Ref_Target]
+# we cleaned the corpus twice, we now have 83 153 refs 57 451 unique refs
+refs <- copy(refs_final)
+# remove institutionnal papers we now have 81 083
+refs <- refs[str_detect(Nom,"\\*")==FALSE]
 
-refs[,n_aut_year:=NULL]
+
+# refs[,n_aut_year:=NULL]
 refs_Claveau[ItemID_Ref_Target=="46322181"][,.N]
 refs_Claveau[ItemID_Ref_Target=="36302916"][,.N]
 refs[ItemID_Ref_Target=="975989"][,.N]
 ################  Scopus merging %%%%%%%%%%%%
-# Scopus normalization
+# Scopus normalization: there are 665 references in the scopus bd
 refs_scopus <- readRDS("EER/Corpus_EER/scopus_references.RDS")
 refs_scopus <- refs_scopus %>% rename(ID_Art = temp_id)
 refs_scopus[,ID_Art:=paste0("S",ID_Art)]
@@ -286,27 +299,29 @@ refs_scopus <- refs_scopus %>% rename(Annee = Year)
 refs_scopus <- refs_scopus %>% rename(Volume = volume)
 refs_scopus <- refs_scopus %>% rename(Page = pages)
 refs_scopus[, first_page:= str_replace(Page, "\\-.*","")]
+
 # WoS normalization
-id_ref <- fread("EER/Corpus_EER/EER_refs_identifiers2.csv", quote="") %>% data.table
-id_ref <- refs
+# id_ref <- fread("EER/Corpus_EER/EER_refs_identifiers2.csv", quote="") %>% data.table
+id_ref <- copy(refs)
 # id_ref <- refs #29943
 id_ref[, names_scopuslike:= str_replace(Nom, "\\-.*","")]
-# Match on author.year.volume
-id_ref_match <- id_ref[names_scopuslike!="NULL" & Annee!="NULL" & Volume!="NULL" & Page!="NULL"]
-id_ref_match <- id_ref_match[,matching_col:=paste0(names_scopuslike,Annee,Volume,Page)]
-refs_scopus_match <- refs_scopus[Nom!="<NA>" & Annee!="<NA>" & Volume!="<NA>" & first_page!="<NA>"]
-refs_scopus_match <- refs_scopus_match[,matching_col:=paste0(Nom,Annee,Volume,first_page)] 
-# Match and get the temp_idref/ItemID_Ref relationship
-scopus_ItemID_Ref <- merge(refs_scopus_match[,.(matching_col,temp_idref)], id_ref_match[,.(matching_col,ItemID_Ref_Target)], by = "matching_col")
-scopus_ItemID_Ref <- scopus_ItemID_Ref[,head(.SD, 1),matching_col]
+
+
+# # Match on author.year.volume
+# id_ref_match <- id_ref[names_scopuslike!="NULL" & Annee!="NULL" & Volume!="NULL" & Page!="NULL"]
+# id_ref_match <- id_ref_match[,matching_col:=paste0(names_scopuslike,Annee,Volume,Page)]
+# refs_scopus_match <- refs_scopus[Nom!="<NA>" & Annee!="<NA>" & Volume!="<NA>" & first_page!="<NA>"]
+# refs_scopus_match <- refs_scopus_match[,matching_col:=paste0(Nom,Annee,Volume,first_page)] 
+# # Match and get the temp_idref/ItemID_Ref relationship
+# scopus_ItemID_Ref <- merge(refs_scopus_match[,.(matching_col,temp_idref)], id_ref_match[,.(matching_col,ItemID_Ref_Target)], by = "matching_col")
+# scopus_ItemID_Ref <- scopus_ItemID_Ref[,head(.SD, 1),matching_col]
 
 #### Give uniques IDs to the sames references that are not in WoS %%%
 refs_scopus <- merge(refs_scopus[,.(ID_Art, temp_idref, Nom, Annee, journal_scopus=journal, Titre_scopus=title)], scopus_ItemID_Ref[,.(temp_idref,ItemID_Ref_Target)], by = "temp_idref", all.x = TRUE)
 refs_to_give_unique_Ids <- refs_scopus[,find_scopus_ids:=.N,.(Nom,Annee)][order(find_scopus_ids)]
-
-
 write.csv(refs_to_give_unique_Ids[order(Nom,Annee)], "EER/Corpus_EER/refs_to_give_unique_Ids.csv")
 
+# Manually give them Ids
 match_list_manual <- id_ref[names_scopuslike %in% refs_to_give_unique_Ids$Nom & Annee %in% refs_to_give_unique_Ids$Annee][order(Nom, Annee)]
 write.csv(match_list_manual, "EER/Corpus_EER/manual_check.csv")
 

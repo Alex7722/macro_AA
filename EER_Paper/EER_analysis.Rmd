@@ -100,6 +100,11 @@ Institutions <- readRDS(file = "EER/1_Corpus_Prepped_and_Merged/Institutions.rds
 Authors <- readRDS("EER/1_Corpus_Prepped_and_Merged/Authors.rds")
 Refs <- readRDS("EER/1_Corpus_Prepped_and_Merged/Refs.rds")
 # Refs[,Id:=ID_Art_Source] #To delete after the 05/04/2021
+who_cites <- fread("EER/Corpus_EER/who_cites_EER.csv", quote="") %>% data.table
+who_cites[,ItemID_Ref:=as.character(ItemID_Ref)]
+who_cites[,ID_Art:=as.character(ID_Art)]
+who_cites <- merge(Corpus, who_cites[,.N,ItemID_Ref], by="ItemID_Ref", all.x=TRUE) 
+who_cites <- who_cites %>% mutate(nb_cit_wos = ifelse(is.na(N)==TRUE,0,N))
 
 time_window <- 7
 first_year <- as.numeric(Corpus[order(Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique)
@@ -125,6 +130,13 @@ ggplot(Corpus, aes(as.numeric(Annee_Bibliographique))) +
   geom_bar()
 
 ```
+
+## Most Influential Articles
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+kable(who_cites[order(-nb_cit_wos)][, head(.SD, 1), .(ID_Art)][,.(Label, Titre, nb_cit_wos)] %>% top_n(50)) %>% kable_styling(bootstrap_options = c("striped", "condensed", full_width = F))
+```
+
 
 
 ## Share Macro
@@ -500,7 +512,7 @@ for (com in com_to_inspect) {
   n_nodes_com <- most_influential_nodes_com[,.N]
   
   most_influential_refs_com <- merge(most_influential_nodes_com[,.(Id,weighted_size)], Refs, by="Id")
-  most_influential_refs_com <- most_influential_refs_com[ItemID_Ref_Target!="NULL"]
+  most_influential_refs_com <- most_influential_refs_com[ItemID_Ref_Target!="NULL" & ItemID_Ref_Target!=0]
   most_influential_refs_com[,n_cit_ref:=.N, ItemID_Ref_Target]
   most_influential_refs_com[,n_nodes:=n_nodes_com]
   most_influential_refs_com[,share:=n_cit_ref/n_nodes*100]
@@ -692,7 +704,7 @@ for (years in list_years) {
     n_nodes_com <- most_influential_nodes_com[,.N]
     
     most_influential_refs_com <- merge(most_influential_nodes_com[,.(Id, size)], Refs, by="Id")
-    most_influential_refs_com <- most_influential_refs_com[ItemID_Ref_Target!="NULL"]
+    most_influential_refs_com <- most_influential_refs_com[ItemID_Ref_Target!="NULL" & ItemID_Ref_Target!=0]
     most_influential_refs_com[,n_cit_ref:=.N, ItemID_Ref_Target]
     most_influential_refs_com[,n_nodes:=n_nodes_com]
     most_influential_refs_com[,share:=n_cit_ref/n_nodes*100]
