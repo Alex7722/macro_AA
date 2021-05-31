@@ -187,3 +187,16 @@ for (Year in all_years) {
 
 saveRDS(list_graph_position, file = paste0(data_path,"EER/2_Raw_Networks_and_Alluv/list_networks.rds"))
 saveRDS(alluv_dt, file = paste0(data_path,"EER/2_Raw_Networks_and_Alluv/alluv_dt.rds"))
+
+# extracting the list of communities
+alluv_dt[share_leiden_max >=0.05][,c("Leiden1","Window")] %>%
+  group_by(Leiden1) %>% 
+  mutate(max_window = as.numeric(max(Window)) + time_window - 1,
+         min_window = min(Window),
+         window = paste0(min_window,"-",max_window)) %>% 
+  select(Leiden1, window) %>% 
+  unique() %>%
+  arrange(window) %>% 
+  write.csv2("EER_community_list.csv", row.names = FALSE)
+  
+

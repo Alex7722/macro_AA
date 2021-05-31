@@ -1392,7 +1392,7 @@ dynamic_biblio_coupling <- function(corpus,
                                     coupling_method = c("coupling_angle","coupling_strength","coupling_similarity"),
                                     time_window_length = 5,
                                     time_window_move = 0,
-                                    weight_treshold = 1,
+                                    weight_threshold = 1,
                                     nodes_threshold = 0,
                                     controlling_nodes = FALSE,
                                     controlling_edges = FALSE,
@@ -1442,8 +1442,8 @@ dynamic_biblio_coupling <- function(corpus,
   #' @time_window
   #' How much time should be covered by the network
   #' 
-  #' @weight_treshold_value
-  #' Treshold value for coupling (see function)
+  #' @weight_threshold_value
+  #' Threshold value for coupling (see function)
   if(!coupling_method %in% c("coupling_angle","coupling_strength","coupling_similarity")) 
     stop('You did not choose a proper method for coupling computation. You have to choose between:\n - coupling_angle\n - coupling_strength\n - coupling_similarity')
   
@@ -1474,7 +1474,7 @@ dynamic_biblio_coupling <- function(corpus,
   for (Year in all_years) {
     
     # fixing the initial value of the threshold
-    edges_threshold <- weight_treshold
+    edges_threshold <- weight_threshold
     threshold_2 <- nodes_threshold
     
     if(Year > first_year){
@@ -1656,7 +1656,7 @@ dynamic_biblio_coupling <- function(corpus,
 #' 
 
 tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_column = "Com_ID", color_column = "color",
-                           com_name_column = "Community_name", com_size_column = "Size_com", treshold_com = 0.01, number_of_words = 12,
+                           com_name_column = "Community_name", com_size_column = "Size_com", threshold_com = 0.01, number_of_words = 12,
                            palette = NULL, size_title_wrap = 8, lemmatize_bigrams = TRUE) {
   #' Creating a TF-IDF analysis of the titles of WoS corpus
   #'
@@ -1825,20 +1825,20 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
   
   # fixing the number of columns, depending of the number of communities
   n_columns <- 3
-  if (length(unique(tf_idf_table[Size_com >= treshold_com]$Com_wrap)) > 9) {
+  if (length(unique(tf_idf_table[Size_com >= threshold_com]$Com_wrap)) > 9) {
     n_columns <- 4
   }
   
-  if (length(unique(tf_idf_table[Size_com >= treshold_com]$Com_wrap)) > 12) {
+  if (length(unique(tf_idf_table[Size_com >= threshold_com]$Com_wrap)) > 12) {
     n_columns <- 5
   }
   
-  if (length(unique(tf_idf_table[Size_com >= treshold_com]$Com_wrap)) > 15) {
+  if (length(unique(tf_idf_table[Size_com >= threshold_com]$Com_wrap)) > 15) {
     n_columns <- 6
   }
   
   # plotting the graph
-  tf_idf_plot <- ggplot(tf_idf_table[Size_com >= treshold_com], aes(reorder_within(word, tf_idf, color), tf_idf, fill = color)) +
+  tf_idf_plot <- ggplot(tf_idf_table[Size_com >= threshold_com], aes(reorder_within(word, tf_idf, color), tf_idf, fill = color)) +
     geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
     labs(
       title = "Highest tf-idf",
@@ -1866,7 +1866,7 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
 #' 
 
 tf_idf_stemmed <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_column = "Com_ID", color_column = "color",
-                   com_name_column = "Community_name", com_size_column = "Size_com", treshold_com = 0.01, number_of_words = 12,
+                   com_name_column = "Community_name", com_size_column = "Size_com", threshold_com = 0.01, number_of_words = 12,
                    palette = NULL, size_title_wrap = 8, unstemming = TRUE) {
   #' Creating a TF-IDF analysis of the titles of WoS corpus
   #'
@@ -2072,20 +2072,20 @@ tf_idf_stemmed <- function(graph = NULL, nodes = NULL, title_column = "Titre", c
 
   # fixing the number of columns, depending of the number of communities
   n_columns <- 3
-  if (length(unique(tf_idf_table[Size_com >= treshold_com]$Com_wrap)) > 9) {
+  if (length(unique(tf_idf_table[Size_com >= threshold_com]$Com_wrap)) > 9) {
     n_columns <- 4
   }
 
-  if (length(unique(tf_idf_table[Size_com >= treshold_com]$Com_wrap)) > 12) {
+  if (length(unique(tf_idf_table[Size_com >= threshold_com]$Com_wrap)) > 12) {
     n_columns <- 5
   }
 
-  if (length(unique(tf_idf_table[Size_com >= treshold_com]$Com_wrap)) > 15) {
+  if (length(unique(tf_idf_table[Size_com >= threshold_com]$Com_wrap)) > 15) {
     n_columns <- 6
   }
 
   # plotting the graph
-  tf_idf_plot <- ggplot(tf_idf_table[Size_com >= treshold_com], aes(reorder_within(term, count, color), count, fill = color)) +
+  tf_idf_plot <- ggplot(tf_idf_table[Size_com >= threshold_com], aes(reorder_within(term, count, color), count, fill = color)) +
     geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
     labs(
       title = "Highest tf-idf",
