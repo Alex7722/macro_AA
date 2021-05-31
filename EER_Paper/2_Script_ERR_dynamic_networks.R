@@ -83,7 +83,7 @@ Corpus <- readRDS(file = paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpu
 Institutions <- readRDS(file = paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Institutions.rds"))
 Authors <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Authors.rds"))
 Refs <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Refs.rds"))
-
+Refs <- Refs[ItemID_Ref_Target!=0]
 #' # Creating the networks for each time windows
 #' 
 #' The first step is to build networks for different moving time window. You need to fix 
@@ -94,16 +94,16 @@ Refs <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Refs.rds"))
 # renaming columns in ref dt for use in the function
 #setnames(eer_ref, c("ID_Art_Source","ItemID_Ref_Target"), c("ID_Art","ItemID_Ref"))
 
-time_window <- 7
-tbl_coup_list <- dynamic_biblio_coupling(corpus = Corpus,
-                                          direct_citation_dt = Refs,
-                                          source = "ID_Art",
-                                          source_as_ref = "ItemID_Ref",
-                                          ref = "ItemID_Ref",
-                                          time_variable = "Annee_Bibliographique",
-                                          coupling_method = "coupling_strength",
-                                          time_window_length = time_window,
-                                          weight_treshold = 1)
+# time_window <- 7
+# tbl_coup_list <- dynamic_biblio_coupling(corpus = Corpus,
+#                                           direct_citation_dt = Refs,
+#                                           source = "ID_Art",
+#                                           source_as_ref = "ItemID_Ref",
+#                                           ref = "ItemID_Ref",
+#                                           time_variable = "Annee_Bibliographique",
+#                                           coupling_method = "coupling_strength",
+#                                           time_window_length = time_window,
+#                                           weight_treshold = 1)
 #' ## Finding Communities
 
 #' We use the leiden_workflow function of the networkflow package (it uses the 
@@ -111,7 +111,7 @@ tbl_coup_list <- dynamic_biblio_coupling(corpus = Corpus,
 #' it seems to converge well before.
 
 #+ r communities
-tbl_coup_list <- lapply(tbl_coup_list, leiden_workflow, niter = 10000)
+# tbl_coup_list <- lapply(tbl_coup_list, leiden_workflow, niter = 10000)
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -177,6 +177,7 @@ for (Year in all_years) {
     tbl <- list_networks[[paste0(Year)]] %>% activate(nodes) %>% left_join(past_position)
     
     list_graph_position[[paste0(Year)]] <- layout_fa2_java(tbl)
+    print(Year)
   }
 }
 
