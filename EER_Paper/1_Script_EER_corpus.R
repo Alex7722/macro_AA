@@ -549,6 +549,8 @@ link_id <- data.table(ID_Art = c("41014562","42281165","42035495","7143275",
 manual_merge <- merge(link_id, scopus_abstract, by = "temp_id")
 merge_corpus <- rbind(merge_corpus[,c("ID_Art","abstract")],manual_merge[,c("ID_Art","abstract")])
 Corpus <- merge(Corpus, merge_corpus, by = "ID_Art", all.x = TRUE)
+Corpus[, Label := paste0(str_remove(Nom_ISI, "-.*"), ",",Annee_Bibliographique)]
+
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### Saving bis ####

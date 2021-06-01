@@ -38,8 +38,12 @@ alluv_dt <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/alluv_dt.rds"
 #' and abstracts for each article, before to compute the tf-idf with communities as
 #' "documents". 
 alluv_with_abstract <- merge(alluv_dt, Corpus[, c("Id","abstract")], by = "Id") %>% 
-  .[share_leiden_max >=0.05 & n_years >= 3] %>% 
+  .[share_leiden_max >=0.05] %>% 
   unite("words", Titre, abstract, sep = " ")
+
+# removing NA value for abstract (at the end of the column)
+alluv_with_abstract <- alluv_with_abstract %>% 
+  mutate(words = str_remove(words, " NA$"))
 
 # adding colors (temporary)
 color <- data.table(color = scico(length(unique(alluv_with_abstract$Leiden1)), palette = "roma"),
@@ -52,7 +56,7 @@ tf_idf_com <- tf_idf(nodes = alluv_com,
          com_name_column = "new_Id_com", 
          com_size_column = "share_leiden_total", 
          color_column = "color",
-         treshold_com = 0.005, 
+         threshold_com = 0.005, 
          number_of_words = 12,
          size_title_wrap = 8, 
          lemmatize_bigrams = FALSE)
@@ -78,7 +82,7 @@ tf_idf_window <- tf_idf(nodes = alluv_window,  # we remove the color column for 
                      com_name_column = "window_name", 
                      com_size_column = "size_window", 
                      color_column = "color_window",
-                     treshold_com = 0.001, 
+                     threshold_com = 0.001, 
                      number_of_words = 12,
                      size_title_wrap = 8, 
                      lemmatize_bigrams = FALSE)

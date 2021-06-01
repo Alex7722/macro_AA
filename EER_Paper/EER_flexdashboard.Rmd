@@ -52,7 +52,7 @@ alluv_dt <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/alluv_dt.rds"
 alluv_with_abstract <- merge(alluv_dt, Corpus[, c("Id","abstract")], by = "Id") %>% 
   .[share_leiden_max >=0.05 & n_years >= 3] %>%
   unite("words", Titre, abstract, sep = " ")
-alluv_dt <- alluv_dt[share_leiden_max >=0.05 & n_years >= 3][,c("Leiden1","Window","Id")]
+alluv_dt <- alluv_dt[share_leiden_max >=0.05][,c("Leiden1","Window","Id")]
 
 ```
 
@@ -107,9 +107,7 @@ plot_ly(nodes,
   layout(yaxis = list(zeroline = FALSE,
                       showgrid = FALSE),
          xaxis = list(zeroline = FALSE,
-                      showgrid = FALSE),
-         paper_bgcolor = "black",
-         plot_bgcolor = "black") %>% 
+                      showgrid = FALSE)) %>% 
   config(scrollZoom = TRUE) %>% 
   # highlight(on = "plotly_selected", 
   #          selectize = TRUE, 
@@ -160,7 +158,7 @@ x <- ggplot(big_inst_year, aes(Annee_Bibliographique, frequency, color = Institu
 #  geom_point() +
   geom_smooth(se = FALSE, span = 0.3, size = 1.5, alpha = 0.6) +
   scale_color_scico_d(palette = "roma") +
-  dark_theme_classic()
+  theme_classic()
 
 #bscols(type_filter, highlight(ggplotly(x), "plotly_click"), widths = c(6,6))
 
@@ -181,7 +179,7 @@ y <- ggplot(type_inst, aes(Annee_Bibliographique, frequency, color = Type)) +
 #  geom_point() +
   geom_smooth(se = FALSE, span = 0.3, size = 1.5, alpha = 0.6, show.legend = FALSE) +
   scale_color_scico_d(palette = "vik", begin = 0.1) +
-  dark_theme_classic()
+  theme_classic()
 
 #ggplotly(y)
 
@@ -207,7 +205,7 @@ x <- ggplot(count_year, aes(Annee_Bibliographique, after_stat(count), fill = Pay
   scale_x_continuous("Years") +
   scale_y_continuous("Countries Identified by Unique Institution by Paper") +
   scale_fill_scico_d(palette = "hawaii", end = 1, direction = 1) +
-  dark_theme_classic()
+  theme_classic()
 
 # We calculate here the share of authors for different grouped countries (EUROPE, USA and OTHER)
 count_year_group <- institutions[,n_inst_tot:=.N, Countries_grouped][order(-n_inst_tot)]
@@ -224,7 +222,7 @@ y <- ggplot(count_year_group, aes(Annee_Bibliographique, after_stat(count), fill
   scale_x_continuous("Years") +
   scale_y_continuous("Countries Identified by Unique Institution by Paper") +
   scale_fill_scico_d(palette = "lapaz", end = 0.9, direction = -1) +
-  dark_theme_classic()
+  theme_classic()
 
 subplot(highlight(ggplotly(y), "plotly_click"),highlight(ggplotly(x), "plotly_click"))
 
@@ -293,8 +291,6 @@ plot_ly(ref_over_time,
         y = ~nb_cit,
         color = ~Label_Target) %>% 
   add_trace(alpha = 0.8) %>% 
-  layout(paper_bgcolor = "black",
-         plot_bgcolor = "black") %>% 
   config(scrollZoom = TRUE) %>% 
   highlight(on = "plotly_click",
             persistent = TRUE,
@@ -355,8 +351,6 @@ plot_ly(words_over_time,
         y = ~proportion,
         color = ~word) %>% 
   add_trace(alpha = 0.8) %>% 
-  layout(paper_bgcolor = "black",
-         plot_bgcolor = "black") %>% 
   config(scrollZoom = TRUE)
 
 ```
@@ -379,7 +373,9 @@ color_com[color == "gray"]$color <- "#808080"
 
 for(i in seq_along(list_graph)){
 list_graph[[i]] <- list_graph[[i]] %>% activate(nodes) %>% left_join(color_com[window == unique(color_com[order(window)]$window)[i]])
-list_graph[[i]] <- list_graph[[i]] %>% activate(nodes) %>% mutate(color = replace(color, is.na(color), "gray"))
+list_graph[[i]] <- list_graph[[i]] %>% activate(nodes) %>% mutate(color = replace(color, is.na(color), "#808080"))
+
+com_label <- label_com(list_graph[[i]], biggest_community = TRUE, community_threshold = 0.02, community_size_column = "share_leiden", community_name_column = "Leiden1")
 
 x <- ggraph(list_graph[[i]], "manual", x = x, y = y) + 
   geom_edge_arc(aes(width = weight, color = node1.color), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
@@ -388,10 +384,12 @@ x <- ggraph(list_graph[[i]], "manual", x = x, y = y) +
   geom_point(aes(x = x, y = y, size = size, fill = color), pch = 21, alpha = 0.9, show.legend = FALSE) +
   scale_size_continuous(range = c(0.5,5)) +
   scale_fill_identity() +
-  #new_scale("size") +
- # geom_text(data=top_nodes, aes(x=x, y=y, label = Author_date), size = 3, fontface="bold", alpha = 1, show.legend = FALSE) +
-  #scale_size_continuous(range = c(0.5,5)) +
-  dark_theme_void() +
+  new_scale("size") +
+  geom_label_repel(data = com_label, aes(x = x, y = y, label = Community_name, fill = color, size = Size_com), fontface = "bold", alpha = 0.9, point.padding = NA, show.legend = FALSE) +
+  scale_size_continuous(range = c(0.5,5)) +
+  new_scale_fill() +
+  scale_fill_identity() +
+  theme_void() +
   ggsave(paste0(picture_path,"graph_", unique(V(list_graph[[i]])$window),".png"), height = 8, width = 11, units = "cm")
 }
 ```
@@ -548,17 +546,19 @@ alluv_dt <- alluv_dt %>%
 
 
 ```{r refs-per-community, eval = TRUE}
-refs_com <- merge(unique(alluv_dt[,-"Window"]), Refs, by = "Id", allow.cartesian = TRUE)
+refs_com <- merge(unique(alluv_dt[,-"Window"]), Refs[! ItemID_Ref_Target %in% c("Null","0")], by = "Id", allow.cartesian = TRUE)
   
 
 refs_com <- refs_com[, `:=` (nb_ref = length(Refs[ItemID_Ref != "Null"]$ItemID_Ref_Target %>% unique()), nb_art = length(unique(alluv_dt$Id)))] %>% 
   .[, total_freq := .N/nb_ref, by = "ItemID_Ref_Target"] %>% 
   .[, nb_ref_com := .N, by = "Leiden1"] %>% 
   .[, com_freq := .N/nb_ref_com, by = c("Leiden1","ItemID_Ref_Target")] %>% 
-  .[, norm_dev_ref := round(sqrt(nb_art)*(com_freq - total_freq)/sqrt(total_freq*(1-total_freq)),3)]
+  .[, norm_dev_ref := round(sqrt(nb_art)*(com_freq - total_freq)/sqrt(total_freq*(1-total_freq)),3)] %>% 
+  .[order(-norm_dev_ref), head(.SD, 1), .(ItemID_Ref_Target)]
+  
 
 top_refs <- refs_com %>% 
-  select(Leiden1, com_years, Nom, Annee, Titre, Revue, norm_dev_ref) %>% 
+  select(Leiden1, com_years, ItemID_Ref, Nom, Annee, Titre, Revue, norm_dev_ref) %>% 
   unique() %>% 
   group_by(Leiden1) %>% 
   slice_max(norm_dev_ref, n = 10) %>% 
@@ -567,6 +567,20 @@ top_refs <- refs_com %>%
                                Annee,
                                "-",
                                str_extract(Titre, "[A-z]{4,}")))
+
+# manage NA
+na_title <- top_refs %>% 
+  filter(is.na(Titre))
+
+top_refs <- top_refs %>% 
+  filter(! is.na(Titre))
+
+na_title <- na_title %>% 
+  filter(! ItemID_Ref %in% top_refs$ItemID_Ref)
+
+top_refs <- rbind(top_refs, na_title) %>% 
+  arrange(Leiden1) %>% 
+  select(-ItemID_Ref)
 
 # Wrap data frame in SharedData
 sd <- SharedData$new(top_refs)
@@ -773,17 +787,18 @@ authors_macro <- merge(Authors, Corpus[JEL_id == 1, "ID_Art"], by = "ID_Art")
 top_auth <- authors_macro[,.N,Nom_ISI] %>% slice_max(order_by = N, n = 20)
 
 refs_macro <- merge(Refs, Corpus[JEL_id == 1, "ID_Art"], by = "ID_Art")
-top_ref <- copy(refs_macro[ItemID_Ref_Target != "NULL", nb_cit := .N, by = "ItemID_Ref_Target"][order(-nb_cit), head(.SD, 1), .(ItemID_Ref_Target)][,.(Nom, Titre, Annee_Bibliographique_Target,nb_cit)]%>% slice_max(order_by = nb_cit, n = 20))
+top_ref <- copy(refs_macro[! ItemID_Ref_Target %in% c("NULL","0"), nb_cit := .N, by = "ItemID_Ref_Target"][order(-nb_cit,Titre), head(.SD, 1), .(ItemID_Ref_Target)][,.(Nom, Titre, Annee_Bibliographique_Target, nb_cit, ItemID_Ref_Target)]%>% slice_max(order_by = nb_cit, n = 20))
 
-top_ref_alt <- merge(refs_macro[ItemID_Ref_Target != "NULL"], Corpus[, c("ID_Art","Annee_Bibliographique")], by.x = "ID_Art_Source", by.y = "ID_Art") 
+top_ref_alt <- merge(refs_macro[! ItemID_Ref_Target %in% c("NULL","0")], Corpus[, c("ID_Art","Annee_Bibliographique")], by.x = "ID_Art_Source", by.y = "ID_Art") 
 top_ref_alt <- top_ref_alt[, nb_cit_year := .N, by = "Annee_Bibliographique"][,nb_cit_year := 1/nb_cit_year][, nb_cit_weighted := sum(nb_cit_year), by = "ItemID_Ref_Target"]
-top_ref_alt <- top_ref_alt[order(-nb_cit_weighted), head(.SD, 1), .(ItemID_Ref_Target)][,.(Nom, Titre, Annee_Bibliographique_Target,nb_cit_weighted)] %>% 
+top_ref_alt <- top_ref_alt[order(-nb_cit_weighted, Titre), head(.SD, 1), .(ItemID_Ref_Target)][,.(Nom, Titre, Annee_Bibliographique_Target,nb_cit_weighted, ItemID_Ref_Target)] %>% 
   slice_max(order_by = nb_cit_weighted, n = 20)
 
-top_ref <- merge(top_ref, top_ref_alt, by = "Titre", all = TRUE)
+top_ref <- merge(top_ref, top_ref_alt, by = "ItemID_Ref_Target", all = TRUE)
 top_ref[is.na(Nom.x)]$Nom.x <- top_ref[is.na(Nom.x)]$Nom.y
+top_ref[is.na(Titre.x)]$Titre.x <- top_ref[is.na(Titre.x)]$Titre.y
 top_ref[is.na(Annee_Bibliographique_Target.x)]$Annee_Bibliographique_Target.x <- top_ref[is.na(Annee_Bibliographique_Target.x)]$Annee_Bibliographique_Target.y
-setnames(top_ref, c("Nom.x","Annee_Bibliographique_Target.x"), c("Nom","Annee_Bibliographique"))
+setnames(top_ref, c("Nom.x","Annee_Bibliographique_Target.x", "Titre.x"), c("Nom","Annee_Bibliographique","Titre"))
 
 bscols(widths = c(4,8),
        datatable(top_auth, extensions="Scroller", width="100%", class = "compact",
@@ -808,7 +823,7 @@ ref_over_time <- ref_over_time[, nb_ref := .N, by = "window"] %>%
   .[, head(.SD,1), by = c("window","ItemID_Ref_Target")]
 
 top_ref <- ref_over_time %>% 
-  filter(ItemID_Ref_Target != "NULL") %>%
+  filter(! ItemID_Ref_Target %in% c("NULL", "0")) %>%
   group_by(window) %>% 
   slice_max(nb_cit, n = 3, with_ties = TRUE) %>% 
   ungroup() %>% 

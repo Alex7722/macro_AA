@@ -7,11 +7,11 @@
 package_list <- c(
   "data.table", "tidyverse", "ggnewscale", "igraph",
   "quanteda", "tm", "tidytext", "ggraph", "tidygraph",
-  "leidenAlg", "reshape2", "scales","RMySQL",
+  "leidenAlg", "reshape2", "scales","RMySQL", "stringi",
   "ggforce", "directlabels", "patchwork", "DescTools", "DT", 
   "grid", "ggdendro", "readtext", "pander","RColorBrewer",
   "scico","plotly","crosstalk","widgetframe","sigmajs",
-  "ggdark","topicmodels")
+  "ggdark","topicmodels","ggrepel")
 for (p in package_list) {
   if (p %in% installed.packages() == FALSE) {
     install.packages(p, dependencies = TRUE)
