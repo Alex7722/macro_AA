@@ -279,11 +279,29 @@ refs_final <- merge(refs, cleaned_refs, by = "ItemID_Ref_Target", all.x = TRUE, 
 refs_final[is.na(New_ItemID_Ref_Target)==FALSE, ItemID_Ref_Target:=New_ItemID_Ref_Target]
 # we cleaned the corpus twice, we now have 83 153 refs 57 451 unique refs
 refs <- copy(refs_final)
-# remove institutionnal papers we now have 81 083
+# remove institutionnal papers we now have 81 083 and 55 583 unique
 refs <- refs[str_detect(Nom,"\\*")==FALSE]
 
 refs[Revue_Abbrege %like% "HDB EC GROW%"]
 write.csv(refs[ID_Art_Source %in% Corpus[Annee_Bibliographique<=1980]$ID_Art][ItemID_Ref_Target!=0,.N,.(ItemID_Ref_Target,Nom,Annee, Titre, Revue_Abbrege)][order(Nom,Annee,Revue_Abbrege,Titre)], "EER/Corpus_EER/explore_refs_last_check.csv")
+
+
+#last cleaning
+cleaned_refs <- fread("EER/Corpus_EER/explore_refs_last_check_cleaned.csv") %>% data.table
+cleaned_refs<- cleaned_refs[,.(New_ItemID_Ref_Target,ItemID_Ref_Target,New_Titre, New_Nom)][New_ItemID_Ref_Target!="" | New_Titre!="" | New_Nom!=""]
+cleaned_refs<- cleaned_refs[!duplicated(cleaned_refs)]
+
+refs[,New_ItemID_Ref_Target:=NULL]
+refs[,New_Titre :=NULL]
+
+refs_final <- merge(refs, cleaned_refs, by = "ItemID_Ref_Target", all.x = TRUE, all.y = FALSE)
+refs_final[New_ItemID_Ref_Target!="", ItemID_Ref_Target:=New_ItemID_Ref_Target]
+refs_final[New_Titre!="", Titre:=New_Titre]
+refs_final[New_Nom!="", Nom:=New_Nom]
+# We now have 81 083 and 55 404 unique
+refs <- copy(refs_final)
+
+
 
 
 # refs[,n_aut_year:=NULL]
@@ -344,8 +362,21 @@ refs_scopus[, ItemID_Ref_Target:=manual_ids]
 refs_scopus[is.na(ItemID_Ref_Target)==TRUE, ItemID_Ref_Target:=temp_idref]
 write.csv(refs_scopus, "EER/Corpus_EER/explore_refs_scopus_last_check.csv")
 
+#### FINAL SCOPUS MANUAL CLEANING %%%
+refs_scopus <- fread("EER/Corpus_EER/explore_refs_scopus_last_check_cleaned.csv") %>% data.table
+refs_scopus[is.na(manual_ids)==FALSE, ItemID_Ref_Target:=manual_ids]
+refs_scopus <- refs_scopus %>% rename(journal_scopus = journal)
+refs_scopus <- refs_scopus %>% rename(Titre_scopus = title)
+refs_scopus <- merge(refs_scopus, cleaned_refs, by = "ItemID_Ref_Target", all.x = TRUE, all.y = FALSE)
+refs_scopus[New_ItemID_Ref_Target!="", ItemID_Ref_Target:=New_ItemID_Ref_Target]
+refs_scopus[,New_ItemID_Ref_Target:=NULL]
+refs_scopus[,New_Titre :=NULL]
+refs_scopus[,New_Nom :=NULL]
+
+
 refs <- rbind(refs, refs_scopus[,.(ID_Art_Source=ID_Art,ItemID_Ref_Target, Nom, Annee, journal_scopus,Titre_scopus)], fill=TRUE)
-refs[is.na(Titre), Titre:=toupper(Titre_scopus)]
+refs[ItemID_Ref_Target=="SR10",Titre_scopus:="L'Equilibre economique en 1961"]
+refs[is.na(Titre) & is.na(Titre_scopus)==FALSE, Titre:=toupper(Titre_scopus)]
 refs[, c("Titre_scopus"):=NULL]
 
 ################ Completing Refs Informations %%%%%%%%%%%%
@@ -366,7 +397,7 @@ refs[, c("name_short"):=NULL]
 refs <- merge(refs, revues[,.(Code_Revue=as.character(Code_Revue), Revue)], by="Code_Revue", all.x = TRUE)
 refs[,Revue := sub("\r","", Revue)]
 refs <- merge(refs, disciplines, by="Code_Discipline", all.x = TRUE)
-refs[is.na(Revue), Revue:=toupper(journal_scopus)]
+refs[is.na(Revue) & is.na(journal_scopus)==FALSE, Revue:=toupper(journal_scopus)]
 refs[, c("journal_scopus"):=NULL]
 
 # Info about Sources

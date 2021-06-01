@@ -87,6 +87,7 @@ library(kableExtra)
 
 source(path.expand("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R"))
 source("/home/alexandre/functions_networks.R")
+euclidean <- function(x1, x2, y1, y2) sqrt((x1 - x2)^2+(y1 - y2)^2)
 
 pswd = 'alex55Truc!1epistemo'
 usr = 'alexandre'
@@ -643,7 +644,7 @@ for (Year in all_years) {
 list_years <- seq(1970, 2010, 3)
 list_years <- as.character(list_years)
 for (years in list_years) {
-  print(years)
+  # print(years)
   tbl <- list_networks[[paste0(years)]]
   plot_network_year <- list_ggplot[[paste0(years)]]
   
@@ -703,6 +704,11 @@ for (years in list_years) {
     
     n_nodes_com <- most_influential_nodes_com[,.N]
     
+    nodes_com[,mean_x:=mean(x)]
+    nodes_com[,mean_y:=mean(y)]
+    nodes_com[,distance_to_center:=euclidean(x, mean_x, y, mean_y)]
+    most_centered_nodes  <- nodes_com[order(distance_to_center)]
+
     most_influential_refs_com <- merge(most_influential_nodes_com[,.(Id, size)], Refs, by="Id")
     most_influential_refs_com <- most_influential_refs_com[ItemID_Ref_Target!="NULL" & ItemID_Ref_Target!=0]
     most_influential_refs_com[,n_cit_ref:=.N, ItemID_Ref_Target]
@@ -745,6 +751,13 @@ for (years in list_years) {
     print(kable(most_influential_nodes_com[,.(Label, Titre, size)][, head(.SD, 20)]) %>% 
             kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
     cat("\n\n")
+    
+    cat("The most influential nodes of the community:")
+    cat("\n\n")
+    print(kable(most_centered_nodes[,.(Label, Titre, distance_to_center)][, head(.SD, 20)]) %>% 
+            kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+    cat("\n\n")
+    
     
     cat("The most common refs:")
     cat("\n\n")
