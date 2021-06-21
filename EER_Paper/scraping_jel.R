@@ -10,43 +10,43 @@ require(bib2df)
 
 
 
-scrap_jel <- function(Titre=Titre,Corpus=Corpus_titles){
-  title_to_match <- Titre
-  id_art_name <- Corpus[Titre==title_to_match]$ID_Art
-  
-  url <- paste0("https://www.google.com/search?q=",Titre)
-  # url <- str_replace(url, "\\\\", "")
-  
-  first_page <- read_html(url)
-  titles <- html_nodes(first_page, xpath = "//div/div/div/a") %>% html_attr('href') 
-  titles <- titles[titles %like% "www.sciencedirect.com"]
-  titles <- str_replace(titles, "\\/url\\?q\\=", "")
-  titles <- titles[str_detect(titles,"pdf")==FALSE]
-  
-  if(identical(titles, character(0))==FALSE)
-  {titles <- str_split(titles, "&")[[1]][1]
-  
-  url = paste(titles)
-  jel <- read_html(url)
-  jel <- html_nodes(jel, ".keyword") %>% html_text() %>% as.data.table() %>% rename(jel_codes = ".")
-  jel <- jel[str_detect(jel_codes,"[:digit:]")]
-  jel[,ID_Art:=id_art_name[1]]
-  } else{jel="0000"}
-  closeAllConnections()
-  gc()
-  # Sys.sleep(1)
-  return(jel)
-}
-
-
-
-Corpus <- readRDS(file = "EER/1_Corpus_Prepped_and_Merged/Corpus.rds")
-Corpus_titles <- copy(Corpus[Annee_Bibliographique>=1995,.(Titre, ID_Art)])
-Corpus_titles[,Titre:=str_replace_all(Titre," ", "+")]
-
-all_jel <- lapply(Corpus_titles[1:1000]$Titre, scrap_jel)
-all_jel2 <- lapply(Corpus_titles[1000:1750]$Titre, scrap_jel)
-all_jel3 <- lapply(Corpus_titles[1751:2296]$Titre, scrap_jel)
+# scrap_jel <- function(Titre=Titre,Corpus=Corpus_titles){
+#   title_to_match <- Titre
+#   id_art_name <- Corpus[Titre==title_to_match]$ID_Art
+#   
+#   url <- paste0("https://www.google.com/search?q=",Titre)
+#   # url <- str_replace(url, "\\\\", "")
+#   
+#   first_page <- read_html(url)
+#   titles <- html_nodes(first_page, xpath = "//div/div/div/a") %>% html_attr('href') 
+#   titles <- titles[titles %like% "www.sciencedirect.com"]
+#   titles <- str_replace(titles, "\\/url\\?q\\=", "")
+#   titles <- titles[str_detect(titles,"pdf")==FALSE]
+#   
+#   if(identical(titles, character(0))==FALSE)
+#   {titles <- str_split(titles, "&")[[1]][1]
+#   
+#   url = paste(titles)
+#   jel <- read_html(url)
+#   jel <- html_nodes(jel, ".keyword") %>% html_text() %>% as.data.table() %>% rename(jel_codes = ".")
+#   jel <- jel[str_detect(jel_codes,"[:digit:]")]
+#   jel[,ID_Art:=id_art_name[1]]
+#   } else{jel="0000"}
+#   closeAllConnections()
+#   gc()
+#   # Sys.sleep(1)
+#   return(jel)
+# }
+# 
+# 
+# 
+# Corpus <- readRDS(file = "EER/1_Corpus_Prepped_and_Merged/Corpus.rds")
+# Corpus_titles <- copy(Corpus[Annee_Bibliographique>=1995,.(Titre, ID_Art)])
+# Corpus_titles[,Titre:=str_replace_all(Titre," ", "+")]
+# 
+# all_jel <- lapply(Corpus_titles[1:1000]$Titre, scrap_jel)
+# all_jel2 <- lapply(Corpus_titles[1000:1750]$Titre, scrap_jel)
+# all_jel3 <- lapply(Corpus_titles[1751:2296]$Titre, scrap_jel)
 
 
 
