@@ -88,11 +88,8 @@ library(kableExtra)
 source(path.expand("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R"))
 source("/home/alexandre/functions_networks.R")
 euclidean <- function(x1, x2, y1, y2) sqrt((x1 - x2)^2+(y1 - y2)^2)
+source("~/macro_AA/logins_DO_NOT_UPLOAD.R")
 
-pswd = 'alex55Truc!1epistemo'
-usr = 'alexandre'
-ESH <- dbConnect(MySQL(), user=usr, password=pswd, dbname='OST_Expanded_SciHum',
-                 host='127.0.0.1')
 setwd("/projects/data/macro_AA")
 
 

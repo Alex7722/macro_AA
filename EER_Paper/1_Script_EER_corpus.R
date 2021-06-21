@@ -23,8 +23,8 @@ knitr::opts_chunk$set(eval = FALSE)
 #'
 library(RMySQL)
 source("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R")
-pswd = 'alex55Truc!1epistemo'
-usr = 'alexandre'
+source("~/macro_AA/logins_DO_NOT_UPLOAD.R")
+
 ESH <- dbConnect(MySQL(), user=usr, password=pswd, dbname='OST_Expanded_SciHum',
                  host='127.0.0.1')
 setwd("/projects/data/macro_AA")
