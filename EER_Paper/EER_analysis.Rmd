@@ -100,6 +100,11 @@ Corpus <- readRDS(file = "EER/1_Corpus_Prepped_and_Merged/Corpus.rds")
 Institutions <- readRDS(file = "EER/1_Corpus_Prepped_and_Merged/Institutions.rds")
 Authors <- readRDS("EER/1_Corpus_Prepped_and_Merged/Authors.rds")
 Refs <- readRDS("EER/1_Corpus_Prepped_and_Merged/Refs.rds")
+Jel_info <- readRDS(file = "EER/1_Corpus_Prepped_and_Merged/Jel_info.rds")
+Jel_info <- Jel_info %>% rename(code_original = value)
+Jel_info[str_detect(code_original,"\\D"), simplified_code:= str_sub(code_original,1,1)]
+Jel_info[str_detect(code_original,"\\D")==FALSE, simplified_code:= str_sub(code_original,1,1)]
+
 # Refs[,Id:=ID_Art_Source] #To delete after the 05/04/2021
 who_cites <- fread("EER/Corpus_EER/who_cites_EER.csv", quote="") %>% data.table
 who_cites[,ItemID_Ref:=as.character(ItemID_Ref)]
@@ -155,6 +160,40 @@ ggplot(mean_jel[V1!=0 & Annee_Bibliographique!="2016"], aes(x=as.numeric(Annee_B
   theme_minimal() +
   ggsave("EER/Graphs/mean_jel.png", width=30, height=20, units = "cm")
 
+jel_evolution <- Jel_info[, head(.SD, 1), .(ID_Art,code_original)]
+jel_evolution[,ID_Art:=as.character(ID_Art)]
+jel_evolution <- merge(jel_evolution, Corpus[,.(ID_Art,Annee_Bibliographique)], by="ID_Art", all.x=TRUE)
+n_code_years <- jel_evolution[,.N, Annee_Bibliographique]
+n_code_years <- n_code_years %>% rename(n_year=N)
+jel_evolution <- jel_evolution[,.N,.(Annee_Bibliographique,simplified_code)]
+jel_evolution <- jel_evolution %>% left_join(n_code_years)
+jel_evolution[,share:=N/n_year]
+
+ggplot(jel_evolution, aes(x=as.numeric(Annee_Bibliographique), y=share, color=simplified_code)) +
+  geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.75)+
+  # geom_point()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  scale_x_continuous("Years") +
+  scale_y_continuous("Share") +
+  coord_cartesian(ylim = c(0,NA)) +
+  theme_minimal() 
+  # ggsave("EER/Graphs/mean_jel.png", width=30, height=20, units = "cm")
+
+ggplot(jel_evolution, aes(x=as.numeric(Annee_Bibliographique), y=share, fill=simplified_code)) + 
+    geom_area(alpha=0.6 , size=1, colour="black")
+
+jel_evolution <- Jel_info[, head(.SD, 1), .(ID_Art,code_original)]
+jel_evolution[,ID_Art:=as.character(ID_Art)]
+jel_evolution <- merge(jel_evolution, Corpus[,.(ID_Art,Annee_Bibliographique)], by="ID_Art", all.x=TRUE)
+
+ggplot(jel_evolution, aes(as.numeric(Annee_Bibliographique), after_stat(count), fill = fct_rev(fct_infreq(simplified_code)))) +
+  geom_density(position = "fill") +
+  labs(fill = "Codes") +
+  scale_x_continuous("Years") +
+  scale_y_continuous("Share") +
+  theme_classic() 
+  # scale_fill_manual(values = c(rev(brewer.pal(n = 9, name = "Paired")))) 
+  # ggsave("Graphs/country_time_stacked.png", scale = 1)
 ```
 
 ## Most Productive authors
@@ -512,6 +551,16 @@ for (com in com_to_inspect) {
   
   n_nodes_com <- most_influential_nodes_com[,.N]
   
+  Jel_info_alluv_com <- Jel_info[ID_Art %in% alluv_com$Id]
+  
+  jel_info_all <- Jel_info_alluv_com[, head(.SD, 1), .(ID_Art,code_original)]
+  jel_info_all <- jel_info_all[,.N,code_original][order(-N)]
+  jel_info_all[,share:=N/n_nodes_com]
+  
+  jel_info_simplified <- Jel_info_alluv_com[, head(.SD, 1), .(ID_Art,simplified_code)]
+  jel_info_simplified <- jel_info_simplified[,.N,simplified_code][order(-N)]
+  jel_info_simplified[,share:=N/n_nodes_com]
+
   most_influential_refs_com <- merge(most_influential_nodes_com[,.(Id,weighted_size)], Refs, by="Id")
   most_influential_refs_com <- most_influential_refs_com[ItemID_Ref_Target!="NULL" & ItemID_Ref_Target!=0]
   most_influential_refs_com[,n_cit_ref:=.N, ItemID_Ref_Target]
@@ -564,9 +613,13 @@ for (com in com_to_inspect) {
           kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
   cat("\n\n")
   
-  cat("The most common refs that are not in econ:")
+  cat("The most common jels:")
   cat("\n\n")
-  print(kable(most_cited_refs_outside[,.(Label_Target,Titre, ESpecialite_custom, share)][, head(.SD, 10)]) %>% 
+  print(kable(jel_info_all[, head(.SD, 10)]) %>% 
+          kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+  cat("\n\n")
+  cat("\n\n")
+  print(kable(jel_info_simplified[, head(.SD, 10)]) %>% 
           kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
   cat("\n\n")
   
@@ -704,6 +757,16 @@ for (years in list_years) {
     
     n_nodes_com <- most_influential_nodes_com[,.N]
     
+    Jel_info_alluv_com <- Jel_info[ID_Art %in% nodes_com$Id]
+    
+    jel_info_all <- Jel_info_alluv_com[, head(.SD, 1), .(ID_Art,code_original)]
+    jel_info_all <- jel_info_all[,.N,code_original][order(-N)]
+    jel_info_all[,share:=N/n_nodes_com]
+    
+    jel_info_simplified <- Jel_info_alluv_com[, head(.SD, 1), .(ID_Art,simplified_code)]
+    jel_info_simplified <- jel_info_simplified[,.N,simplified_code][order(-N)]
+    jel_info_simplified[,share:=N/n_nodes_com]
+  
     nodes_com[,mean_x:=mean(x)]
     nodes_com[,mean_y:=mean(y)]
     nodes_com[,distance_to_center:=euclidean(x, mean_x, y, mean_y)]
@@ -765,9 +828,13 @@ for (years in list_years) {
             kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
     cat("\n\n")
     
-    cat("The most common refs that are not in econ:")
+    cat("The most common jels:")
     cat("\n\n")
-    print(kable(most_cited_refs_outside[,.(Label_Target,Titre, ESpecialite_custom, share)][, head(.SD, 10)]) %>% 
+    print(kable(jel_info_all[, head(.SD, 10)]) %>% 
+            kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+    cat("\n\n")
+    cat("\n\n")
+    print(kable(jel_info_simplified[, head(.SD, 10)]) %>% 
             kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
     cat("\n\n")
     
