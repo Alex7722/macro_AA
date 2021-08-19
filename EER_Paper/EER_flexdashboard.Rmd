@@ -234,17 +234,18 @@ subplot(highlight(ggplotly(y), "plotly_click"),highlight(ggplotly(x), "plotly_cl
 
 top_auth <- Authors[,.N,Nom_ISI] %>% slice_max(order_by = N, n = 20)
 
-top_ref <- copy(Refs[ItemID_Ref_Target != "NULL", nb_cit := .N, by = "ItemID_Ref_Target"][order(-nb_cit), head(.SD, 1), .(ItemID_Ref_Target)][,.(Nom, Titre, Annee_Bibliographique_Target,nb_cit)]%>% slice_max(order_by = nb_cit, n = 20))
+top_ref <- copy(Refs[ItemID_Ref_Target != "NULL" & ItemID_Ref_Target != "0", nb_cit := .N, by = "ItemID_Ref_Target"][order(-nb_cit), head(.SD, 1), .(ItemID_Ref_Target)][,.(Nom, Titre, Annee_Bibliographique_Target,ItemID_Ref_Target,nb_cit)]%>% slice_max(order_by = nb_cit, n = 20))
 
-top_ref_alt <- merge(Refs[ItemID_Ref_Target != "NULL"], Corpus[, c("ID_Art","Annee_Bibliographique")], by.x = "ID_Art_Source", by.y = "ID_Art") 
+top_ref_alt <- merge(Refs[ItemID_Ref_Target != "NULL" & ItemID_Ref_Target != 0], Corpus[, c("ID_Art","Annee_Bibliographique")], by.x = "ID_Art_Source", by.y = "ID_Art") 
 top_ref_alt <- top_ref_alt[, nb_cit_year := .N, by = "Annee_Bibliographique"][,nb_cit_year := 1/nb_cit_year][, nb_cit_weighted := sum(nb_cit_year), by = "ItemID_Ref_Target"]
-top_ref_alt <- top_ref_alt[order(-nb_cit_weighted), head(.SD, 1), .(ItemID_Ref_Target)][,.(Nom, Titre, Annee_Bibliographique_Target,nb_cit_weighted)] %>% 
+top_ref_alt <- top_ref_alt[order(-nb_cit_weighted), head(.SD, 1), .(ItemID_Ref_Target)][,.(Nom, Titre, Annee_Bibliographique_Target,ItemID_Ref_Target,nb_cit_weighted)] %>% 
   slice_max(order_by = nb_cit_weighted, n = 20)
 
-top_ref <- merge(top_ref, top_ref_alt, by = "Titre", all = TRUE)
+top_ref <- merge(top_ref, top_ref_alt, by = "ItemID_Ref_Target", all = TRUE)
 top_ref[is.na(Nom.x)]$Nom.x <- top_ref[is.na(Nom.x)]$Nom.y
 top_ref[is.na(Annee_Bibliographique_Target.x)]$Annee_Bibliographique_Target.x <- top_ref[is.na(Annee_Bibliographique_Target.x)]$Annee_Bibliographique_Target.y
-setnames(top_ref, c("Nom.x","Annee_Bibliographique_Target.x"), c("Nom","Annee_Bibliographique"))
+top_ref[is.na(Titre.x)]$Titre.x <- top_ref[is.na(Titre.x)]$Titre.y
+setnames(top_ref, c("Nom.x","Annee_Bibliographique_Target.x","Titre.x"), c("Nom","Annee_Bibliographique","Titre"))
 
 bscols(widths = c(4,8),
        datatable(top_auth, extensions="Scroller", width="100%", class = "compact",
@@ -546,7 +547,15 @@ alluv_dt <- alluv_dt %>%
 
 
 ```{r refs-per-community, eval = TRUE}
-refs_com <- merge(unique(alluv_dt[,-"Window"]), Refs[! ItemID_Ref_Target %in% c("Null","0")], by = "Id", allow.cartesian = TRUE)
+refs_com <- merge(unique(alluv_dt[,-"Window"]), Refs[ItemID_Ref_Target != "Null" & ItemID_Ref_Target != 0], by = "Id", allow.cartesian = TRUE)
+
+# list titles for each itemID_Ref to merge later
+titles <- refs_com %>% 
+  select(ItemID_Ref_Target, Titre) %>% 
+  filter(! is.na(Titre)) %>% 
+  unique() %>% 
+  group_by(ItemID_Ref_Target) %>% 
+  slice(1)
   
 
 refs_com <- refs_com[, `:=` (nb_ref = length(Refs[ItemID_Ref != "Null"]$ItemID_Ref_Target %>% unique()), nb_art = length(unique(alluv_dt$Id)))] %>% 
@@ -558,7 +567,7 @@ refs_com <- refs_com[, `:=` (nb_ref = length(Refs[ItemID_Ref != "Null"]$ItemID_R
   
 
 top_refs <- refs_com %>% 
-  select(Leiden1, com_years, ItemID_Ref, Nom, Annee, Titre, Revue, norm_dev_ref) %>% 
+  select(Leiden1, com_years, ItemID_Ref_Target, Nom, Annee, Titre, Revue, norm_dev_ref) %>% 
   unique() %>% 
   group_by(Leiden1) %>% 
   slice_max(norm_dev_ref, n = 10) %>% 
@@ -566,7 +575,10 @@ top_refs <- refs_com %>%
                                "-",
                                Annee,
                                "-",
-                               str_extract(Titre, "[A-z]{4,}")))
+                               str_extract(Titre, "[A-z]{4,}"))) %>% 
+  select(-Titre)
+
+top_refs <- merge(top_refs, titles, by = "ItemID_Ref_Target", all.x = TRUE)
 
 # manage NA
 na_title <- top_refs %>% 
@@ -576,11 +588,12 @@ top_refs <- top_refs %>%
   filter(! is.na(Titre))
 
 na_title <- na_title %>% 
-  filter(! ItemID_Ref %in% top_refs$ItemID_Ref)
+  filter(! ItemID_Ref_Target %in% top_refs$ItemID_Ref_Target)
 
 top_refs <- rbind(top_refs, na_title) %>% 
   arrange(Leiden1) %>% 
-  select(-ItemID_Ref)
+  select(-ItemID_Ref_Target) %>% 
+  relocate(Titre, .after = Annee)
 
 # Wrap data frame in SharedData
 sd <- SharedData$new(top_refs)

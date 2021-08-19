@@ -28,6 +28,7 @@ knitr::opts_chunk$set(eval = FALSE)
 #' 
 source("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R")
 source("~/macro_AA/functions/functions_for_network_analysis.R")
+source("~/macro_AA/functions/functions_for_topic_modelling.R")
 Corpus <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpus.rds"))
 alluv_dt <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/alluv_dt.rds"))
 
@@ -96,21 +97,107 @@ saveRDS(tf_idf_window, paste0(data_path, "EER/2_Raw_Networks_and_Alluv/tf_idf_wi
 #' LDA methods (working better for document with more than 50 words). We will then
 #' use the Gibbs sampling method for all the articles but with just the title.
 #' 
-#' ## LDA on abstracts
+#' ## Checking abstract distribution
+#' 
+#' The first thing is to check which articles have no abstract. If the articles without abstracts
+#' have a stable distribution over time, it will make our results stronger.
+#' 
+
+stat_abstract  <- copy(Corpus)
+stat_abstract  <- stat_abstract[JEL_id == 1][, nb_article := .N, by = Annee_Bibliographique][! is.na(abstract)]
+stat_abstract  <- stat_abstract[, abstract := round(.N/nb_article,2), by = Annee_Bibliographique][, abstract := as.double(abstract)] %>%
+  .[, no_abstract := (1 - abstract)] %>%
+  pivot_longer(cols = ends_with("abstract"), names_to = "abstract", values_to = "proportion") %>% 
+  select(Annee_Bibliographique, abstract, proportion) %>% 
+  unique()
+
+stat_abstract %>% 
+  ggplot(aes(Annee_Bibliographique, proportion, fill = abstract)) +
+  geom_bar(stat = "identity")
+
+#' ## stm on abstracts only
+#' 
+#' We will run the topic model analysis only on the articles with an abstract. As a significant
+#' proportion of macro articles in the late 1970s, early 1980s lack of an abstract, we will be forced
+#' in a second step to run the same analysis with the articles without abstracts.
 
 remove_words <- tibble(word = c("paper",
-                          "datum")) # We remove the use of papers and of numbers that comes often in abstracts but are not informative
+                                "article",
+                                "datum",
+                                "contribution",
+                                "study",
+                                "show",
+                                "find",
+                                "imply",
+                                "analyze",
+                                "compare")) # We remove typical abstract words and figures
 
-corpus_dtm <- Corpus %>% 
-  filter(! is.na(abstract)) %>% 
+term_list <- Corpus %>% 
+  filter(! is.na(abstract) & JEL_id == 1) %>% 
   unite("word", Titre, abstract, sep = " ") %>% 
   select(ID_Art, word) %>% 
-  unnest_tokens(word, word) %>% 
-  anti_join(stop_words) %>% 
-  mutate(word = textstem::lemmatize_words(word)) %>% 
-  anti_join(remove_words) %>% 
-  count(ID_Art, word) %>% 
-  cast_dtm(ID_Art, word, n)
+  unnest_tokens(word, word, token = "ngrams", n_min = 1, n = 2) %>% 
+  separate(word, into = c("word_1", "word_2"), sep = " ") %>% 
+  mutate(word_2 = ifelse(is.na(word_2), "", word_2)) %>% 
+  anti_join(stop_words, by = c("word_1" = "word")) %>% 
+  anti_join(stop_words, by = c("word_2" = "word")) %>% 
+  mutate(word_1 = textstem::lemmatize_words(word_1), 
+         word_2 = textstem::lemmatize_words(word_2)) %>% 
+  anti_join(remove_words, by = c("word_1" = "word")) %>% 
+  anti_join(remove_words, by = c("word_2" = "word")) %>% 
+  unite(term, word_1, word_2, sep = " ") %>% 
+  mutate(term = str_trim(term, "both"))
+
+#' We will now produce different set of data depending on different filtering parameters:
+#' 
+hyper_grid <- expand.grid(
+  upper_share = c(1, 0.5, 0.4),
+  lower_share = c(0, 0.01, 0.02),
+  min_word = 0,
+  max_word = Inf,
+  prop_word = c(0.9, 1)
+)
+
+#' The first step is to use a function to create a list of words data depending on different
+#' feature selection criteria (listed in `hyper_grid`).
+
+data_set <- create_topicmodels_dataset(hyper_grid, term_list, document_name = "ID_Art")
+
+#' The second step is to use the different data sets to create stm objects and them to fit 
+#' topic models for different number of topics.
+#' 
+
+# setting up parallel process
+nb_cores <- availableCores()/2 + 1
+plan(multicore, workers = 2)
+
+data_set <- create_stm(data_set) 
+topic_number <- seq(10, 110, 10) 
+many_models <- create_many_models(data_set, topic_number, max.em.its = 700)
+
+#' The third step is to calculate different statistics for each model and produce 
+#' different plots summarising these statistics.
+
+tuning_results <- stm_results(many_models)
+saveRDS(tuning_results, (paste0(data_path,"EER/topic_models.rds")))
+
+plot_topic_models  <- plot_topicmodels_stat(tuning_results)
+
+agg_png(paste0(picture_path, "tuning_topicmodels_summary.png"),
+        width = 13, height = 10, units = "cm", res = 300)
+plot_topic_models$summary
+invisible(dev.off())
+
+agg_png(paste0(picture_path, "tuning_topicmodels_coherence_vs_exclusivity.png"),
+        width = 13, height = 10, units = "cm", res = 300)
+plot_topic_models$
+invisible(dev.off())agg_png(paste0(picture_path, "tuning_topicmodels_mix_measure.png"),
+                            width = 13, height = 10, units = "cm", res = 300)
+plot_topic_models$
+invisible(dev.off())
+
+
+
 
 #' Once we have our document term matrix, we can first test different number of topics
 #' and observe how documents are split in different topics. If for each topic, you have a 
