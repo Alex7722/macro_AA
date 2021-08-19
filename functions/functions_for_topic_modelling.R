@@ -224,18 +224,20 @@ plot_topicmodels_stat <- function(data, size = 1, weight_1 = 0.5, weight_2 = 0.3
               residual,
               semantic_coherence_mean,
               heldout_likelihood,
-              exclusivity_mean) %>%
+              exclusivity_mean,
+              lbound) %>%
     gather(Metric, Value, -c(preprocessing_id,upper_share,lower_share,min_word,max_word,prop_word,K))
   
   
   plot_summary <- ggplot(results_summary, aes(K, Value, color = as.factor(preprocessing_id))) +
     geom_point(size = size) + 
     geom_line(size = size, alpha = 0.8) +
-    facet_wrap(~Metric, scales = "free_y") +
+    facet_wrap(~Metric, scales = "free_y", ncol = 3) +
     theme_bw() +
     labs(x = "K (number of topics)",
          y = NULL,
-         title = "Model diagnostics by number of topics and preprocessing type")
+         title = "Model diagnostics by number of topics and preprocessing type") +
+    theme(legend.position = "bottom")
   
   plot_exclusivity_coherence <- data %>% 
     mutate(id = paste0(preprocessing_id, "-", K)) %>% 

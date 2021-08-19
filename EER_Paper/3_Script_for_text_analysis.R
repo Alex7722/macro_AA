@@ -117,11 +117,13 @@ stat_abstract %>%
 
 #' ## stm on abstracts only
 #' 
+#' ### Choosing the preprocessing steps and the number of topics
+#' 
 #' We will run the topic model analysis only on the articles with an abstract. As a significant
 #' proportion of macro articles in the late 1970s, early 1980s lack of an abstract, we will be forced
 #' in a second step to run the same analysis with the articles without abstracts.
 
-remove_words <- tibble(word = c("paper",
+remove_words <- data.table(word = c("paper",
                                 "article",
                                 "datum",
                                 "contribution",
@@ -132,6 +134,8 @@ remove_words <- tibble(word = c("paper",
                                 "analyze",
                                 "compare")) # We remove typical abstract words and figures
 
+remove_expressions <- c("'s", "\\.")
+
 term_list <- Corpus %>% 
   filter(! is.na(abstract) & JEL_id == 1) %>% 
   unite("word", Titre, abstract, sep = " ") %>% 
@@ -139,6 +143,10 @@ term_list <- Corpus %>%
   unnest_tokens(word, word, token = "ngrams", n_min = 1, n = 2) %>% 
   separate(word, into = c("word_1", "word_2"), sep = " ") %>% 
   mutate(word_2 = ifelse(is.na(word_2), "", word_2)) %>% 
+  mutate(word_1 = str_remove_all(word_1, paste0(remove_expressions, collapse = "|")),
+         word_2 = str_remove_all(word_2, paste0(remove_expressions, collapse = "|"))) %>% 
+  filter(! str_detect(word_1, "[:digit:]") &
+           ! str_detect(word_2, "[:digit:]")) %>% 
   anti_join(stop_words, by = c("word_1" = "word")) %>% 
   anti_join(stop_words, by = c("word_2" = "word")) %>% 
   mutate(word_1 = textstem::lemmatize_words(word_1), 
@@ -179,8 +187,14 @@ many_models <- create_many_models(data_set, topic_number, max.em.its = 700)
 #' different plots summarising these statistics.
 
 tuning_results <- stm_results(many_models)
-saveRDS(tuning_results, (paste0(data_path,"EER/topic_models.rds")))
+#' If needed, we can save the result: 
+#' `saveRDS(tuning_results, (paste0(data_path, "EER/topic_models.rds")))`.
+#' 
+#' And reload them at the beginning of a new session: 
+#' `tuning_results <- readRDS(paste0(data_path, "EER/topic_models.rds"))`.
 
+
+#' We can now project the different statistics to choose the best model(s).
 plot_topic_models  <- plot_topicmodels_stat(tuning_results)
 
 agg_png(paste0(picture_path, "tuning_topicmodels_summary.png"),
@@ -196,38 +210,18 @@ invisible(dev.off())agg_png(paste0(picture_path, "tuning_topicmodels_mix_measure
 plot_topic_models$
 invisible(dev.off())
 
-
-
-
-#' Once we have our document term matrix, we can first test different number of topics
-#' and observe how documents are split in different topics. If for each topic, you have a 
-#' small number of documents with a high gamma, it means that you have a good diversity
-#' of topics with several articles clearly belonging to these topics.
-LDA_test_topic <- function(corpus, k = 10, ...){
-  topic_model <- LDA(corpus, k = k, ...)
-art_by_topics <- tidy(topic_model, matrix = "gamma") %>% 
-  as.data.table()
-
-ggplot(art_by_topics, aes(gamma, fill = as.factor(topic))) +
-  geom_histogram(alpha = 0.8, show.legend = FALSE) +
-  facet_wrap(~ topic, ncol = 4) +
-  scale_y_log10() +
-  labs(title = "Distribution of probability for each topic",
-       y = "Number of documents", x = expression(gamma)) +
-  ggsave(paste0(picture_path,"test_",k,"_topics.png"), width = 40, height = 30, units = "cm")
-}
-
-for(i in seq(50, 60, 5)){
-topic_test <- LDA_test_topic(corpus_dtm, k = i) 
-}
-
-#' We test with 50 topics
+#' For now, we select the preprocessing 17 and 30 topics.
 #' 
+#' ### Working with the chosen topic model
 
-topic_model <- LDA(corpus_dtm, k = 50, control = list(seed = 1234))
+id <- 17
+nb_topics <- 30 
+chosen_model <- tuning_results[preprocessing_id == id & K == nb_topics]$topic_model[[1]]
 
-topics <- tidy(topic_model, matrix = "beta") 
-saveRDS(topics, paste0(data_path, "topic_model_EER.rds"))
+topics <- tidy(chosen_model, matrix = "beta") 
+
+#' If we want to save the topics and the most identifying words:
+#' `saveRDS(topics, paste0(data_path, "topic_model_EER.rds"))`.
 
 top_terms <- topics %>%
   group_by(topic) %>%
@@ -241,7 +235,7 @@ top_terms %>%
   geom_col(show.legend = FALSE) +
   facet_wrap(~ topic, scales = "free") +
   scale_y_reordered() +
-  ggsave(paste0(picture_path,"topic_model_EER50_topics.png"), width = 40, height = 30, units = "cm")
+  ggsave(paste0(picture_path,"topic_model_", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
 
 #' We now extract the gamma values of the topic model to see which article are in which
 #' topics, and to observe the links between communities and topics
