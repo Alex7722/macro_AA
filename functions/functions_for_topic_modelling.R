@@ -127,8 +127,8 @@ create_many_models <- function(data, nb_topics, max.em.its) {
                                                      data$stm[[i]][[2]],
                                                      init.type = "Spectral",
                                                      K = .,
-                                                     verbose = TRUE,
-                                                     max.em.its = max.em.its)))
+                                                     max.em.its = max.em.its,
+                                                     seed = seed)))
     list_models[[i]] <- topic_model 
   }
   
@@ -267,4 +267,92 @@ plot_topicmodels_stat <- function(data, size = 1, weight_1 = 0.5, weight_2 = 0.3
   plot_list <- list("summary" = plot_summary, 
                     "exclusivity_coherence" = plot_exclusivity_coherence, 
                     "exclusivity_coherence_mean" = plot_mix_measure)
+}
+
+#' # Studying a topic model
+#' 
+#' Many functions that follow are used to transform the data produce by the 
+#' `stm` package in data.frame/data.table to be used in `ggplot2`/`ggraph`.
+#' 
+#' ## Plot top beta words
+#' 
+
+plot_beta_value <- function(model, nb_terms = 10){
+beta_top_terms <- tidytext::tidy(model, matrix = "beta") %>% 
+    group_by(topic) %>%
+    slice_max(beta, n = nb_terms) %>% 
+    ungroup() %>%
+    arrange(topic, -beta)
+
+beta_top_terms %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(beta, term, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  scale_y_reordered() 
+}
+
+#' ## Extract top terms for different measures
+#' 
+#' Here we extract the top terms per topic for the four 
+#' measures calculated in the `stm` package. It serves to 
+#' better describe the topics and to used other measures for
+#' labelling the topic if we don't want to use beta (the "prob" measure).
+
+extract_top_terms <- function(model, 
+                              nb_words = 20, 
+                              weight_frex = 0.4){
+terms <- stm::labelTopics(model, n = nb_words, frexweight = weight_frex)
+top_terms <- data.table("topic" = rep(1:model$settings$dim$K, each = nb_words),
+                        "rank" = 1:nb_words)
+
+for(i in names(terms)[-5]){
+  terms_per_stat <- as.data.frame(terms[[i]]) %>% 
+    mutate(topic = row_number()) %>% 
+    pivot_longer(cols = starts_with("V"), names_to = "rank", values_to = i) %>% 
+    mutate(rank = as.integer(str_remove(rank, "V")))
+  
+  top_terms <- merge(top_terms, terms_per_stat, by = c("topic", "rank"))
+}
+return(top_terms)
+}
+
+#' ## Topic Correlation graph with ggraph
+#' 
+
+ggraph_topic_correlation <- function(model,
+                                     top_terms, 
+                                     method = c("simple", "huge"), 
+                                     size_label = 4){
+correlation <- topicCorr(chosen_model, method = method)
+
+nodes <- top_terms %>% 
+  filter(rank <= 4) %>%
+  select(topic, frex) %>% 
+  group_by(topic) %>%
+  mutate(term_label = paste0(frex, collapse = " / ")) %>% 
+  ungroup() %>% 
+  select(-frex) %>% 
+  rename(id = topic) %>% 
+  mutate(topic = paste0("topic ", id),
+         label = paste0(topic, "\n", term_label)) %>% 
+  unique()
+
+edges <- as.data.frame(as.matrix(test$poscor)) %>% 
+  mutate(from = row_number()) %>% 
+  pivot_longer(cols = 1:30, names_to = "to", values_to = "weight") %>% 
+  mutate(to = str_remove(to, "V")) %>% 
+  filter(weight != 0) %>% 
+  unique()
+
+graph_corr <- tbl_graph(nodes = nodes, edges = edges, directed = FALSE)
+graph_corr <- leiden_workflow(graph_corr)
+graph_corr <- community_colors(graph_corr, palette = scico(n = length(unique((V(graph_corr)$Com_ID))), palette = "roma", begin = 0.1))
+graph_corr <- vite::complete_forceatlas2(graph_corr, first.iter = 5000)
+ggraph(graph_corr, layout = "manual", x = x, y = y) +
+  geom_edge_arc0(aes(color = color_edges, width = weight), strength = 0.3, alpha = 0.8, show.legend = FALSE) +
+  scale_edge_width_continuous(range = c(0.5,12)) +
+  scale_edge_colour_identity() +
+  scale_fill_identity() +
+  geom_node_label(aes(label = label, fill = color), size = size_label, alpha = 0.85)
 }

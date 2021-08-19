@@ -26,9 +26,9 @@ knitr::opts_chunk$set(eval = FALSE)
 #' # Loading packages, paths and data
 #' 
 #' 
-source("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R")
-source("~/macro_AA/functions/functions_for_network_analysis.R")
-source("~/macro_AA/functions/functions_for_topic_modelling.R")
+source("EER_Paper/Script_paths_and_basic_objects_EER.R")
+source("functions/functions_for_network_analysis.R")
+source("functions/functions_for_topic_modelling.R")
 Corpus <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpus.rds"))
 alluv_dt <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/alluv_dt.rds"))
 
@@ -132,12 +132,25 @@ remove_words <- data.table(word = c("paper",
                                 "find",
                                 "imply",
                                 "analyze",
-                                "compare")) # We remove typical abstract words and figures
+                                "compare",
+                                "literature",
+                                "discuss",
+                                "focus",
+                                "consider",
+                                "characterize",
+                                "conclusion",
+                                "demonstrate",
+                                "finally",
+                                "significantly",
+                                "explore",
+                                "ii")) # We remove typical abstract words and figures
 
 remove_expressions <- c("'s", "\\.")
 
 term_list <- Corpus %>% 
-  filter(! is.na(abstract) & JEL_id == 1) %>% 
+  filter(! is.na(abstract) & 
+           JEL_id == 1 &
+           Annee_Bibliographique <= 2007) %>% 
   unite("word", Titre, abstract, sep = " ") %>% 
   select(ID_Art, word) %>% 
   unnest_tokens(word, word, token = "ngrams", n_min = 1, n = 2) %>% 
@@ -159,8 +172,8 @@ term_list <- Corpus %>%
 #' We will now produce different set of data depending on different filtering parameters:
 #' 
 hyper_grid <- expand.grid(
-  upper_share = c(1, 0.5, 0.4),
-  lower_share = c(0, 0.01, 0.02),
+  upper_share = c(0.5, 0.4),
+  lower_share = c(0.01, 0.015, 0.02),
   min_word = 0,
   max_word = Inf,
   prop_word = c(0.9, 1)
@@ -180,8 +193,8 @@ nb_cores <- availableCores()/2 + 1
 plan(multicore, workers = 2)
 
 data_set <- create_stm(data_set) 
-topic_number <- seq(10, 110, 10) 
-many_models <- create_many_models(data_set, topic_number, max.em.its = 700)
+topic_number <- seq(20, 100, 10) 
+many_models <- create_many_models(data_set, topic_number, max.em.its = 700, seed = 1989)
 
 #' The third step is to calculate different statistics for each model and produce 
 #' different plots summarising these statistics.
@@ -205,7 +218,9 @@ invisible(dev.off())
 agg_png(paste0(picture_path, "tuning_topicmodels_coherence_vs_exclusivity.png"),
         width = 13, height = 10, units = "cm", res = 300)
 plot_topic_models$
-invisible(dev.off())agg_png(paste0(picture_path, "tuning_topicmodels_mix_measure.png"),
+invisible(dev.off())
+
+agg_png(paste0(picture_path, "tuning_topicmodels_mix_measure.png"),
                             width = 13, height = 10, units = "cm", res = 300)
 plot_topic_models$
 invisible(dev.off())
@@ -214,29 +229,88 @@ invisible(dev.off())
 #' 
 #' ### Working with the chosen topic model
 
-id <- 17
+id <- 18
 nb_topics <- 30 
 chosen_model <- tuning_results[preprocessing_id == id & K == nb_topics]$topic_model[[1]]
 
-topics <- tidy(chosen_model, matrix = "beta") 
 
 #' If we want to save the topics and the most identifying words:
 #' `saveRDS(topics, paste0(data_path, "topic_model_EER.rds"))`.
 
-top_terms <- topics %>%
-  group_by(topic) %>%
-  slice_max(beta, n = 15) %>% 
-  ungroup() %>%
-  arrange(topic, -beta)
-
-top_terms %>%
-  mutate(term = reorder_within(term, beta, topic)) %>%
-  ggplot(aes(beta, term, fill = factor(topic))) +
-  geom_col(show.legend = FALSE) +
-  facet_wrap(~ topic, scales = "free") +
-  scale_y_reordered() +
+plot_beta <- plot_beta_value(chosen_model, n = 15) +
+  scale_fill_viridis_d()
+plot_beta +
   ggsave(paste0(picture_path,"topic_model_", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
 
+#' We can use the stm package function to plot some descriptive visualisations.
+#' For certain visualisations, we can extract the data to use ggplot/ggraph.
+#' 
+#' Here is the prevalence per topic, showing the most recurrent topics:
+plot.STM(chosen_model, n = 5, labeltype = "frex", frexw = 0.4)
+
+#' We can also extract the top terms for different measure (not just for beta).
+#' This data.frame can also be used to give name to the topics. We will use it
+#' for the nodes of the topic correlation network.
+
+top_terms <- extract_top_terms(chosen_model)
+set.seed(1989)
+topic_corr_network <- ggraph_topic_correlation(chosen_model, top_terms, "huge", size_label = 3) +
+  ggsave(paste0(picture_path,"topic_correlation", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
+
+#' We can look at some topics we find close to understand better their differences:
+#' 
+similar_topics <- list(c(22,4),
+                       c(4,11),
+                       c(23,19),
+                       c(21, 2),
+                       c(15, 2),
+                      c(14, 27))
+ragg::agg_png(paste0(picture_path,"topic_comparison", id, "-", nb_topics, ".png"), 
+              width = 40, 
+              height = 30, 
+              res = 400, 
+              units = "cm")
+par(mfrow = c(3, 2))
+for(i in 1:length(similar_topics)){
+  plot.STM(chosen_model, type = "perspectives", 
+           topics = similar_topics[[i]], 
+           n = 30, 
+           text.cex = 1.5)
+}
+invisible(dev.off())
+
+#' ## Topic model and covariates
+#' 
+
+stm_data <- tuning_results[preprocessing_id == id & K == nb_topics]$stm[[1]]
+metadata <- data.table("ID_Art" = names(stm_data$documents))
+metadata <- merge(metadata, Corpus[, c("ID_Art", "Annee_Bibliographique")], by = "ID_Art")
+stm_data$meta$Year <- as.integer(metadata$Annee_Bibliographique)
+topic_model <- stm(stm_data$documents, 
+                   stm_data$vocab, 
+                   prevalence = ~Year,
+                   data = stm_data$meta,
+                   K = 30,
+                   init.type = "Spectral",
+                   seed = 1989)
+
+prep <- estimateEffect(~Year,
+               topic_model,
+               metadata = stm_data$meta)
+summary(prep)
+data <- tidy(prep) %>% 
+  select(topic, term, estimate) %>% 
+  pivot_wider(names_from = term, values_from = estimate) %>% 
+  rename(intercept = `(Intercept)`,
+         coeff = Year)
+
+ggplot(data, aes(x = unique(stm_data$meta$Year, group = topic))) +
+  geom_line(aes(y = intercept + coeff*stm_data$meta$Year))
+
+plot(prep, "Year",
+     topics = c(1,2,3),
+     method = "continuous")
+--------------------------------------------------------------------------------
 #' We now extract the gamma values of the topic model to see which article are in which
 #' topics, and to observe the links between communities and topics
 #' 
@@ -263,75 +337,3 @@ topic_and_community %>%
   labs(x = "topic", y = expression(gamma)) +
   ggsave(paste0(picture_path,"topic_model_by_com.png"), width = 50, height = 40, units = "cm")
 
-#' ## Gibbs Sampling on title
-#' 
-#' We now do the same but only on title, and using a different topic modelling method.
-#' 
-
-title_dtm <- Corpus %>% 
-  select(ID_Art, Titre) %>% 
-  unnest_tokens(word, Titre) %>% 
-  anti_join(stop_words) %>% 
-  mutate(word = textstem::lemmatize_words(word)) %>% 
-  count(ID_Art, word) %>% 
-  cast_dtm(ID_Art, word, n)
-
-#' We now test which number of topics could be the best
-for(i in seq(55, 70, 5)){
-  topic_test <- LDA_test_topic(title_dtm, 
-                               k = i, 
-                               method = "Gibbs", 
-                               control = list(seed = 1234, burnin = 1000, thin = 100, iter = 1000)) 
-}
-
-#' Between 35 and 40 topics seems the best in the graphs generated above.
-#' But topics appear more relevant when we choose 40.
-#' 
-
-topic_model <- LDA(title_dtm,
-                   k = 40,
-                   method = "Gibbs",
-                   control = list(seed = 1234, burnin = 1000, thin = 100, iter = 1000))
-
-topics <- tidy(topic_model, matrix = "beta") 
-saveRDS(topics, paste0(data_path, "topic_model_EER_Title_40.rds"))
-
-top_terms <- topics %>%
-  group_by(topic) %>%
-  slice_max(beta, n = 15) %>% 
-  ungroup() %>%
-  arrange(topic, -beta)
-
-top_terms %>%
-  mutate(term = reorder_within(term, beta, topic)) %>%
-  ggplot(aes(beta, term, fill = factor(topic))) +
-  geom_col(show.legend = FALSE) +
-  facet_wrap(~ topic, scales = "free") +
-  scale_y_reordered() +
-  ggsave(paste0(picture_path,"topic_model_EER_40_title_topics.png"), width = 40, height = 30, units = "cm")
-
-#' We now extract the gamma values of the topic model to see which article are in which
-#' topics, and to observe the links between communities and topics
-#' 
-
-topic_gamma <- tidy(topic_model, matrix = "gamma") 
-saveRDS(topic_gamma, paste0(data_path, "topic_model_EER_40_title_gamma.rds"))
-
-topic_and_community <- merge(topic_gamma, 
-                             alluv_with_abstract[, c("Id","Leiden1")],
-                             by.x = "document",
-                             by.y = "Id") %>% 
-  as.data.table()
-topic_and_community <- topic_and_community[, mean_gamma := mean(gamma), 
-                                           by = c("Leiden1","topic")] %>% 
-  .[, c("Leiden1","topic","gamma")] %>% 
-  unique()
-
-topic_and_community %>%
-  mutate(Leiden1 = reorder(Leiden1, gamma * topic)) %>%
-  ggplot(aes(factor(topic), gamma, color = factor(topic), fill = factor(topic))) +
-  geom_boxplot(outlier.size = 0.5, outlier.alpha = 0.5, show.legend = FALSE) +
-  facet_wrap(~ Leiden1) +
-  theme_minimal() +
-  labs(x = "topic", y = expression(gamma)) +
-  ggsave(paste0(picture_path,"topic_model_title_by_com.png"), width = 50, height = 40, units = "cm")

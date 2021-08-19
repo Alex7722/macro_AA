@@ -11,7 +11,7 @@ package_list <- c(
   "ggforce", "directlabels", "patchwork", "DescTools", "DT", 
   "grid", "ggdendro", "readtext", "pander","RColorBrewer",
   "scico","plotly","crosstalk","widgetframe","sigmajs",
-  "ggdark","topicmodels","ggrepel","stm","furrr")
+  "ggdark","topicmodels","ggrepel","stm","furrr", "huge")
 for (p in package_list) {
   if (p %in% installed.packages() == FALSE) {
     install.packages(p, dependencies = TRUE)
@@ -29,15 +29,22 @@ for (p in github_list) {
 
 ######################### Paths and data ##########################################------------
 
+if(stringr::str_detect(getwd(), "MEGA")) {
+  boards_path <- path.expand("~/MEGA/Research/R/projets/data/macro_AA/EER/editorial_boards/")
+  eer_data <- path.expand("~/MEGA/Research/R/projets/data/macro_AA/EER/Corpus_EER/")
+  picture_path <- path.expand("~/MEGA/Research/R/projets/macro_AA/EER_Paper/Pictures/")
+  data_path <- path.expand("~/MEGA/Research/R/projets/data/macro_AA/")
+} else {
 boards_path <- "/projects/data/macro_AA/EER/editorial_boards/"
 eer_data <- "/projects/data/macro_AA/EER/Corpus_EER/"
 picture_path <- "/home/aurelien/macro_AA/EER_Paper/Pictures/"
 data_path <- "/projects/data/macro_AA/"
+}
 
-eer_nodes <- fread(paste0(eer_data,"EER_NODES_XP.csv")) %>% as.data.table()
-eer_ref <- fread(paste0(eer_data,"EER_REFS_XP.csv")) %>% as.data.table()
-eer_inst <- fread(paste0(eer_data,"EER_INST_XP.csv")) %>% as.data.table()
-eer_aut <- fread(paste0(eer_data,"EER_AUT_XP.csv")) %>% as.data.table()
+#eer_nodes <- fread(paste0(eer_data,"EER_NODES_XP.csv")) %>% as.data.table()
+#eer_ref <- fread(paste0(eer_data,"EER_REFS_XP.csv")) %>% as.data.table()
+#eer_inst <- fread(paste0(eer_data,"EER_INST_XP.csv")) %>% as.data.table()
+#eer_aut <- fread(paste0(eer_data,"EER_AUT_XP.csv")) %>% as.data.table()
 
 nodes_JEL <- readRDS(paste0(data_path, "Corpus_Econlit_Matched_WoS/JEL_matched_corpus_nodes.rds"))
 nodes_old_JEL <- readRDS(paste0(data_path, "Corpus_Econlit_Matched_WoS/Old_JEL_matched_corpus_nodes.rds"))
