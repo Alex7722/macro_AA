@@ -1,43 +1,51 @@
-#' ---
-#' title: "Script for working on titles and abstracts of EER articles"
-#' author: "Aurélien Goutsmedt and Alexandre Truc"
-#' date: "/ Last compiled on `r format(Sys.Date())`"
-#' output: 
-#'   github_document:
-#'     toc: true
-#'     number_sections: true
-#' ---
-#' 
-#' # What is this script for?
-#' 
-#' This script takes the `alluv_dt` data built in 
-#' [2_Script_EER_dynamic_networks.md](/EER_Paper/2_Script_EER_dynamic_networks.md) 
-#' and merge it with titles and abstracts of corresponding articles. We can then
-#' work on the words associated to each article, and notably calculate highest 
-#' tf-idf for communities and windows.
-#' 
-#' 
-#' > WARNING: This script still needs a lot of cleaning
-#' 
-#' 
-#+ r setup, include = FALSE
-knitr::opts_chunk$set(eval = FALSE)
+Script for working on titles and abstracts of EER articles
+================
+Aurélien Goutsmedt and Alexandre Truc
+/ Last compiled on 2021-08-20
 
-#' # Loading packages, paths and data
-#' 
-#' 
+-   [1 What is this script for?](#what-is-this-script-for)
+-   [2 Loading packages, paths and
+    data](#loading-packages-paths-and-data)
+-   [3 TF-IDF at the community level](#tf-idf-at-the-community-level)
+-   [4 TF-IDF at the window level](#tf-idf-at-the-window-level)
+-   [5 Topic modelling on titles and
+    abstracts](#topic-modelling-on-titles-and-abstracts)
+    -   [5.1 Checking abstract
+        distribution](#checking-abstract-distribution)
+    -   [5.2 stm on abstracts only](#stm-on-abstracts-only)
+        -   [5.2.1 Choosing the preprocessing steps and the number of
+            topics](#choosing-the-preprocessing-steps-and-the-number-of-topics)
+        -   [5.2.2 Working with the chosen topic
+            model](#working-with-the-chosen-topic-model)
+    -   [5.3 Topic model and covariates](#topic-model-and-covariates)
+
+# 1 What is this script for?
+
+This script takes the `alluv_dt` data built in
+[2\_Script\_EER\_dynamic\_networks.md](/EER_Paper/2_Script_EER_dynamic_networks.md)
+and merge it with titles and abstracts of corresponding articles. We can
+then work on the words associated to each article, and notably calculate
+highest tf-idf for communities and windows.
+
+> WARNING: This script still needs a lot of cleaning
+
+# 2 Loading packages, paths and data
+
+``` r
 source("EER_Paper/Script_paths_and_basic_objects_EER.R")
 source("functions/functions_for_network_analysis.R")
 source("functions/functions_for_topic_modelling.R")
 Corpus <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpus.rds"))
 alluv_dt <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/alluv_dt.rds"))
+```
 
+# 3 TF-IDF at the community level
 
-#' # TF-IDF at the community level
-#' 
-#' We merge the alluv data table with the abstract in the corpus. Then we unite titles
-#' and abstracts for each article, before to compute the tf-idf with communities as
-#' "documents". 
+We merge the alluv data table with the abstract in the corpus. Then we
+unite titles and abstracts for each article, before to compute the
+tf-idf with communities as “documents”.
+
+``` r
 alluv_with_abstract <- merge(alluv_dt, Corpus[, c("Id","abstract")], by = "Id") %>% 
   .[share_leiden_max >=0.05] %>% 
   unite("words", Titre, abstract, sep = " ")
@@ -63,11 +71,13 @@ tf_idf_com <- tf_idf(nodes = alluv_com,
          lemmatize_bigrams = FALSE)
 
 saveRDS(tf_idf_com, paste0(data_path, "EER/2_Raw_Networks_and_Alluv/tf_idf_communities.rds"))
+```
 
-#' # TF-IDF at the window level
-#' 
-#' Now, documents will be the windows.
+# 4 TF-IDF at the window level
 
+Now, documents will be the windows.
+
+``` r
 # adding colors
 color <- data.table(color_window = scico(length(unique(alluv_with_abstract$Window)), palette = "hawaii"),
                     Window = unique(alluv_with_abstract$Window))
@@ -89,20 +99,23 @@ tf_idf_window <- tf_idf(nodes = alluv_window,  # we remove the color column for 
                      lemmatize_bigrams = FALSE)
 
 saveRDS(tf_idf_window, paste0(data_path, "EER/2_Raw_Networks_and_Alluv/tf_idf_windows.rds"))
+```
 
-#' # Topic modelling on titles and abstracts
-#' 
-#' We will work with two different topic models: one with just the abstract + title of
-#' articles that have an abstract, using the standard
-#' LDA methods (working better for document with more than 50 words). We will then
-#' use the Gibbs sampling method for all the articles but with just the title.
-#' 
-#' ## Checking abstract distribution
-#' 
-#' The first thing is to check which articles have no abstract. If the articles without abstracts
-#' have a stable distribution over time, it will make our results stronger.
-#' 
+# 5 Topic modelling on titles and abstracts
 
+We will work with two different topic models: one with just the abstract
++ title of articles that have an abstract, using the standard LDA
+methods (working better for document with more than 50 words). We will
+then use the Gibbs sampling method for all the articles but with just
+the title.
+
+## 5.1 Checking abstract distribution
+
+The first thing is to check which articles have no abstract. If the
+articles without abstracts have a stable distribution over time, it will
+make our results stronger.
+
+``` r
 stat_abstract  <- copy(Corpus)
 stat_abstract  <- stat_abstract[JEL_id == 1][, nb_article := .N, by = Annee_Bibliographique][! is.na(abstract)]
 stat_abstract  <- stat_abstract[, abstract := round(.N/nb_article,2), by = Annee_Bibliographique][, abstract := as.double(abstract)] %>%
@@ -114,15 +127,18 @@ stat_abstract  <- stat_abstract[, abstract := round(.N/nb_article,2), by = Annee
 stat_abstract %>% 
   ggplot(aes(Annee_Bibliographique, proportion, fill = abstract)) +
   geom_bar(stat = "identity")
+```
 
-#' ## stm on abstracts only
-#' 
-#' ### Choosing the preprocessing steps and the number of topics
-#' 
-#' We will run the topic model analysis only on the articles with an abstract. As a significant
-#' proportion of macro articles in the late 1970s, early 1980s lack of an abstract, we will be forced
-#' in a second step to run the same analysis with the articles without abstracts.
+## 5.2 stm on abstracts only
 
+### 5.2.1 Choosing the preprocessing steps and the number of topics
+
+We will run the topic model analysis only on the articles with an
+abstract. As a significant proportion of macro articles in the late
+1970s, early 1980s lack of an abstract, we will be forced in a second
+step to run the same analysis with the articles without abstracts.
+
+``` r
 remove_words <- data.table(word = c("paper",
                                 "article",
                                 "datum",
@@ -168,9 +184,12 @@ term_list <- Corpus %>%
   anti_join(remove_words, by = c("word_2" = "word")) %>% 
   unite(term, word_1, word_2, sep = " ") %>% 
   mutate(term = str_trim(term, "both"))
+```
 
-#' We will now produce different set of data depending on different filtering parameters:
-#' 
+We will now produce different set of data depending on different
+filtering parameters:
+
+``` r
 hyper_grid <- expand.grid(
   upper_share = c(0.5, 0.4),
   lower_share = c(0.01, 0.015, 0.02),
@@ -178,16 +197,20 @@ hyper_grid <- expand.grid(
   max_word = Inf,
   prop_word = c(0.9, 1)
 )
+```
 
-#' The first step is to use a function to create a list of words data depending on different
-#' feature selection criteria (listed in `hyper_grid`).
+The first step is to use a function to create a list of words data
+depending on different feature selection criteria (listed in
+`hyper_grid`).
 
+``` r
 data_set <- create_topicmodels_dataset(hyper_grid, term_list, document_name = "ID_Art")
+```
 
-#' The second step is to use the different data sets to create stm objects and them to fit 
-#' topic models for different number of topics.
-#' 
+The second step is to use the different data sets to create stm objects
+and them to fit topic models for different number of topics.
 
+``` r
 # setting up parallel process
 nb_cores <- availableCores()/2 + 1
 plan(multicore, workers = 2)
@@ -195,19 +218,23 @@ plan(multicore, workers = 2)
 data_set <- create_stm(data_set) 
 topic_number <- seq(20, 100, 10) 
 many_models <- create_many_models(data_set, topic_number, max.em.its = 700, seed = 1989)
+```
 
-#' The third step is to calculate different statistics for each model and produce 
-#' different plots summarising these statistics.
+The third step is to calculate different statistics for each model and
+produce different plots summarising these statistics.
 
+``` r
 tuning_results <- stm_results(many_models)
-#' If needed, we can save the result: 
-#' `saveRDS(tuning_results, (paste0(data_path, "EER/topic_models.rds")))`.
-#' 
-#' And reload them at the beginning of a new session: 
-#' `tuning_results <- readRDS(paste0(data_path, "EER/topic_models.rds"))`.
+```
 
+If needed, we can save the result:
+`saveRDS(tuning_results, (paste0(data_path, "EER/topic_models.rds")))`.
 
-#' We can now project the different statistics to choose the best model(s).
+And reload them at the beginning of a new session:
+`tuning_results <- readRDS(paste0(data_path, "EER/topic_models.rds"))`.
+We can now project the different statistics to choose the best model(s).
+
+``` r
 plot_topic_models  <- plot_topicmodels_stat(tuning_results)
 
 agg_png(paste0(picture_path, "tuning_topicmodels_summary.png"),
@@ -224,36 +251,41 @@ agg_png(paste0(picture_path, "tuning_topicmodels_mix_measure.png"),
         width = 13, height = 10, units = "cm", res = 300)
 plot_topic_models$exclusivity_coherence_mean %>% ggplotly()
 invisible(dev.off())
+```
 
-#' If we want to look at the stat in an interactive framework, we can do:
-#' 
-#' - `plot_topic_models$summary %>% ggplotly()`;
-#' - `plot_topic_models$exclusivity_coherence_mean %>% ggplotly()`
+If we want to look at the stat in an interactive framework, we can do:
 
-#' For now, we select the preprocessing 12 and 30 topics.
-#' 
-#' ### Working with the chosen topic model
+-   `plot_topic_models$summary %>% ggplotly()`;
+-   `plot_topic_models$exclusivity_coherence_mean %>% ggplotly()` For
+    now, we select the preprocessing 12 and 30 topics.
 
+### 5.2.2 Working with the chosen topic model
+
+``` r
 id <- 12
 nb_topics <- 30 
 chosen_model <- tuning_results[preprocessing_id == id & K == nb_topics]$topic_model[[1]]
+```
 
+If we want to save the topics and the most identifying words:
+`saveRDS(topics, paste0(data_path, "topic_model_EER.rds"))`.
 
-#' If we want to save the topics and the most identifying words:
-#' `saveRDS(topics, paste0(data_path, "topic_model_EER.rds"))`.
-
+``` r
 plot_beta <- plot_beta_value(chosen_model, n = 15) +
   scale_fill_viridis_d()
 plot_beta +
   ggsave(paste0(picture_path,"topic_model_", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
+```
 
-#' We can use the stm package function to plot some descriptive visualisations.
-#' For certain visualisations, we can extract the data to use ggplot/ggraph.
-#' 
-#' We can also extract the top terms for different measure (not just for beta).
-#' This data.frame can also be used to give name to the topics. We will use it
-#' for the nodes of the topic correlation network.
+We can use the stm package function to plot some descriptive
+visualisations. For certain visualisations, we can extract the data to
+use ggplot/ggraph.
 
+We can also extract the top terms for different measure (not just for
+beta). This data.frame can also be used to give name to the topics. We
+will use it for the nodes of the topic correlation network.
+
+``` r
 top_terms <- extract_top_terms(chosen_model)
 topics <- name_topics(top_terms, "frex", nb_word = 4)
 
@@ -263,21 +295,30 @@ color <- data.table::data.table(
   color = c(scico(n = nb_topics/2 - 1, begin = 0, end = 0.3, palette = "roma"),
             scico(n = nb_topics/2 + 1, begin = 0.6, palette = "roma")))
 topics <- merge(topics, color, by = "id")
+```
 
-#' We now plot the frequency of each topics:
+We now plot the frequency of each topics:
+
+``` r
 plot_frequency(topics) +
   ggsave(paste0(picture_path,"topic_model_frequency_", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
+```
 
-#' We now plot the topic correlation network:
+We now plot the topic correlation network:
+
+``` r
 set.seed(1989)
 topic_corr_network <- ggraph_topic_correlation(chosen_model, 
                                                nodes = topics,
                                                method = "huge", 
                                                size_label = 3) +
   ggsave(paste0(picture_path,"topic_correlation", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
+```
 
-#' We can look at some topics we find close to understand better their differences:
-#' 
+We can look at some topics we find close to understand better their
+differences:
+
+``` r
 similar_topics <- list(c(16,24),
                        c(9,16),
                        c(23,7),
@@ -297,14 +338,16 @@ for(i in 1:length(similar_topics)){
            text.cex = 1.5)
 }
 invisible(dev.off())
+```
 
-#' ## Topic model and covariates
-#' 
-#' Now we can add the covariates. It seems that it is not changing the topic
-#' model too much. The topics are the same, just the order of the words can
-#' change. Perhaps that is not changing it at all and the small changes
-#' are just linked to the random part of the stm function. 
+## 5.3 Topic model and covariates
 
+Now we can add the covariates. It seems that it is not changing the
+topic model too much. The topics are the same, just the order of the
+words can change. Perhaps that is not changing it at all and the small
+changes are just linked to the random part of the stm function.
+
+``` r
 # extracting the data
 stm_data <- tuning_results[preprocessing_id == id & K == nb_topics]$stm[[1]]
 metadata <- data.table("ID_Art" = names(stm_data$documents))
@@ -316,10 +359,12 @@ Corpus_merged <- merge(Corpus[, c("ID_Art", "Annee_Bibliographique")],
 metadata <- merge(metadata, Corpus_merged, by = "ID_Art")
 stm_data$meta$Year <- as.integer(metadata$Annee_Bibliographique)
 stm_data$meta$Origin <- metadata$EU_US_collab
+```
 
-#' We can now fit again the topic model for the same number of topics,
-#' but adding the covariates for topic prevalence and topic content.
+We can now fit again the topic model for the same number of topics, but
+adding the covariates for topic prevalence and topic content.
 
+``` r
 topic_model <- stm(stm_data$documents, 
                    stm_data$vocab, 
                    prevalence = ~s(Year) + Origin,
@@ -332,15 +377,21 @@ topic_model <- stm(stm_data$documents,
 top_terms <- extract_top_terms(topic_model)
 topics_covariate <- name_topics(top_terms, "frex", nb_word = 4)
 topics_covariate <- merge(topics_covariate, topics[, c("id", "color")], by = "id")
+```
 
-#' We fit regressions for our two covariates. We use a b-spline transformation
-#' for the year.
+We fit regressions for our two covariates. We use a b-spline
+transformation for the year.
+
+``` r
 prep <- estimateEffect(~s(Year) + Origin,
                topic_model,
                metadata = stm_data$meta,
                nsims = 50)
+```
 
-#' We first look at the impact of year:
+We first look at the impact of year:
+
+``` r
 tidyprep_year <- tidystm::extract.estimateEffect(prep, "Year", topic_model, method = "continuous")
 tidyprep_year <- merge(tidyprep_year, topics_covariate[, c("id", "topic_name", "color")], by.x = "topic", by.y = "id")
 slope <- tidyprep_year %>% 
@@ -353,8 +404,11 @@ slope <- tidyprep_year %>%
   arrange(slope)
 tidyprep_year <- merge(tidyprep_year, slope, by = "topic_name")
 tidyprep_year$topic_name <- factor(tidyprep_year$topic_name, levels = slope$topic_name)
+```
 
-#' We plot the impact for each topics:
+We plot the impact for each topics:
+
+``` r
 ggplot(tidyprep_year, aes(x = covariate.value, y = estimate,
                    ymin = ci.lower, ymax = ci.upper,
                    group = factor(topic),
@@ -363,10 +417,13 @@ ggplot(tidyprep_year, aes(x = covariate.value, y = estimate,
   facet_wrap(~ topic_name, nrow = 5) +
   geom_ribbon(alpha = .5, show.legend = FALSE) +
   geom_line()
+```
 
-#' We now look at the importance of the geographical institutions of authors. We
-#' focus on papers writtent by European-based economists only, or by US-based
-#' authors only.
+We now look at the importance of the geographical institutions of
+authors. We focus on papers writtent by European-based economists only,
+or by US-based authors only.
+
+``` r
 tidyprep_origin <- tidystm::extract.estimateEffect(prep, 
                                                    "Origin", 
                                                    model = topic_model, 
@@ -377,8 +434,12 @@ tidyprep_origin <- tidystm::extract.estimateEffect(prep,
 tidyprep_origin <- merge(tidyprep_origin, topics_covariate[, c("id", "topic_name", "color")], by.x = "topic", by.y = "id") 
 setDT(tidyprep_origin)
 tidyprep_origin$topic <- factor(tidyprep_origin$topic, levels = tidyprep_origin[order(estimate)]$topic)
+```
 
-#' We plot the topic prevalence depending of the country of authors' affiliation:
+We plot the topic prevalence depending of the country of authors’
+affiliation:
+
+``` r
 ggplot(tidyprep_origin, aes(x = estimate, y = topic,
                             group = factor(topic_name),
                             color = color)) +
@@ -392,12 +453,13 @@ ggplot(tidyprep_origin, aes(x = estimate, y = topic,
        x = "US only (left) vs. Europe only (right)",
        y = "") +
   theme_bw()
+```
 
---------------------------------------------------------------------------------
-#' We now extract the gamma values of the topic model to see which article are in which
-#' topics, and to observe the links between communities and topics
-#' 
+We now extract the gamma values of the topic model to see which article
+are in which topics, and to observe the links between communities and
+topics
 
+``` r
 topic_gamma <- tidy(topic_model, matrix = "gamma") 
 saveRDS(topic_gamma, paste0(data_path, "topic_model_EER_50_gamma.rds"))
 
@@ -419,4 +481,4 @@ topic_and_community %>%
   theme_minimal() +
   labs(x = "topic", y = expression(gamma)) +
   ggsave(paste0(picture_path,"topic_model_by_com.png"), width = 50, height = 40, units = "cm")
-
+```

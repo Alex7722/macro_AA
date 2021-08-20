@@ -119,7 +119,7 @@ create_stm <- function(data, min_word_number = 200){
 
 #' ## Creating several topic models for different preprocessing criteria and different number of topics
 #' 
-create_many_models <- function(data, nb_topics, max.em.its) {
+create_many_models <- function(data, nb_topics, max.em.its, seed) {
   list_models <- list()
   for(i in 1:nrow(data_set)) {
     topic_model <- tibble(K = nb_topics) %>%
@@ -306,39 +306,55 @@ terms <- stm::labelTopics(model, n = nb_words, frexweight = weight_frex)
 top_terms <- data.table("topic" = rep(1:model$settings$dim$K, each = nb_words),
                         "rank" = 1:nb_words)
 
+if(length(terms$topics) == 0)
 for(i in names(terms)[-5]){
   terms_per_stat <- as.data.frame(terms[[i]]) %>% 
     mutate(topic = row_number()) %>% 
     pivot_longer(cols = starts_with("V"), names_to = "rank", values_to = i) %>% 
-    mutate(rank = as.integer(str_remove(rank, "V")))
+    mutate(rank = as.integer(str_remove(rank, "V"))) 
   
   top_terms <- merge(top_terms, terms_per_stat, by = c("topic", "rank"))
+} else {
+  top_terms <- as.data.frame(terms$topics) %>% 
+    mutate(topic = row_number()) %>% 
+    pivot_longer(cols = starts_with("V"), names_to = "rank", values_to = "frex") %>% 
+    mutate(rank = as.integer(str_remove(rank, "V"))) %>% 
+    filter(! frex == "") %>% 
+    as.data.table()
 }
 return(top_terms)
 }
 
+#' ## Naming topics
+#' 
+name_topics <- function(data, measure, nb_word = 3) {
+  labels <- data %>% 
+    filter(rank <= nb_word) %>%
+    select(topic, measure) %>% 
+    group_by(topic) %>%
+    mutate(term_label = paste0(.data[[measure]], collapse = " / ")) %>% 
+    ungroup() %>% 
+    select(-measure) %>% 
+    rename(id = topic) %>% 
+    mutate(topic = paste0("Topic ", id),
+           topic_name = paste0(topic, "\n", term_label)) %>% 
+    unique()
+}
 #' ## Topic Correlation graph with ggraph
 #' 
 
 ggraph_topic_correlation <- function(model,
-                                     top_terms, 
+                                     nodes = NULL,
+                                     top_terms = NULL, 
                                      method = c("simple", "huge"), 
                                      size_label = 4){
 correlation <- topicCorr(chosen_model, method = method)
 
-nodes <- top_terms %>% 
-  filter(rank <= 4) %>%
-  select(topic, frex) %>% 
-  group_by(topic) %>%
-  mutate(term_label = paste0(frex, collapse = " / ")) %>% 
-  ungroup() %>% 
-  select(-frex) %>% 
-  rename(id = topic) %>% 
-  mutate(topic = paste0("topic ", id),
-         label = paste0(topic, "\n", term_label)) %>% 
-  unique()
+if(is.null(nodes)){
+nodes <- name_topics(top_terms, "frex", nb_word = 4)
+}
 
-edges <- as.data.frame(as.matrix(test$poscor)) %>% 
+edges <- as.data.frame(as.matrix(correlation$poscor)) %>% 
   mutate(from = row_number()) %>% 
   pivot_longer(cols = 1:30, names_to = "to", values_to = "weight") %>% 
   mutate(to = str_remove(to, "V")) %>% 
@@ -354,5 +370,28 @@ ggraph(graph_corr, layout = "manual", x = x, y = y) +
   scale_edge_width_continuous(range = c(0.5,12)) +
   scale_edge_colour_identity() +
   scale_fill_identity() +
-  geom_node_label(aes(label = label, fill = color), size = size_label, alpha = 0.85)
+  geom_node_label(aes(label = topic_name, fill = color), size = size_label, alpha = 0.85)
+}
+
+#' ## Plot topic frequency
+#' 
+plot_frequency <- function(topics){
+  topics <- topics %>% 
+    arrange(id) %>% 
+    mutate(frequency = colMeans(chosen_model$theta)) %>% 
+    as.data.table()
+  topics$topic <- factor(topics$topic, levels = topics[order(frequency)]$topic)
+  
+  ggplot(topics, aes(x = frequency, y = topic,
+                     group = factor(topic_name),
+                     color = color)) +
+    geom_segment(aes(x = 0, xend = frequency, yend = topic), size = 4, show.legend = FALSE) +
+    theme(legend.position = "none") +
+    geom_label(aes(x = frequency, color = color, label = term_label), size = 4, alpha = 1, hjust = -0.01) +
+    scale_color_identity() +
+    expand_limits(x = c(0, max(frequency$frequency) + 0.015)) +
+    labs(title = "Top Topics",
+         x = "Frequency",
+         y = "") +
+    theme_bw()
 }
