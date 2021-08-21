@@ -551,7 +551,18 @@ merge_corpus <- rbind(merge_corpus[,c("ID_Art","abstract")],manual_merge[,c("ID_
 Corpus <- merge(Corpus, merge_corpus, by = "ID_Art", all.x = TRUE)
 Corpus[, Label := paste0(str_remove(Nom_ISI, "-.*"), ",",Annee_Bibliographique)]
 
-
+#' For 1973, we don't have the JEL code because we did not get the articles through
+#' WoS. But we can have the JEL code thanks to econlit (unfortunately, not for the
+#' years before 1973). We can thus define new papers that are macroeconomics.
+#' 
+new_macro <- c("S13",
+               "S17",
+               "S8",
+               "S2",
+               "S3",
+               "S6",
+               "S19")
+Corpus[ID_Art %in% new_macro, JEL_id := 1]
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### Saving bis ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#

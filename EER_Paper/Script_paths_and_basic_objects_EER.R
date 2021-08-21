@@ -11,7 +11,8 @@ package_list <- c(
   "ggforce", "directlabels", "patchwork", "DescTools", "DT", 
   "grid", "ggdendro", "readtext", "pander","RColorBrewer",
   "scico","plotly","crosstalk","widgetframe","sigmajs",
-  "ggdark","topicmodels","ggrepel","stm", "tidystm", "huge")
+  "ggdark","topicmodels","ggrepel","stm", "tidystm", "huge",
+  "spacyr")
 for (p in package_list) {
   if (p %in% installed.packages() == FALSE) {
     install.packages(p, dependencies = TRUE)
@@ -26,6 +27,7 @@ for (p in github_list) {
   }
   library(gsub(".*/", "", p), character.only = TRUE)
 }
+
 
 ######################### Paths and data ##########################################------------
 

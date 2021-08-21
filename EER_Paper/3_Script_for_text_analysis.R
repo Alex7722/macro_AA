@@ -32,7 +32,6 @@ source("functions/functions_for_topic_modelling.R")
 Corpus <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpus.rds"))
 alluv_dt <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/alluv_dt.rds"))
 
-
 #' # TF-IDF at the community level
 #' 
 #' We merge the alluv data table with the abstract in the corpus. Then we unite titles
@@ -100,10 +99,17 @@ saveRDS(tf_idf_window, paste0(data_path, "EER/2_Raw_Networks_and_Alluv/tf_idf_wi
 #' ## Checking abstract distribution
 #' 
 #' The first thing is to check which articles have no abstract. If the articles without abstracts
-#' have a stable distribution over time, it will make our results stronger.
+#' have a stable distribution over time, it will make our results stronger. For this, we have
+#' to clean the corpus from articles that are mere comment/discussion, as they obviously
+#' have no abstracts and have a title that is redundant (for instance, in ISoM special
+#' issues, you have two discussions for each paper). These discussion/comment papers
+#' have a particular format of the type "- COMENT", to be distinguished from papers 
+#' with abstract that are more generally answering to another paper. 
 #' 
+Corpus_cleaned <- Corpus %>% 
+  filter(! str_detect(Titre, "- COMMENT$|- COMMENTS$|- REPLY$")) 
 
-stat_abstract  <- copy(Corpus)
+stat_abstract  <- copy(Corpus_cleaned)
 stat_abstract  <- stat_abstract[JEL_id == 1][, nb_article := .N, by = Annee_Bibliographique][! is.na(abstract)]
 stat_abstract  <- stat_abstract[, abstract := round(.N/nb_article,2), by = Annee_Bibliographique][, abstract := as.double(abstract)] %>%
   .[, no_abstract := (1 - abstract)] %>%
@@ -123,66 +129,172 @@ stat_abstract %>%
 #' proportion of macro articles in the late 1970s, early 1980s lack of an abstract, we will be forced
 #' in a second step to run the same analysis with the articles without abstracts.
 
-remove_words <- data.table(word = c("paper",
-                                "article",
-                                "datum",
-                                "contribution",
-                                "study",
-                                "show",
-                                "find",
-                                "imply",
-                                "analyze",
-                                "compare",
-                                "literature",
-                                "discuss",
-                                "focus",
-                                "consider",
-                                "characterize",
-                                "conclusion",
-                                "demonstrate",
-                                "finally",
-                                "significantly",
-                                "explore",
-                                "ii")) # We remove typical abstract words and figures
+text <- Corpus_cleaned %>% 
+  filter(JEL_id == 1 &
+           Annee_Bibliographique <= 2007) %>% 
+  mutate(have_abstract = ! is.na(abstract)) %>% 
+  unite("word", Titre, abstract, sep = " ") %>% 
+  select(ID_Art, word, have_abstract) %>% 
+  mutate(word = str_remove(word, " NA$"),
+         id = row_number())
 
+position_excluded <- c("PUNCT", 
+                       "CCONJ", 
+                       "SCONJ", 
+                       "DET",
+                       "ADP",
+                       "NUM", 
+                       "AUX", 
+                       "PART", 
+                       "PRON", 
+                       "INTJ")
+
+to_keep <- c("flows", 
+             "sticky", 
+             "flexible", 
+             "disconnected",
+             "rational",
+             "redistribution",
+             "budgets",
+             "choice",
+             "equilibrium",
+             "realignment",
+             "tradable",
+             "developed",
+             "optimistic",
+             "termed",
+             "fischer",
+             "systematic",
+             "accommodation",
+             "smoothness",
+             "german",
+             "inflows",
+             "specific",
+             "experiments",
+             "merchants",
+             "forecasts",
+             "offers",
+             "instantaneous",
+             "in1ationary")
+
+spacy_initialize()
+spacy_word <- spacy_parse(text$word, entity = FALSE) %>% 
+  filter(! (pos %in% position_excluded &
+           ! lemma %in% to_keep)) %>% 
+  select(doc_id, token, lemma) %>% 
+  mutate(doc_id = as.integer(str_remove(doc_id, "text")),
+         lemma = str_trim(str_replace_all(lemma, "[:punct:]|[:digit:]", " "), "both")) %>% 
+  rename(id = doc_id) %>%
+  filter(! lemma == " " & 
+           ! lemma == "" &
+           str_count(lemma) > 1) %>% 
+    as.data.table()
+  
+to_correct <- data.table("to_correct" = c("experiments",
+                                          "forecasts",
+                                          "forecasting",
+                                          "offers",
+                                          "inflow",
+                                          "flows",
+                                          "accommodation",
+                                          "accommodative",
+                                          "budgets",
+                                          "in1ationary"),
+                         "correction" = c("experiment",
+                                          "forecast",
+                                          "forecast",
+                                          "offer",
+                                          "inflows",
+                                          "flow",
+                                          "accommodate",
+                                          "accommodate",
+                                          "budget",
+                                          "inflation"))
+for(i in 1:nrow(to_correct)) {
+  spacy_word[lemma == to_correct$to_correct[i]]$lemma <- to_correct$correction[i]
+}
+
+text <- merge(text[, c("id", "ID_Art", "have_abstract")], 
+              spacy_word, 
+              by = "id") %>% 
+  group_by(ID_Art) %>% 
+  mutate(word = paste0(lemma, collapse = " ")) %>% 
+  select(-token, -id, -lemma) %>% 
+  unique()
+
+remove_words <- data.table(word = c("paper",
+                                    "article",
+                                    "datum",
+                                    "contribution",
+                                    "study",
+                                    "show",
+                                    "find",
+                                    "imply",
+                                    "analyze",
+                                    "compare",
+                                    "literature",
+                                    "discuss",
+                                    "focus",
+                                    "consider",
+                                    "characterize",
+                                    "conclusion",
+                                    "demonstrate",
+                                    "finally",
+                                    "significantly",
+                                    "explore",
+                                    "ii"),
+                           lexicon = "own_built") # We remove typical abstract words and figures
+stop_words<- rbind(stop_words, remove_words)
 remove_expressions <- c("'s", "\\.")
 
-term_list <- Corpus %>% 
-  filter(! is.na(abstract) & 
-           JEL_id == 1 &
-           Annee_Bibliographique <= 2007) %>% 
-  unite("word", Titre, abstract, sep = " ") %>% 
-  select(ID_Art, word) %>% 
-  unnest_tokens(word, word, token = "ngrams", n_min = 1, n = 2) %>% 
-  separate(word, into = c("word_1", "word_2"), sep = " ") %>% 
-  mutate(word_2 = ifelse(is.na(word_2), "", word_2)) %>% 
+term_list <- text %>% 
+  unnest_tokens(word, word, token = "ngrams", n_min = 1, n = 3, drop = FALSE) %>% 
+  separate(word, into = c("word_1", "word_2", "word_3"), sep = " ") %>% 
+  mutate(unigram = is.na(word_2) & is.na(word_3),
+         bigram = !is.na(word_2) & is.na(word_3)) %>% 
+  mutate(ngram = ifelse(unigram == TRUE, "unigram", NA),
+         ngram = ifelse(bigram == TRUE, "bigram", ngram),
+         ngram = ifelse(is.na(ngram), "trigram", ngram)) %>% 
+  mutate(word_2 = ifelse(is.na(word_2), "", word_2),
+         word_3 = ifelse(is.na(word_3), "", word_3)) %>% 
   mutate(word_1 = str_remove_all(word_1, paste0(remove_expressions, collapse = "|")),
-         word_2 = str_remove_all(word_2, paste0(remove_expressions, collapse = "|"))) %>% 
+         word_2 = str_remove_all(word_2, paste0(remove_expressions, collapse = "|")),
+         word_3 = str_remove_all(word_3, paste0(remove_expressions, collapse = "|"))) %>% 
   filter(! str_detect(word_1, "[:digit:]") &
-           ! str_detect(word_2, "[:digit:]")) %>% 
+           ! str_detect(word_2, "[:digit:]") &
+           ! str_detect(word_3, "[:digit:]")) %>% 
   anti_join(stop_words, by = c("word_1" = "word")) %>% 
   anti_join(stop_words, by = c("word_2" = "word")) %>% 
-  mutate(word_1 = textstem::lemmatize_words(word_1), 
-         word_2 = textstem::lemmatize_words(word_2)) %>% 
-  anti_join(remove_words, by = c("word_1" = "word")) %>% 
-  anti_join(remove_words, by = c("word_2" = "word")) %>% 
-  unite(term, word_1, word_2, sep = " ") %>% 
-  mutate(term = str_trim(term, "both"))
+  anti_join(stop_words, by = c("word_3" = "word")) %>% 
+  unite(term, word_1, word_2, word_3, sep = " ") %>% 
+  mutate(term = str_trim(term, "both")) %>% 
+  select(-unigram, -bigram)
+term_list <- merge(term_list, text[,c("ID_Art","have_abstract")], by = "ID_Art")
 
 #' We will now produce different set of data depending on different filtering parameters:
 #' 
 hyper_grid <- expand.grid(
   upper_share = c(0.5, 0.4),
-  lower_share = c(0.01, 0.015, 0.02),
-  min_word = 0,
+  lower_share = c(0.01, 0.02),
+  min_word = c(3, 6, 13),
   max_word = Inf,
-  prop_word = c(0.9, 1)
-)
+  prop_word = 1)
 
 #' The first step is to use a function to create a list of words data depending on different
 #' feature selection criteria (listed in `hyper_grid`).
 
-data_set <- create_topicmodels_dataset(hyper_grid, term_list, document_name = "ID_Art")
+data_set_trigram <- create_topicmodels_dataset(hyper_grid, 
+                                       term_list, 
+                                       document_name = "ID_Art",
+                                       different_ngram = TRUE)
+data_set_trigram[, trigram := TRUE]
+
+data_set_bigram <- create_topicmodels_dataset(hyper_grid, 
+                                              filter(term_list, ngram != "trigram"), 
+                                              document_name = "ID_Art",
+                                              different_ngram = TRUE)
+data_set_bigram[, trigram := FALSE]
+data_set <- rbind(data_set_trigram, data_set_bigram)
 
 #' The second step is to use the different data sets to create stm objects and them to fit 
 #' topic models for different number of topics.
@@ -193,7 +305,7 @@ nb_cores <- availableCores()/2 + 1
 plan(multicore, workers = 2)
 
 data_set <- create_stm(data_set) 
-topic_number <- seq(20, 100, 10) 
+topic_number <- seq(20, 90, 10) 
 many_models <- create_many_models(data_set, topic_number, max.em.its = 700, seed = 1989)
 
 #' The third step is to calculate different statistics for each model and produce 

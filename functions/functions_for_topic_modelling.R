@@ -34,7 +34,8 @@ filter_terms <- function(data, upper_share = 1,
                          max_word = Inf,
                          prop_word = 1,
                          document_name = "document",
-                         term_name = "term") {
+                         term_name = "term",
+                         different_ngram = FALSE) {
   
   data.table::setDT(data)
   data_dt <- copy(data)
@@ -42,7 +43,7 @@ filter_terms <- function(data, upper_share = 1,
                        c(document_name, term_name),
                        c("document", "term"))
   
-  
+  if(different_ngram == FALSE) {
   data_filtered <- data_dt %>% 
     .[, count := .N, by = term] %>%
     .[, nb_words := .N, by = document] %>% 
@@ -51,11 +52,34 @@ filter_terms <- function(data, upper_share = 1,
     .[, nb_apparition := .N/length(unique(data_dt$document)), by = term] %>% 
     .[between(nb_apparition, lower_share, upper_share) & between(nb_words, min_word, max_word)] %>% 
     slice_max(order_by = count, prop = prop_word) 
+  } else {
+    count_unigram <- data_dt %>% 
+      filter(ngram == "unigram") %>% 
+      group_by(document) %>% 
+      count(document) %>% 
+      rename(nb_words = n) %>% 
+      as.data.table()
+    data_dt <- merge(data_dt, count_unigram, by = "document")
+    
+    data_filtered <- data_dt %>% 
+      .[, count := .N, by = term] %>%
+      .[, count_per_doc := .N, by = c("term", "document")] %>% 
+      unique() %>% 
+      .[, nb_apparition := .N/length(unique(data_dt$document)), by = term] %>% 
+      .[between(nb_apparition, lower_share, upper_share) & between(nb_words, min_word, max_word)] %>% 
+      slice_max(order_by = count, prop = prop_word) 
+  }
+  return(data_filtered)
 }
 
 #' # Functions for creating the data table for different pre-processing criteria
 #' 
-create_topicmodels_dataset <- function(tuning_parameters, data, document_name = "document", term_name = "term") {
+create_topicmodels_dataset <- function(tuning_parameters, 
+                                       data, 
+                                       document_name = "document", 
+                                       term_name = "term",
+                                       different_ngram = FALSE,
+                                       verbose = TRUE) {
   data_list <- list()
   for(i in 1:nrow(hyper_grid)) {
     data_filtered <- filter_terms(data,
@@ -65,7 +89,8 @@ create_topicmodels_dataset <- function(tuning_parameters, data, document_name = 
                                   max_word = hyper_grid$max_word[i],
                                   prop_word = hyper_grid$prop_word[i],
                                   document_name = document_name,
-                                  term_name = term_name)
+                                  term_name = term_name,
+                                  different_ngram = different_ngram)
     data_filtered <- data_filtered %>% 
       mutate(upper_share = hyper_grid$upper_share[i],
              lower_share = hyper_grid$lower_share[i],
@@ -74,6 +99,13 @@ create_topicmodels_dataset <- function(tuning_parameters, data, document_name = 
              prop_word = hyper_grid$prop_word[i])
     
     data_list[[i]] <- data_filtered
+    
+    if(verbose == TRUE) {
+      message(paste0("Hyper grid ", i, 
+                     " completed. The resulting data frame has ", 
+                     nrow(data_filtered),
+                     "rows."))
+    }
     
   }
   
