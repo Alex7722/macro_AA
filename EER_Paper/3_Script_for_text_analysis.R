@@ -274,7 +274,7 @@ term_list <- merge(term_list, text[,c("ID_Art","have_abstract")], by = "ID_Art")
 #' We will now produce different set of data depending on different filtering parameters:
 #' 
 hyper_grid <- expand.grid(
-  upper_share = c(0.5, 0.4),
+  upper_share = c(0.4, 0.35),
   lower_share = c(0.01, 0.02),
   min_word = c(3, 6, 13),
   max_word = Inf,
@@ -322,20 +322,18 @@ tuning_results <- stm_results(many_models)
 #' We can now project the different statistics to choose the best model(s).
 plot_topic_models  <- plot_topicmodels_stat(tuning_results)
 
-agg_png(paste0(picture_path, "tuning_topicmodels_summary.png"),
-        width = 13, height = 10, units = "cm", res = 300)
-plot_topic_models$summary
-invisible(dev.off())
+plot_topic_models$summary %>%
+  ggplotly() %>% 
+  htmlwidgets::saveWidget(paste0(picture_path, "tuning_topicmodels_summary.html"))
 
-agg_png(paste0(picture_path, "tuning_topicmodels_coherence_vs_exclusivity.png"),
-        width = 13, height = 10, units = "cm", res = 300)
+ragg::agg_png(paste0(picture_path, "tuning_topicmodels_coherence_vs_exclusivity.png"),
+        width = 20, height = 15, units = "cm", res = 300)
 plot_topic_models$exclusivity_coherence
 invisible(dev.off())
 
-agg_png(paste0(picture_path, "tuning_topicmodels_mix_measure.png"),
-        width = 13, height = 10, units = "cm", res = 300)
-plot_topic_models$exclusivity_coherence_mean %>% ggplotly()
-invisible(dev.off())
+plot_topic_models$exclusivity_coherence_mean %>%
+  ggplotly() %>% 
+  htmlwidgets::saveWidget(paste0(picture_path, "tuning_topicmodels_frex_general.html"))
 
 #' If we want to look at the stat in an interactive framework, we can do:
 #' 
@@ -344,20 +342,39 @@ invisible(dev.off())
 
 #' For now, we select the preprocessing 12 and 30 topics.
 #' 
-#' ### Working with the chosen topic model
+#' ### Working with the chosen topic model: basic description
 
 id <- 12
 nb_topics <- 30 
-chosen_model <- tuning_results[preprocessing_id == id & K == nb_topics]$topic_model[[1]]
 
+#' Now we can add the covariates. It seems that it is not changing the topic
+#' model too much. The topics are the same, just the order of the words can
+#' change. Perhaps that is not changing it at all and the small changes
+#' are just linked to the random part of the stm function. 
 
-#' If we want to save the topics and the most identifying words:
-#' `saveRDS(topics, paste0(data_path, "topic_model_EER.rds"))`.
+# extracting the data
+stm_data <- tuning_results[preprocessing_id == id & K == nb_topics]$stm[[1]]
+metadata <- data.table("ID_Art" = names(stm_data$documents))
 
-plot_beta <- plot_beta_value(chosen_model, n = 15) +
-  scale_fill_viridis_d()
-plot_beta +
-  ggsave(paste0(picture_path,"topic_model_", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
+# merging with corpus data and selecting the covariates
+Corpus_merged <- merge(Corpus[, c("ID_Art", "Annee_Bibliographique")], 
+                       unique(Institutions[, c("ID_Art", "EU_US_collab")]),
+                       by = "ID_Art")
+metadata <- merge(metadata, Corpus_merged, by = "ID_Art")
+stm_data$meta$Year <- as.integer(metadata$Annee_Bibliographique)
+stm_data$meta$Origin <- metadata$EU_US_collab
+
+#' We can now fit again the topic model for the same number of topics,
+#' but adding the covariates for topic prevalence and topic content.
+
+topic_model <- stm(stm_data$documents, 
+                   stm_data$vocab, 
+                   prevalence = ~s(Year) + Origin,
+                   content = ~Origin,
+                   data = stm_data$meta,
+                   K = nb_topics,
+                   init.type = "Spectral",
+                   seed = 1989)
 
 #' We can use the stm package function to plot some descriptive visualisations.
 #' For certain visualisations, we can extract the data to use ggplot/ggraph.
@@ -366,8 +383,11 @@ plot_beta +
 #' This data.frame can also be used to give name to the topics. We will use it
 #' for the nodes of the topic correlation network.
 
-top_terms <- extract_top_terms(chosen_model)
-topics <- name_topics(top_terms, "frex", nb_word = 4)
+top_terms <- extract_top_terms(topic_model,
+                               tuning_results[preprocessing_id == id & K == nb_topics]$data[[1]],
+                               nb_terms = 15,
+                               frexweight = 0.3)
+topics <- name_topics(top_terms, method = "frex", nb_word = 2)
 
 # Setup Colors
 color <- data.table::data.table(
@@ -376,16 +396,32 @@ color <- data.table::data.table(
             scico(n = nb_topics/2 + 1, begin = 0.6, palette = "roma")))
 topics <- merge(topics, color, by = "id")
 
+#' We plot the terms with the highest FREX value for each topic:
+top_terms %>%
+  filter(measure == "frex") %>% 
+  inner_join(topics[, c("id", "color")], by = c("topic" = "id")) %>% 
+  mutate(term = reorder_within(term, value, topic)) %>%
+  ggplot(aes(value, term)) +
+  scale_fill_identity() +
+  geom_col(aes(fill = color), show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  scale_y_reordered() +
+  coord_cartesian(xlim=c(0.95,1)) +
+  ggsave(paste0(picture_path,"topic_model_", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
+
 #' We now plot the frequency of each topics:
-plot_frequency(topics) +
+#' 
+
+plot_frequency(topics, model) +
   ggsave(paste0(picture_path,"topic_model_frequency_", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
 
 #' We now plot the topic correlation network:
 set.seed(1989)
-topic_corr_network <- ggraph_topic_correlation(chosen_model, 
+topic_corr_network <- ggraph_topic_correlation(topic_model, 
                                                nodes = topics,
                                                method = "huge", 
-                                               size_label = 3) +
+                                               size_label = 3) 
++
   ggsave(paste0(picture_path,"topic_correlation", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
 
 #' We can look at some topics we find close to understand better their differences:
@@ -412,34 +448,7 @@ invisible(dev.off())
 
 #' ## Topic model and covariates
 #' 
-#' Now we can add the covariates. It seems that it is not changing the topic
-#' model too much. The topics are the same, just the order of the words can
-#' change. Perhaps that is not changing it at all and the small changes
-#' are just linked to the random part of the stm function. 
 
-# extracting the data
-stm_data <- tuning_results[preprocessing_id == id & K == nb_topics]$stm[[1]]
-metadata <- data.table("ID_Art" = names(stm_data$documents))
-
-# merging with corpus data and selecting the covariates
-Corpus_merged <- merge(Corpus[, c("ID_Art", "Annee_Bibliographique")], 
-                       unique(Institutions[, c("ID_Art", "EU_US_collab")]),
-                       by = "ID_Art")
-metadata <- merge(metadata, Corpus_merged, by = "ID_Art")
-stm_data$meta$Year <- as.integer(metadata$Annee_Bibliographique)
-stm_data$meta$Origin <- metadata$EU_US_collab
-
-#' We can now fit again the topic model for the same number of topics,
-#' but adding the covariates for topic prevalence and topic content.
-
-topic_model <- stm(stm_data$documents, 
-                   stm_data$vocab, 
-                   prevalence = ~s(Year) + Origin,
-                   content = ~Origin,
-                   data = stm_data$meta,
-                   K = nb_topic,
-                   init.type = "Spectral",
-                   seed = 1989)
 
 top_terms <- extract_top_terms(topic_model)
 topics_covariate <- name_topics(top_terms, "frex", nb_word = 4)

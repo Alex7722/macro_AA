@@ -241,6 +241,101 @@ harmonic_mean_exclusivity_coherence <- function(weight, semantic_coherence_mean,
   measure <- (weight/semantic_coherence_mean + (1 - weight)/exclusivity_mean)^(-1)
 }
 
+#' ## Calculate FREX measure
+#' 
+#' Inspired by the STM package but a bit revisited to fit with our goals
+
+calculate_frex <- function(model, nb_terms = 10, w = 0.5) {
+logbeta <- model$beta$logbeta[[1]]
+
+col.lse <- function(mat) {
+  matrixStats::colLogSumExps(mat)
+}
+
+excl <- t(t(logbeta) - col.lse(logbeta))
+freqscore <- apply(logbeta,1,data.table::frank)/ncol(logbeta)
+exclscore <- apply(excl,1,data.table::frank)/ncol(logbeta)
+frex <- 1/(w/freqscore + (1-w)/exclscore)
+frex <- data.table("term" = model$vocab,
+                   as.data.table(frex)) %>% 
+  pivot_longer(cols = starts_with("V"), 
+               names_to = "topic", 
+               values_to = "frex") %>%
+  mutate(topic = as.integer(str_remove(topic, "V"))) %>% 
+  group_by(topic) %>% 
+  slice_max(frex, n = nb_terms) %>% 
+  select(topic, term, frex) %>% 
+  mutate(rank = row_number(),
+         mean = mean(frex))
+}
+
+#' ## Calculate Beta (Highest probability of a word per topic):
+#' 
+calculate_beta <- function(model, nb_terms = 10) {
+beta_value <- tidytext::tidy(model, matrix = "beta") %>% 
+  filter(! is.na(topic) & ! is.na(term)) %>% 
+  group_by(topic) %>% 
+  slice_max(beta, n = nb_terms) %>% 
+  mutate(rank = row_number())
+}
+
+#' ## Calculate Score measure (cf. stm package):
+#' 
+calculate_score <- function(model, nb_terms = 10) {
+  logbeta <- model$beta$logbeta[[1]]
+  
+  ldascore <- exp(logbeta)*(logbeta - rep(colMeans(logbeta), each=nrow(logbeta)))
+  ldascore <- t(ldascore)
+  ldascore <- data.table("term" = model$vocab,
+                       as.data.table(ldascore)) %>%
+  pivot_longer(cols = starts_with("V"), 
+               names_to = "topic", 
+               values_to = "score") %>% 
+  mutate(topic = as.integer(str_remove(topic, "V"))) %>% 
+  group_by(topic) %>% 
+  slice_max(score, n = nb_terms) %>% 
+  select(topic, term, score) %>% 
+  mutate(rank = row_number())
+}
+
+#' ## Calculate Lift measure (cf. stm package):
+#' 
+calculate_lift <- function(model, list_terms, nb_terms = 10) {
+  wordcounts <- list_terms %>% select(term, count) %>% unique() %>% arrange(term)
+  logbeta <- model$beta$logbeta[[1]]
+  emp.prob <- log(wordcounts$count) - log(sum(wordcounts$count))
+  lift <- logbeta - rep(emp.prob, each=nrow(logbeta)) 
+  lift <- t(lift)
+  lift <- data.table("term" = tuning_results[preprocessing_id == id & K == nb_topics]$topic_model[[1]]$vocab,
+                     as.data.table(lift)) %>% 
+    pivot_longer(cols = starts_with("V"), 
+                 names_to = "topic", 
+                 values_to = "lift") %>%
+    mutate(topic = as.integer(str_remove(topic, "V"))) %>% 
+    group_by(topic) %>% 
+    slice_max(lift, n = nb_terms) %>% 
+    select(topic, term, lift) %>% 
+    mutate(rank = row_number())
+}
+
+#' ## Extract top terms for 4 different measures (beta, FREX, score, lift)
+#' 
+extract_top_terms <- function(model, list_terms, nb_terms = 10, frexweight = 0.5) {
+  frex_value <- calculate_frex(model, nb_terms = nb_terms, w = frexweight) %>% 
+    mutate(measure = "frex") %>% 
+    rename(value = frex) %>% 
+    select(-mean)
+  beta_value <- calculate_beta(model, nb_terms = nb_terms) %>% 
+    mutate(measure = "beta") %>% 
+    rename(value = beta)
+  score_value <- calculate_score(model, nb_terms = nb_terms) %>% 
+    mutate(measure = "score") %>% 
+    rename(value = score)
+  lift_value <- calculate_lift(model, list_terms = list_terms, nb_terms = nb_terms)%>% 
+    mutate(measure = "lift") %>% 
+    rename(value = lift)
+  top_terms <- rbind(frex_value, beta_value, score_value, lift_value)
+}
 #' ## Building multiple plots for summing up the topic models statistics
 #' 
 plot_topicmodels_stat <- function(data, size = 1, weight_1 = 0.5, weight_2 = 0.3){
@@ -308,6 +403,7 @@ plot_topicmodels_stat <- function(data, size = 1, weight_1 = 0.5, weight_2 = 0.3
 #' 
 #' ## Plot top beta words
 #' 
+#' > Deprecated
 
 plot_beta_value <- function(model, nb_terms = 10){
 beta_top_terms <- tidytext::tidy(model, matrix = "beta") %>% 
@@ -330,8 +426,10 @@ beta_top_terms %>%
 #' measures calculated in the `stm` package. It serves to 
 #' better describe the topics and to used other measures for
 #' labelling the topic if we don't want to use beta (the "prob" measure).
+#' 
+#' > Deprecated
 
-extract_top_terms <- function(model, 
+extract_top_terms_old <- function(model, 
                               nb_words = 20, 
                               weight_frex = 0.4){
 terms <- stm::labelTopics(model, n = nb_words, frexweight = weight_frex)
@@ -359,14 +457,17 @@ return(top_terms)
 
 #' ## Naming topics
 #' 
-name_topics <- function(data, measure, nb_word = 3) {
+name_topics <- function(data, 
+                        method = c("beta", "frex", "score", "lift"), 
+                        nb_word = 3) {
   labels <- data %>% 
-    filter(rank <= nb_word) %>%
-    select(topic, measure) %>% 
+    filter(rank <= nb_word & 
+             measure == method) %>%
+    select(topic, term, value) %>% 
     group_by(topic) %>%
-    mutate(term_label = paste0(.data[[measure]], collapse = " / ")) %>% 
+    mutate(term_label = paste0(term, collapse = " / ")) %>% 
     ungroup() %>% 
-    select(-measure) %>% 
+    select(-value, -term) %>% 
     rename(id = topic) %>% 
     mutate(topic = paste0("Topic ", id),
            topic_name = paste0(topic, "\n", term_label)) %>% 
@@ -397,20 +498,24 @@ graph_corr <- tbl_graph(nodes = nodes, edges = edges, directed = FALSE)
 graph_corr <- leiden_workflow(graph_corr)
 graph_corr <- community_colors(graph_corr, palette = scico(n = length(unique((V(graph_corr)$Com_ID))), palette = "roma", begin = 0.1))
 graph_corr <- vite::complete_forceatlas2(graph_corr, first.iter = 5000)
-ggraph(graph_corr, layout = "manual", x = x, y = y) +
+graph_plot <- ggraph(graph_corr, layout = "manual", x = x, y = y) +
   geom_edge_arc0(aes(color = color_edges, width = weight), strength = 0.3, alpha = 0.8, show.legend = FALSE) +
   scale_edge_width_continuous(range = c(0.5,12)) +
   scale_edge_colour_identity() +
   scale_fill_identity() +
   geom_node_label(aes(label = topic_name, fill = color), size = size_label, alpha = 0.85)
+
+list <- list("graph" = graph_corr,
+             "plot" = graph_plot)
+return(list)
 }
 
 #' ## Plot topic frequency
 #' 
-plot_frequency <- function(topics){
+plot_frequency <- function(topics, model){
   topics <- topics %>% 
     arrange(id) %>% 
-    mutate(frequency = colMeans(chosen_model$theta)) %>% 
+    mutate(frequency = colMeans(model$theta)) %>% 
     as.data.table()
   topics$topic <- factor(topics$topic, levels = topics[order(frequency)]$topic)
   
@@ -421,7 +526,7 @@ plot_frequency <- function(topics){
     theme(legend.position = "none") +
     geom_label(aes(x = frequency, color = color, label = term_label), size = 4, alpha = 1, hjust = -0.01) +
     scale_color_identity() +
-    expand_limits(x = c(0, max(frequency$frequency) + 0.015)) +
+    expand_limits(x = c(0, max(topics$frequency) + 0.015)) +
     labs(title = "Top Topics",
          x = "Frequency",
          y = "") +

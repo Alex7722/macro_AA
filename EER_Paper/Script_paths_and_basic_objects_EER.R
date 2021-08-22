@@ -12,7 +12,7 @@ package_list <- c(
   "grid", "ggdendro", "readtext", "pander","RColorBrewer",
   "scico","plotly","crosstalk","widgetframe","sigmajs",
   "ggdark","topicmodels","ggrepel","stm", "tidystm", "huge",
-  "spacyr")
+  "spacyr", "htmlwidgets")
 for (p in package_list) {
   if (p %in% installed.packages() == FALSE) {
     install.packages(p, dependencies = TRUE)
@@ -20,7 +20,10 @@ for (p in package_list) {
   library(p, character.only = TRUE)
 }
 
-github_list <- c("ParkerICI/vite", "agoutsmedt/biblionetwork", "agoutsmedt/networkflow")
+github_list <- c("ParkerICI/vite",
+                 "agoutsmedt/biblionetwork", 
+                 "agoutsmedt/networkflow",
+                 "mikajoh/tidystm")
 for (p in github_list) {
   if (gsub(".*/", "", p) %in% installed.packages() == FALSE) {
     devtools::install_github(p)
