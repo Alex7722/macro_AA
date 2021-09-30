@@ -269,14 +269,23 @@ frex <- data.table("term" = model$vocab,
          mean = mean(frex))
 }
 
+#' Calculate Frex mean
+#' 
+average_frex <- function(model, nb_terms = 10, w = 0.5) {
+  frex_mean <- calculate_frex(model, nb_terms = nb_terms, w = w) %>% 
+    select(topic, mean) %>% 
+    unique()
+  frex_mean <- mean(frex_mean$mean)
+} 
+
 #' ## Calculate Beta (Highest probability of a word per topic):
 #' 
 calculate_beta <- function(model, nb_terms = 10) {
-beta_value <- tidytext::tidy(model, matrix = "beta") %>% 
-  filter(! is.na(topic) & ! is.na(term)) %>% 
-  group_by(topic) %>% 
-  slice_max(beta, n = nb_terms) %>% 
-  mutate(rank = row_number())
+  beta_value <- tidytext::tidy(model, matrix = "beta") %>% 
+    filter(! is.na(topic) & ! is.na(term)) %>% 
+    group_by(topic) %>% 
+    slice_max(beta, n = nb_terms) %>% 
+    mutate(rank = row_number())
 }
 
 #' ## Calculate Score measure (cf. stm package):
@@ -287,15 +296,15 @@ calculate_score <- function(model, nb_terms = 10) {
   ldascore <- exp(logbeta)*(logbeta - rep(colMeans(logbeta), each=nrow(logbeta)))
   ldascore <- t(ldascore)
   ldascore <- data.table("term" = model$vocab,
-                       as.data.table(ldascore)) %>%
-  pivot_longer(cols = starts_with("V"), 
-               names_to = "topic", 
-               values_to = "score") %>% 
-  mutate(topic = as.integer(str_remove(topic, "V"))) %>% 
-  group_by(topic) %>% 
-  slice_max(score, n = nb_terms) %>% 
-  select(topic, term, score) %>% 
-  mutate(rank = row_number())
+                         as.data.table(ldascore)) %>%
+    pivot_longer(cols = starts_with("V"), 
+                 names_to = "topic", 
+                 values_to = "score") %>% 
+    mutate(topic = as.integer(str_remove(topic, "V"))) %>% 
+    group_by(topic) %>% 
+    slice_max(score, n = nb_terms) %>% 
+    select(topic, term, score) %>% 
+    mutate(rank = row_number())
 }
 
 #' ## Calculate Lift measure (cf. stm package):
@@ -338,7 +347,7 @@ extract_top_terms <- function(model, list_terms, nb_terms = 10, frexweight = 0.5
 }
 #' ## Building multiple plots for summing up the topic models statistics
 #' 
-plot_topicmodels_stat <- function(data, size = 1, weight_1 = 0.5, weight_2 = 0.3){
+plot_topicmodels_stat <- function(data, size = 1, weight_1 = 0.5, weight_2 = 0.3, nb_terms = 10){
   
   results_summary <- data %>%
     transmute(K,
@@ -376,20 +385,22 @@ plot_topicmodels_stat <- function(data, size = 1, weight_1 = 0.5, weight_2 = 0.3
          title = "Exclusivity versus Coherence by number of topics and preprocessing type")
   
   mix_measure <- tuning_results %>% 
-    mutate(mix_measure_1 = harmonic_mean_exclusivity_coherence(weight_1, semantic_coherence_mean, exclusivity_mean),
-           mix_measure_2 = harmonic_mean_exclusivity_coherence(weight_2, semantic_coherence_mean, exclusivity_mean)) %>% 
-    select(preprocessing_id, K, mix_measure_1, mix_measure_2)
-  setnames(mix_measure, c("mix_measure_1","mix_measure_2"), c(paste0("mean_weight_",weight_1), paste0("mean_weight_",weight_2)))
+    mutate(frex_data_1 = map(topic_model, average_frex, w = weight_1, nb_terms = nb_terms),
+           frex_data_2 = map(topic_model, average_frex, w = weight_2, nb_terms = nb_terms)) %>% 
+    select(preprocessing_id, K, frex_data_1, frex_data_2)
+  setnames(mix_measure, c("frex_data_1","frex_data_2"), c(paste0("frex_mean_",weight_1), paste0("frex_mean_",weight_2)))
+  
   plot_mix_measure <- mix_measure %>% 
-    pivot_longer(cols = starts_with("mean"), names_to = "measure", values_to = "measure_value") %>% 
+    pivot_longer(cols = starts_with("frex"), names_to = "measure", values_to = "measure_value") %>% 
+    mutate(measure_value = unlist(measure_value)) %>% 
     ggplot(aes(K, measure_value, color = as.factor(preprocessing_id), group = as.factor(preprocessing_id))) +
     geom_point(size = size, alpha = 0.7) +
     geom_line() +
     facet_wrap(~measure, scales = "free_y") +
     theme_bw() +
     labs(x = "Number of topics",
-         y = "Harmonic mean",
-         title = "Harmonic mean of Exclusivity versus Coherence for different weights")
+         y = "Frex mean",
+         title = "Frex mean value for different number of topics and preprocessing steps")
   
   plot_list <- list("summary" = plot_summary, 
                     "exclusivity_coherence" = plot_exclusivity_coherence, 
@@ -481,7 +492,7 @@ ggraph_topic_correlation <- function(model,
                                      top_terms = NULL, 
                                      method = c("simple", "huge"), 
                                      size_label = 4){
-correlation <- topicCorr(chosen_model, method = method)
+correlation <- topicCorr(model, method = method)
 
 if(is.null(nodes)){
 nodes <- name_topics(top_terms, "frex", nb_word = 4)
