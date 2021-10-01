@@ -812,7 +812,7 @@ naming_communities <- function(graph, centrality_measure = "Strength", naming = 
 }
 
 
-# Force Atlas Function
+# Force Atlas Functions
 force_atlas <- function(graph, seed = NULL, ew.influence = 1, kgrav = 1, iter_1 = 5000, iter_2 = 200, barnes.hut = FALSE, change_size = TRUE, size_min = 10, size_max = 50) {
   #' Force Atlas 2 algorithm for the graph (without overlap)
   #'
@@ -894,6 +894,66 @@ force_atlas <- function(graph, seed = NULL, ew.influence = 1, kgrav = 1, iter_1 
   graph <- graph %>%
     activate(nodes) %>%
     mutate(x = fa$x, y = fa$y)
+}
+
+layout_fa2_java <- function(graph_list,
+                            niter = 3000,
+                            threads = 2,
+                            gravity = 1)
+{
+  #Layout
+  graph_before <- graph_list %>% 
+    activate(nodes) %>% 
+    mutate(id = as.character(Id))
+  nodes_before <- graph_list %>% 
+    activate(nodes) %>% 
+    as.data.table()
+  
+  if("x" %in% colnames(nodes_before)){
+    graph_before <- graph_before %>% 
+      activate(nodes) %>% 
+      mutate(x = ifelse(is.na(x) == TRUE, sample(1:100), x))
+    graph_before <- graph_before %>% 
+      activate(nodes) %>% 
+      mutate(y = ifelse(is.na(y) == TRUE, sample(1:100), y))
+    graph_before <- graph_before %>% 
+      activate(nodes) %>% 
+      select(id, ID_Art, x, y, size)
+  }
+  else{
+    graph_before <- graph_before %>% 
+      activate(nodes) %>% 
+      select(id, ID_Art, size)
+  }
+  
+  write.graph(graph = graph_before, file = 'tidy.graphml', format = 'graphml')
+  system(paste0("java -jar GephiLayouts-1.0.jar forceatlas2 -i ./tidy.graphml -o  ./forceatlas2.graphml -threads ",
+                threads,
+                "-maxiters ",
+                niter,
+                " -barneshut true -adjustsizes true -gravity ",
+                gravity))
+  gml <- read.graph("forceatlas2.graphml", 
+                    format="graphml")
+  graph_after <- as_tbl_graph(gml)
+  graph_after <- graph_after %>% 
+    activate(nodes) %>% 
+    as.data.table() %>% 
+    .[,.(x,y,ID_Art)]
+  
+  if("x" %in% colnames(nodes_before)){
+    graph_list <- graph_list %>% 
+      activate(nodes) %>% 
+      select(-c(x,y)) %>% 
+      left_join(graph_after)
+  }
+  else{
+    graph_list <- graph_list %>% 
+      activate(nodes) %>% 
+      left_join(graph_after)
+  }
+  
+  return (graph_list)
 }
 
 # Simple functions for keeping a number n of nodes with highest citations measures per communities
@@ -1640,7 +1700,7 @@ dynamic_biblio_coupling <- function(corpus,
     nodes_of_the_year$threshold <- threshold_2
     
     # make tbl
-    tbl_list[[as.character(Year)]] <- tbl_graph(nodes = nodes_of_the_year, edges = edges, directed = FALSE, node_key = source)
+    tbl_list[[as.character(Year)]] <- networkflow::tbl_main_component(nodes = nodes_of_the_year, edges = edges, directed = FALSE, node_key = source)
   }
   
   return (tbl_list)
