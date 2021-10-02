@@ -318,9 +318,29 @@ tuning_results <- stm_results(many_models)
 #' And reload them at the beginning of a new session: 
 #' `tuning_results <- readRDS(paste0(data_path, "EER/topic_models.rds"))`.
 
+tuning_results_test <- tuning_results %>% 
+  mutate(frex_data_0.3 = map(topic_model, average_frex, w = weight_1),
+         frex_data_0.5 = map(topic_model, average_frex, w = weight_2))
 
+mix_measure <- tuning_results %>% 
+  mutate(frex_data_1 = map(topic_model, average_frex, w = weight_1, nb_terms = 20),
+         frex_data_2 = map(topic_model, average_frex, w = weight_2, nb_terms = 20)) %>% 
+  select(preprocessing_id, K, frex_data_1, frex_data_2)
+setnames(mix_measure, c("frex_data_1","frex_data_2"), c(paste0("frex_mean_",weight_1), paste0("frex_mean_",weight_2)))
+
+plot_mix_measure <- mix_measure %>% 
+  pivot_longer(cols = starts_with("frex"), names_to = "measure", values_to = "measure_value") %>% 
+  mutate(measure_value = unlist(measure_value)) %>% 
+  ggplot(aes(K, measure_value, color = as.factor(preprocessing_id), group = as.factor(preprocessing_id))) +
+  geom_point(size = size, alpha = 0.7) +
+  geom_line() +
+  facet_wrap(~measure, scales = "free_y") +
+  theme_bw() +
+  labs(x = "Number of topics",
+       y = "Frex mean",
+       title = "Frex mean value for different number of topics and preprocessing steps")
 #' We can now project the different statistics to choose the best model(s).
-plot_topic_models  <- plot_topicmodels_stat(tuning_results)
+plot_topic_models  <- plot_topicmodels_stat(tuning_results, nb_terms = 100)
 
 plot_topic_models$summary %>%
   ggplotly() %>% 
