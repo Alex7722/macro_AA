@@ -28,11 +28,11 @@ knitr::opts_chunk$set(eval = FALSE)
 
 #' # Loading packages, paths and data
 
-source("~/macro_AA/functions/functions_for_network_analysis.R")
-source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
+source("functions/functions_for_network_analysis.R")
+source("dynamic_networks/Script_paths_and_basic_objects.R")
 
 # loading the files 
-list_graph <- readRDS(paste0(graph_data_path, "list_graph_", 1969, "-", 2011, ".rds"))
+list_graph <- readRDS(paste0(graph_data_path, "list_graph_", first_year, "-", last_year, ".rds"))
 
 
 #' # Intertemporal Naming: Find Communities Across Time 
@@ -132,7 +132,7 @@ intertemporal_naming_function <- function(tbl_list = tbl_list,
         # si z% des noeuds vont vers une communauté unique, 
         # + cette communauté est composée à z% par les articles de Y, alors c'est la même communauté
         
-        if(dt$share_full_x[[1]]>threshold_similarity & dt$share_full_y[[1]]>threshold_similarity){
+        if(dt$share_full_x[[1]] > threshold_similarity & dt$share_full_y[[1]] > threshold_similarity){
           new_name <- dt[order(-share_full)]$Id_com.y[[1]]
           alluv_list[[paste0(com.x)]] <- data.table(new_Id_com.y = paste0(com.x), Id_com.y = new_name)
         }
@@ -171,11 +171,15 @@ intertemporal_naming_function <- function(tbl_list = tbl_list,
   return (intertemporal_naming)
 }
 
-intertemporal_naming <- intertemporal_naming_function(tbl_list = list_graph, community_column = "Com_ID", individual_ids = "ID_Art", threshold_similarity = 0.60)
+intertemporal_naming <- intertemporal_naming_function(list_graph, 
+                                                      community_column = "Com_ID", 
+                                                      individual_ids = "ID_Art", 
+                                                      threshold_similarity = 0.60)
 
 #' ## Transforming the data in alluvial compatible data
 
-make_into_alluv_dt <- function(intertemporal_networks = intertemporal_networks, community_column=new_Id_com){
+make_into_alluv_dt <- function(intertemporal_networks, 
+                               community_column = new_Id_com){
   
   #' This function 
   #' 
@@ -208,7 +212,7 @@ make_into_alluv_dt <- function(intertemporal_networks = intertemporal_networks, 
   return (alluv_dt)
 }
 
-alluv_dt <- make_into_alluv_dt(intertemporal_networks = intertemporal_naming)
+alluv_dt <- make_into_alluv_dt(intertemporal_naming)
 
 alluv_dt$new_Id_com   <- as.factor(alluv_dt$new_Id_com)
 alluv_dt$new_Id_com <- fct_reorder(alluv_dt$new_Id_com, alluv_dt$share_leiden_total,min, .desc = FALSE)

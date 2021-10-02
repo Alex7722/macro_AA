@@ -33,8 +33,10 @@ knitr::opts_chunk$set(eval = FALSE)
 #' and color palettes.
 
 #+ r source
-source("~/macro_AA/functions/functions_for_network_analysis.R")
-source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
+source("functions/functions_for_network_analysis.R")
+source("dynamic_networks/Script_paths_and_basic_objects.R")
+#source("functions/functions_dynamics_networks_alex.R")
+#source("functions/functions_networks_alex.R")
 
 #' # Building the networks
 #' 
@@ -48,45 +50,25 @@ source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
 #' Leiden.
 
 #+ r list
-tbl_coup_list <- dynamic_biblio_coupling(corpus = nodes_JEL[between(Annee_Bibliographique, 1969, 1990)], 
+tbl_coup_list <- dynamic_biblio_coupling(corpus = nodes_JEL[between(Annee_Bibliographique, 1969, 2015)], 
                                     direct_citation_dt = edges_JEL, 
                                     source = "ID_Art",
                                     source_as_ref = "ItemID_Ref",
-                                    ref = "New_id2", 
+                                    ref = "new_id", 
                                     time_variable = "Annee_Bibliographique",
                                     coupling_method = "coupling_strength",
                                     time_window_length = 5,
                                     time_window_move = 0,
-                                    weight_treshold = 2,
+                                    weight_threshold = 2,
                                     nodes_threshold = 0,
                                     controlling_nodes = FALSE,
-                                    controlling_edges = TRUE,
+                                    controlling_edges = FALSE,
                                     nodes_limit = 10000,
                                     edges_limit = 400000,
                                     distribution_pruning = FALSE,
                                     quantile_threshold = 1,
                                     quantile_move = 0)
 
-tbl_coup_list_bis <- dynamic_biblio_coupling(corpus = nodes_JEL[between(Annee_Bibliographique, 1987, 2015)], 
-                                         direct_citation_dt = edges_JEL, 
-                                         source = "ID_Art",
-                                         source_as_ref = "ItemID_Ref",
-                                         ref = "New_id2", 
-                                         time_variable = "Annee_Bibliographique",
-                                         coupling_method = "coupling_strength",
-                                         time_window_length = 5,
-                                         time_window_move = 0,
-                                         weight_treshold = 3,
-                                         nodes_threshold = 0,
-                                         controlling_nodes = FALSE,
-                                         controlling_edges = TRUE,
-                                         nodes_limit = 10000,
-                                         edges_limit = 500000,
-                                         distribution_pruning = FALSE,
-                                         quantile_threshold = 1,
-                                         quantile_move = 0)
-
-tbl_coup_list <- append(tbl_coup_list,tbl_coup_list_bis)
 
 # cleaning now useless objects
 gc()
@@ -95,11 +77,10 @@ rm(list = c("edges_JEL", "nodes_JEL","tbl_coup_list_bis"))
 #' ## Finding Communities
 
 #' We use the leiden_workflow function of the networkflow package (it uses the 
-#' leidenAlg package). We set the number of iteration at 10000 to be sure but 
-#' it seems to converge well before.
+#' leidenAlg package). 
 
 #+ r communities
-tbl_coup_list <- lapply(tbl_coup_list, leiden_workflow, niter = 10000)
+tbl_coup_list <- lapply(tbl_coup_list, leiden_workflow)
 # list_graph <- lapply(list_graph, FUN = community_colors, palette = mypalette)
 
 #+ r saving_com, include = FALSE
@@ -109,32 +90,44 @@ saveRDS(tbl_coup_list, paste0(graph_data_path, "list_graph_", names(tbl_coup_lis
 
 #' ## Running force atlas 
 
-tbl_coup_list <- readRDS(paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
+tbl_coup_list <- readRDS(paste0(graph_data_path, "list_graph_", first_year, "-", last_year, ".rds"))
+tbl_coup_list <- lapply(tbl_coup_list, function(tbl){tbl %>% activate(nodes) %>% mutate(size = nb_cit)})
 
 list_graph_position <- list()
 
 for (Year in all_years) {
   message(paste0("Running Force Atlas for the ", Year, "-", Year + time_window - 1, " window."))
-  if (is.null(tbl_coup_list[[paste0(Year - 1)]])) {
-    list_graph_position[[paste0(Year)]] <- force_atlas(tbl_coup_list[[paste0(Year)]], kgrav = 4, change_size = FALSE)
+  if(is.null(tbl_coup_list[[paste0(Year-1)]])){
+    list_graph_position[[paste0(Year)]] <- layout_fa2_java(tbl_coup_list[[paste0(Year)]])
   }
-  if (!is.null(tbl_coup_list[[paste0(Year - 1)]])) {
-    past_position <- list_graph_position[[paste0(Year - 1)]] %>%
-      activate(nodes) %>%
-      as.data.table()
-    past_position <- past_position[, .(ID_Art, x, y)]
-    tbl <- tbl_coup_list[[paste0(Year)]] %>%
-      activate(nodes) %>%
-      left_join(past_position)
-    list_graph_position[[paste0(Year)]] <- force_atlas(tbl, kgrav = 4, change_size = FALSE)
+  if(!is.null(tbl_coup_list[[paste0(Year-1)]])){
+    past_position <- list_graph_position[[paste0(Year-1)]] %>% activate(nodes) %>% as.data.table()
+    past_position <- past_position[,.(ID_Art,x,y)]
+    
+    tbl <- tbl_coup_list[[paste0(Year)]] %>% activate(nodes) %>% left_join(past_position)
+    
+    list_graph_position[[paste0(Year)]] <- layout_fa2_java(tbl)
+    print(Year)
   }
-  # saveRDS(tbl_coup_list, paste0(graph_data_path,"coupling_graph_",Year,"-",Year+time_window-1,".rds"))
-  saveRDS(list_graph_position[[paste0(Year)]], paste0(graph_data_path, "coupling_graph_", Year, "-", Year + time_window - 1, ".rds"))
-  gc()
 }
 
-saveRDS(list_graph_position, paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
+saveRDS(list_graph_position, paste0(graph_data_path, "list_graph_position", first_year, "-", last_year + time_window - 1, ".rds"))
+test <- readRDS(paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
 
+agg_png(paste0(picture_path, "coupling_graph_plot_test.png"),
+        width = 60, height = 40, units = "cm", res = 300)
+test[["2006"]] %>% 
+  ggraph("manual", x = x, y = y) + 
+  geom_edge_arc0(aes(color = Com_ID, width = weight), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
+  scale_edge_width_continuous(range = c(0.1,2)) +
+  geom_node_point(aes(x=x, y=y, size = nb_cit, fill = Com_ID), pch = 21, alpha = 0.9, show.legend = FALSE) +
+  scale_size_continuous(range = c(0.01,6)) +
+#  new_scale("size") +
+#  geom_text_repel(data=top_nodes, aes(x=x, y=y, label = Label), size = 3, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
+#  geom_label_repel(data=community_labels, aes(x=x, y=y, label = Community_name, fill = color, size = Size_com), fontface="bold", alpha = 0.8, point.padding=NA, show.legend = FALSE) +
+#  scale_size_continuous(range = c(1,5)) +
+  theme_void()
+invisible(dev.off())
 
 #' ## Integrating Community names (temporary)
 

@@ -74,10 +74,10 @@ library(sigmajs)
 setwd("/projects/data/macro_AA")
 
 
-source("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R")
-source("~/macro_AA/functions/functions_for_network_analysis.R")
-source("/home/alexandre/functions_dynamics_networks.R")
-source("/home/alexandre/functions_networks.R")
+source("EER_Paper/Script_paths_and_basic_objects_EER.R")
+source("functions/functions_for_network_analysis.R")
+source("functions/functions_dynamics_networks_alex.R")
+source("functions/functions_networks_alex.R")
 
 Corpus <- readRDS(file = paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpus.rds"))
 Institutions <- readRDS(file = paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Institutions.rds"))
@@ -128,7 +128,7 @@ tbl_coup_list <- dynamics_coupling_networks(corpus = Corpus,
                                              target = "ItemID_Ref", 
                                              time_variable = Annee_Bibliographique,
                                              time_window = time_window, 
-                                             weight_treshold_value = 1)
+                                             weight_treshold_value = 2)
 
 #### Citations Total ####
 who_cites <- fread("EER/Corpus_EER/who_cites_EER.csv", quote="") %>% data.table
