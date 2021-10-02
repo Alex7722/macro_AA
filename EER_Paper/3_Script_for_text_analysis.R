@@ -136,7 +136,8 @@ text <- Corpus_cleaned %>%
   unite("word", Titre, abstract, sep = " ") %>% 
   select(ID_Art, word, have_abstract) %>% 
   mutate(word = str_remove(word, " NA$"),
-         id = row_number())
+         id = row_number()) %>% 
+  mutate(word = str_replace_all(word, "EURO-", "EURO"))
 
 position_excluded <- c("PUNCT", 
                        "CCONJ", 
@@ -199,7 +200,8 @@ to_correct <- data.table("to_correct" = c("experiments",
                                           "accommodation",
                                           "accommodative",
                                           "budgets",
-                                          "in1ationary"),
+                                          "in1ationary",
+                                          "markets"),
                          "correction" = c("experiment",
                                           "forecast",
                                           "forecast",
@@ -209,7 +211,8 @@ to_correct <- data.table("to_correct" = c("experiments",
                                           "accommodate",
                                           "accommodate",
                                           "budget",
-                                          "inflation"))
+                                          "inflation",
+                                          "market"))
 for(i in 1:nrow(to_correct)) {
   spacy_word[lemma == to_correct$to_correct[i]]$lemma <- to_correct$correction[i]
 }
@@ -364,7 +367,7 @@ plot_topic_models$exclusivity_coherence_mean %>%
 #' 
 #' ### Working with the chosen topic model: basic description
 
-id <- 12
+id <- 24
 nb_topics <- 30 
 
 #' Now we can add the covariates. It seems that it is not changing the topic
@@ -407,11 +410,11 @@ top_terms <- extract_top_terms(topic_model,
                                tuning_results[preprocessing_id == id & K == nb_topics]$data[[1]],
                                nb_terms = 15,
                                frexweight = 0.3)
-topics <- name_topics(top_terms, method = "frex", nb_word = 2)
+topics <- name_topics(top_terms, method = "frex", nb_word = 4)
 
 # Setup Colors
 color <- data.table::data.table(
-  id = 1:nb_topics,
+  id = 1:30,
   color = c(scico(n = nb_topics/2 - 1, begin = 0, end = 0.3, palette = "roma"),
             scico(n = nb_topics/2 + 1, begin = 0.6, palette = "roma")))
 topics <- merge(topics, color, by = "id")
@@ -426,27 +429,34 @@ top_terms %>%
   geom_col(aes(fill = color), show.legend = FALSE) +
   facet_wrap(~ topic, scales = "free") +
   scale_y_reordered() +
-  coord_cartesian(xlim=c(0.95,1)) +
+  coord_cartesian(xlim=c(0.93,1)) +
   ggsave(paste0(picture_path,"topic_model_", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
 
 #' We now plot the frequency of each topics:
 #' 
 
-plot_frequency(topics, model) +
+plot_frequency(topics, topic_model) +
   ggsave(paste0(picture_path,"topic_model_frequency_", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
 
 #' We now plot the topic correlation network:
 set.seed(1989)
 topic_corr_network <- ggraph_topic_correlation(topic_model, 
-                                               nodes = topics,
-                                               method = "huge", 
+                                               nodes = select(topics, -color),
+                                               method = "simple", 
                                                size_label = 3) 
-+
+topic_corr_network$plot +
   ggsave(paste0(picture_path,"topic_correlation", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
+
+# add communities to the topics file:
+communities <- topic_corr_network$graph %>% 
+  activate(nodes) %>% 
+  as.data.table %>% 
+  select(topic, Com_ID)
+topics <- merge(topics, communities, by = "topic")
 
 #' We can look at some topics we find close to understand better their differences:
 #' 
-similar_topics <- list(c(16,24),
+similar_topics <- list(c(4,22),
                        c(9,16),
                        c(23,7),
                        c(17,23),
@@ -459,21 +469,15 @@ ragg::agg_png(paste0(picture_path,"topic_comparison", id, "-", nb_topics, ".png"
               units = "cm")
 par(mfrow = c(3, 2))
 for(i in 1:length(similar_topics)){
-  plot.STM(chosen_model, type = "perspectives", 
+  plot.STM(topic_model, type = "perspectives", 
            topics = similar_topics[[i]], 
            n = 30, 
            text.cex = 1.5)
 }
 invisible(dev.off())
 
-#' ## Topic model and covariates
+#' ### Working with the chosen topic model: covariates
 #' 
-
-
-top_terms <- extract_top_terms(topic_model)
-topics_covariate <- name_topics(top_terms, "frex", nb_word = 4)
-topics_covariate <- merge(topics_covariate, topics[, c("id", "color")], by = "id")
-
 #' We fit regressions for our two covariates. We use a b-spline transformation
 #' for the year.
 prep <- estimateEffect(~s(Year) + Origin,
@@ -482,8 +486,11 @@ prep <- estimateEffect(~s(Year) + Origin,
                nsims = 50)
 
 #' We first look at the impact of year:
-tidyprep_year <- tidystm::extract.estimateEffect(prep, "Year", topic_model, method = "continuous")
-tidyprep_year <- merge(tidyprep_year, topics_covariate[, c("id", "topic_name", "color")], by.x = "topic", by.y = "id")
+tidyprep_year <- tidystm::extract.estimateEffect(prep, 
+                                                 "Year", 
+                                                 topic_model, 
+                                                 method = "continuous")
+tidyprep_year <- merge(tidyprep_year, topics[, c("id", "topic_name", "color")], by.x = "topic", by.y = "id")
 slope <- tidyprep_year %>% 
   filter(covariate.value == max(tidyprep_year$covariate.value) |
            covariate.value == min(tidyprep_year$covariate.value)) %>% 
@@ -505,6 +512,28 @@ ggplot(tidyprep_year, aes(x = covariate.value, y = estimate,
   geom_ribbon(alpha = .5, show.legend = FALSE) +
   geom_line()
 
+test <- tidyprep_year %>% 
+  mutate(year = str_remove(covariate.value, "\\..*")) %>% 
+  group_by(year, topic) %>% 
+  mutate(year_estimate = mean(estimate)) %>% 
+  select(topic_name, topic, year_estimate, year, color) %>% 
+  unique() %>% 
+  mutate(year_estimate = round(year_estimate, 3))
+
+
+  ungroup() %>% 
+  group_by(year) %>% 
+  mutate(sum = sum(year_estimate)) %>% 
+  ungroup() %>% 
+  mutate(rescaled_estimate = rescale)
+
+test %>% group_by %>% mutate(sum )
+
+plot <- ggplot(test, aes(x = year, y = year_estimate, fill = factor(topic_name), group = factor(topic_name))) +
+  geom_area(position = "stack")
+
+  ggplotly(plot)
+
 #' We now look at the importance of the geographical institutions of authors. We
 #' focus on papers writtent by European-based economists only, or by US-based
 #' authors only.
@@ -515,7 +544,10 @@ tidyprep_origin <- tidystm::extract.estimateEffect(prep,
                                                    cov.value1 = "Europe Only",
                                                    cov.value2 = "USA Only")
 
-tidyprep_origin <- merge(tidyprep_origin, topics_covariate[, c("id", "topic_name", "color")], by.x = "topic", by.y = "id") 
+tidyprep_origin <- merge(tidyprep_origin, 
+                         topics[, c("id", "topic_name", "color")], 
+                         by.x = "topic", 
+                         by.y = "id") 
 setDT(tidyprep_origin)
 tidyprep_origin$topic <- factor(tidyprep_origin$topic, levels = tidyprep_origin[order(estimate)]$topic)
 
