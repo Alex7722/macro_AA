@@ -7,6 +7,7 @@
 *.Rproj
 *.csv
 *.png
+*.jar
 
 # Ignoring html (usually compiled from Rmd)
 *.html
