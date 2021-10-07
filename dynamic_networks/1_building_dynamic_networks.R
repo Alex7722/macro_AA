@@ -91,32 +91,42 @@ saveRDS(tbl_coup_list, paste0(graph_data_path, "list_graph_", names(tbl_coup_lis
 #' ## Running force atlas 
 
 tbl_coup_list <- readRDS(paste0(graph_data_path, "list_graph_", first_year, "-", last_year, ".rds"))
-tbl_coup_list <- lapply(tbl_coup_list, function(tbl){tbl %>% activate(nodes) %>% mutate(size = nb_cit)})
+tbl_coup_list <- lapply(tbl_coup_list, 
+                        function(tbl){tbl %>% 
+                            activate(nodes) %>% 
+                            mutate(size = nb_cit,
+                                   ID_Art = as.character(ID_Art))})
 
 list_graph_position <- list()
 
 for (Year in all_years) {
   message(paste0("Running Force Atlas for the ", Year, "-", Year + time_window - 1, " window."))
   if(is.null(tbl_coup_list[[paste0(Year-1)]])){
-    list_graph_position[[paste0(Year)]] <- layout_fa2_java(tbl_coup_list[[paste0(Year)]])
+    list_graph_position[[paste0(Year)]] <- layout_fa2_java(tbl_coup_list[[paste0(Year)]],
+                                                           niter = 4000,
+                                                           threads = 8)
   }
   if(!is.null(tbl_coup_list[[paste0(Year-1)]])){
     past_position <- list_graph_position[[paste0(Year-1)]] %>% activate(nodes) %>% as.data.table()
     past_position <- past_position[,.(ID_Art,x,y)]
     
-    tbl <- tbl_coup_list[[paste0(Year)]] %>% activate(nodes) %>% left_join(past_position)
+    tbl <- tbl_coup_list[[paste0(Year)]] %>% 
+      activate(nodes) %>% 
+      left_join(past_position)
     
-    list_graph_position[[paste0(Year)]] <- layout_fa2_java(tbl)
+    list_graph_position[[paste0(Year)]] <- layout_fa2_java(tbl,
+                                                           niter = 4000,
+                                                           threads = 8)
     print(Year)
   }
 }
 
 saveRDS(list_graph_position, paste0(graph_data_path, "list_graph_position", first_year, "-", last_year + time_window - 1, ".rds"))
-test <- readRDS(paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
+
 
 agg_png(paste0(picture_path, "coupling_graph_plot_test.png"),
         width = 60, height = 40, units = "cm", res = 300)
-test[["2006"]] %>% 
+list_graph_position[["1988"]] %>% 
   ggraph("manual", x = x, y = y) + 
   geom_edge_arc0(aes(color = Com_ID, width = weight), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
   scale_edge_width_continuous(range = c(0.1,2)) +
@@ -128,6 +138,21 @@ test[["2006"]] %>%
 #  scale_size_continuous(range = c(1,5)) +
   theme_void()
 invisible(dev.off())
+
+# Rescaling coordinates and size
+list_graph_position <- readRDS(paste0(graph_data_path, "list_graph_", first_year, "-", last_year + time_window - 1, ".rds"))
+
+list_graph_position <- lapply(list_graph_position, 
+                        function(tbl){tbl %>% 
+                            activate(nodes) %>% 
+                            mutate(original_x = x,
+                                   original_y = y,
+                                   x = rescale(x, c(0, 1200)),
+                                   y = rescale(y, c(0, 1000)),
+                                   size = rescale(nb_cit, c(1,100)))})
+
+saveRDS(list_graph_position, paste0(graph_data_path, "list_graph_position", first_year, "-", last_year + time_window - 1, ".rds"))
+
 
 #' ## Integrating Community names (temporary)
 

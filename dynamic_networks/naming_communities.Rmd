@@ -65,6 +65,13 @@ if (length(doublons) != 0) {
 }
 
 # Adding info to references
+edges_JEL <- edges_JEL %>% mutate(ID_Art = as.character(ID_Art),
+                                   New_id2 = as.character(New_id2),
+                                  ItemID_Ref = as.character(ItemID_Ref))
+ref_info_JEL <- ref_info_JEL %>% mutate(New_id2 = as.character(New_id2))
+nodes_JEL <- nodes_JEL %>% mutate(ID_Art = as.character(ID_Art),
+                                  ItemID_Ref = as.character(ItemID_Ref))
+authors_JEL <- authors_JEL %>% mutate(ID_Art = as.character(ID_Art))
 edges_JEL <- merge(unique(edges_JEL), unique(ref_info_JEL[Titre != "NA" & ESpecialite != "NA", c("New_id2", "Titre", "ESpecialite")]), by = "New_id2", all.x = TRUE)
 edges_JEL <- merge(edges_JEL, unique(nodes_JEL[, c("ID_Art", "Annee_Bibliographique")]), by = "ID_Art", all.x = TRUE)
 
@@ -92,7 +99,7 @@ We have communities that just stay for five years, and some that persist for dec
 
 ```{r alluvial_plot, eval=TRUE}
 
-include_graphics(path.expand(paste0(picture_path,"alluvial.png")))
+include_graphics(path.expand(paste0("~/macro_AA/", picture_path, "alluvial.png")))
 
 ```
 

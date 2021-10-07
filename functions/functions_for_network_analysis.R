@@ -897,8 +897,8 @@ force_atlas <- function(graph, seed = NULL, ew.influence = 1, kgrav = 1, iter_1 
 }
 
 layout_fa2_java <- function(graph_list,
-                            niter = 3000,
-                            threads = 2,
+                            niter = 4000,
+                            threads = 4,
                             gravity = 1)
 {
   #Layout
@@ -929,7 +929,7 @@ layout_fa2_java <- function(graph_list,
   write.graph(graph = graph_before, file = 'tidy.graphml', format = 'graphml')
   system(paste0("java -jar GephiLayouts-1.0.jar forceatlas2 -i ./tidy.graphml -o  ./forceatlas2.graphml -threads ",
                 threads,
-                "-maxiters ",
+                " -maxiters ",
                 niter,
                 " -barneshut true -adjustsizes true -gravity ",
                 gravity))
@@ -1717,7 +1717,7 @@ dynamic_biblio_coupling <- function(corpus,
 
 tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_column = "Com_ID", color_column = "color",
                            com_name_column = "Community_name", com_size_column = "Size_com", threshold_com = 0.01, number_of_words = 12,
-                           palette = NULL, size_title_wrap = 8, lemmatize_bigrams = TRUE) {
+                           palette = NULL, size_title_wrap = 8, lemmatize_bigrams = TRUE, min_count = 10) {
   #' Creating a TF-IDF analysis of the titles of WoS corpus
   #'
   #' This function takes as input a tidygraph object or a data frame with nodes, both with a community attribute, and analyzes
@@ -1764,6 +1764,10 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
   #' @param lemmatize_bigrams
   #' Chose whether you want to lemmatize each word in a bigram (which could lead to a bigram that has no 
   #' clear meaning) or not.
+  #' 
+  #' @param min_count
+  #' Number of time an ngram should appeared in the corpus to be integrated in the
+  #' tf-idf calculation.
   
   # extracting the nodes
   if (!is.null(graph)) {
@@ -1820,7 +1824,9 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
   tf_idf_table <- tible_tf_idf
   tf_idf_table <- tf_idf_table %>% unnest_tokens(word, V1) %>% as.data.table()
   tf_idf_table <- tf_idf_table[, word := textstem::lemmatize_words(word)] 
-  tf_idf_table <- tf_idf_table[, count := .N, by = c("Com_ID","word")] %>% unique()
+  tf_idf_table <- tf_idf_table[, count := .N, by = c("Com_ID","word")] %>% 
+    filter(count >= min_count) %>% 
+    unique()
   # applying tf-idf
   tf_idf_table <- tidytext::bind_tf_idf(tf_idf_table, word, Com_ID, count)
   tf_idf_table_uni <- tf_idf_table
@@ -1860,7 +1866,9 @@ tf_idf <- function(graph = NULL, nodes = NULL, title_column = "Titre", com_colum
     as.data.table()
   }
   
-  tf_idf_table <- tf_idf_table[, count := .N, by = c("Com_ID","word")] %>% unique()
+  tf_idf_table <- tf_idf_table[, count := .N, by = c("Com_ID","word")] %>% 
+    filter(count >= min_count) %>% 
+    unique()
   
   # applying tf-idf
   tf_idf_table <- tidytext::bind_tf_idf(tf_idf_table, word, Com_ID, count)

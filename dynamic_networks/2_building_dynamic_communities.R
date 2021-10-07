@@ -32,7 +32,7 @@ source("functions/functions_for_network_analysis.R")
 source("dynamic_networks/Script_paths_and_basic_objects.R")
 
 # loading the files 
-list_graph <- readRDS(paste0(graph_data_path, "list_graph_", first_year, "-", last_year, ".rds"))
+list_graph <- readRDS(paste0(graph_data_path, "list_graph_position", first_year, "-", last_year + time_window - 1, ".rds"))
 
 
 #' # Intertemporal Naming: Find Communities Across Time 
@@ -174,7 +174,7 @@ intertemporal_naming_function <- function(tbl_list = tbl_list,
 intertemporal_naming <- intertemporal_naming_function(list_graph, 
                                                       community_column = "Com_ID", 
                                                       individual_ids = "ID_Art", 
-                                                      threshold_similarity = 0.60)
+                                                      threshold_similarity = 0.55)
 
 #' ## Transforming the data in alluvial compatible data
 
@@ -243,14 +243,15 @@ label[,Label:=new_Id_com]
 alluv_dt<-merge(alluv_dt,label[,.(new_Id_com,Window,Label)], by = c("new_Id_com","Window"), all.x = TRUE) 
 
 
-ggplot(alluv_dt, aes(x = Window, y=share, stratum = new_Id_com, alluvium = ID_Art, fill = color, label = new_Id_com)) +
+plot_alluvial <- ggplot(alluv_dt, aes(x = Window, y=share, stratum = new_Id_com, alluvium = ID_Art, fill = color, label = new_Id_com)) +
   scale_fill_identity("Disciplines", guide = "legend") +
   geom_flow() +
   geom_stratum(alpha =1, size=1/10) +
   theme(legend.position = "none") +
   geom_label(stat = "stratum", size = 5, aes(label = Label)) +
-  ggtitle("") +
-  ggsave(paste0(picture_path,"alluvial.png"), width = 40, height = 30, units = "cm")
+  ggtitle("")
+
+  ggsave(paste0(picture_path,"alluvial.png"), plot = plot_alluvial, width = 40, height = 30, units = "cm")
 
 alluv_dt <- alluv_dt[, Com_ID := new_Id_com]
 alluv_dt <- alluv_dt[, share_max := max(share_leiden), by = "Com_ID"]
@@ -258,10 +259,10 @@ alluv_dt <- alluv_dt[, share_max := max(share_leiden), by = "Com_ID"]
 # adding a more simple label for naming communities later
 ID_bis <- unique(alluv_dt[color != "grey"][order(Window,-n_years), "Com_ID"])
 ID_bis <- ID_bis[, ID_bis:= 1:.N]
-alluv_dt <- merge(alluv_dt, ID_bis, by = "Com_ID")
+alluv_dt <- merge(alluv_dt, ID_bis, by = "Com_ID", all.x = TRUE)
 
 # saving the entire dt and just the community identifiers in csv
-write_csv2(unique(alluv_dt[,c("ID_bis","Com_ID")]), "community_list_1969-2015.csv")
+write_csv2(unique(alluv_dt[color != "grey",c("ID_bis","Com_ID")]), "community_list_1969-2015.csv")
 saveRDS(alluv_dt, paste0(graph_data_path, "alluv_dt_", first_year, "-", last_year + time_window - 1, ".rds"))
 
 #' ## Search tf-idf values for each community
@@ -271,10 +272,11 @@ saveRDS(alluv_dt, paste0(graph_data_path, "alluv_dt_", first_year, "-", last_yea
 tf_idf_results <- tf_idf(nodes = alluv_dt[color != "grey"],
                          com_name_column = "new_Id_com",
                          number_of_words = 20, 
-                         treshold_com = 0.05,
+                         threshold_com = 0.05,
                          com_size_column = "share_max",
-                         size_title_wrap=10)
-tf_idf_results$plot + ggsave(paste0(picture_path,"tf-idf.png"), width = 55, height = 55, units = "cm")
+                         size_title_wrap = 10)
+tf_idf_results$plot + 
+  ggsave(paste0(picture_path,"tf-idf.png"), width = 55, height = 55, units = "cm")
 
 saveRDS(tf_idf_results, paste0(graph_data_path, "tf_idf_alluvial", first_year, "-", last_year + time_window - 1, ".rds"))
 
