@@ -175,6 +175,7 @@ intertemporal_naming <- intertemporal_naming_function(list_graph,
                                                       community_column = "Com_ID", 
                                                       individual_ids = "ID_Art", 
                                                       threshold_similarity = 0.55)
+saveRDS(intertemporal_naming, paste0(graph_data_path, "list_graph_position_intertemporal_naming", first_year, "-", last_year + time_window - 1, ".rds"))
 
 #' ## Transforming the data in alluvial compatible data
 

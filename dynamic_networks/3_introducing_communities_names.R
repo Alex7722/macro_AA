@@ -28,6 +28,8 @@ source("~/macro_AA/functions/functions_for_network_analysis.R")
 source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
 
 #' # Renaming using the new community names (in construction)
+readRDS(paste0(graph_data_path, "alluv_dt_", first_year, "-", last_year + time_window - 1, ".rds"))
+list_graph <- readRDS(paste0(graph_data_path, "list_graph_position", first_year, "-", last_year + time_window - 1, ".rds"))
 
 ######################### Label **********************
 alluv_dt<-alluv_dt[, c("Label"):=NULL]
