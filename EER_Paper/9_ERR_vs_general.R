@@ -93,7 +93,7 @@ Corpus3 <- readRDS("/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/Old_JEL_m
 
 Refs2 <- Refs2[ItemID_Ref!=0]
 Refs3 <- Refs3[ItemID_Ref!=0]
-Corpus
+# Corpus
 
 Corpus <- rbind(Corpus2, Corpus3, fill=TRUE)
 Refs <- rbind(Refs2, Refs3, fill=TRUE)
