@@ -11,7 +11,7 @@ package_list <- c(
   "ggforce", "directlabels", "patchwork", "DescTools", "DT", 
   "grid", "ggdendro", "readtext", "pander","RColorBrewer",
   "scico","plotly","crosstalk","widgetframe","sigmajs",
-  "ggdark","topicmodels","ggrepel","stm", "tidystm", "huge",
+  "ggdark","topicmodels","ggrepel","stm", "huge",
   "spacyr", "htmlwidgets")
 for (p in package_list) {
   if (p %in% installed.packages() == FALSE) {
@@ -20,10 +20,10 @@ for (p in package_list) {
   library(p, character.only = TRUE)
 }
 
-github_list <- c("ParkerICI/vite",
-                 "agoutsmedt/biblionetwork", 
+github_list <- c("agoutsmedt/biblionetwork", 
                  "agoutsmedt/networkflow",
-                 "mikajoh/tidystm")
+                 "mikajoh/tidystm",
+                 "ParkerICI/vite")
 for (p in github_list) {
   if (gsub(".*/", "", p) %in% installed.packages() == FALSE) {
     devtools::install_github(p)
@@ -35,10 +35,10 @@ for (p in github_list) {
 ######################### Paths and data ##########################################------------
 
 if(stringr::str_detect(getwd(), "MEGA")) {
-  boards_path <- path.expand("~/MEGA/Research/R/projets/data/macro_AA/EER/editorial_boards/")
-  eer_data <- path.expand("~/MEGA/Research/R/projets/data/macro_AA/EER/Corpus_EER/")
-  picture_path <- path.expand("~/MEGA/Research/R/projets/macro_AA/EER_Paper/Pictures/")
-  data_path <- path.expand("~/MEGA/Research/R/projets/data/macro_AA/")
+  boards_path <- path.expand("~/MEGAsync/Research/R/projets/data/macro_AA/EER/editorial_boards/")
+  eer_data <- path.expand("~/MEGAsync/Research/R/projets/data/macro_AA/EER/Corpus_EER/")
+  picture_path <- path.expand("~/MEGAsync/Research/R/projets/macro_AA/EER_Paper/Pictures/")
+  data_path <- path.expand("~/MEGAsync/Research/R/projets/data/macro_AA/")
 } else {
 boards_path <- "/projects/data/macro_AA/EER/editorial_boards/"
 eer_data <- "/projects/data/macro_AA/EER/Corpus_EER/"

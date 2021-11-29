@@ -29,8 +29,14 @@ knitr::opts_chunk$set(eval = FALSE)
 source("EER_Paper/Script_paths_and_basic_objects_EER.R")
 source("functions/functions_for_network_analysis.R")
 source("functions/functions_for_topic_modelling.R")
-Corpus <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpus.rds"))
+
+# EER data
+Corpus_EER <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpus.rds"))
 alluv_dt <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/alluv_dt.rds"))
+
+# Top 5 data
+Corpus_top5 <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/abstracts_MS_with_ID_Art.RDS"))
+Corpus_top5 <- Corpus_top5[ID_Art %in% nodes_JEL$ID_Art]
 
 #' # TF-IDF at the community level
 #' 
@@ -106,7 +112,7 @@ saveRDS(tf_idf_window, paste0(data_path, "EER/2_Raw_Networks_and_Alluv/tf_idf_wi
 #' have a particular format of the type "- COMENT", to be distinguished from papers 
 #' with abstract that are more generally answering to another paper. 
 #' 
-Corpus_cleaned <- Corpus %>% 
+Corpus_cleaned <- Corpus_EER %>% 
   filter(! str_detect(Titre, "- COMMENT$|- COMMENTS$|- REPLY$")) 
 
 stat_abstract  <- copy(Corpus_cleaned)
@@ -123,21 +129,63 @@ stat_abstract %>%
 
 #' ## stm on abstracts only
 #' 
+#' ### Preparing the corpus of EER and top5
+#' 
+
+# merging both
+
+#' For the moment, we keep only the top 5 articles from MS that we have matched with WoS,
+#' as we need the affiliations data from WoS.
+
+
+Corpus_cleaned <-Corpus_cleaned %>% 
+  filter(JEL_id == 1 &
+           Annee_Bibliographique <= 2007) %>% 
+  mutate(have_abstract = ! is.na(abstract))
+
+Corpus_cleaned <- Corpus_cleaned[, c("ID_Art", 
+                             "Titre", 
+                             "Annee_Bibliographique", 
+                             "Nom_ISI",
+                             "abstract")]
+Corpus_cleaned$Journal <- "EUROPEAN ECONOMIC REVIEW"
+
+Corpus_top5_cleaned <- Corpus_top5 %>% 
+  select("ID_Art",
+         "TITLE",
+         "YEAR",
+         "AUTHOR",
+         "ABSTRACT",
+         "JOURNAL") %>% 
+  filter(between(YEAR,1973,2007)) %>% 
+  mutate(TITLE = toupper(TITLE)) %>% 
+  filter(! str_detect(TITLE, ": COMMENT$|: COMMENT \\[|- REPLY$")) 
+
+colnames(Corpus_top5_cleaned) <- colnames(Corpus_cleaned)
+Corpus_topic <- rbind(Corpus_top5_cleaned,Corpus_cleaned)
+
+# nettoyage des doublons
+Corpus_topic <- Corpus_topic %>% 
+  mutate(test_doublon = paste(Titre, Annee_Bibliographique, Journal)) %>% 
+  mutate(doublon = duplicated(test_doublon)) %>% 
+  filter(doublon == FALSE) %>% 
+  select(-contains("doublon"))
+
+#' 
 #' ### Choosing the preprocessing steps and the number of topics
 #' 
 #' We will run the topic model analysis only on the articles with an abstract. As a significant
 #' proportion of macro articles in the late 1970s, early 1980s lack of an abstract, we will be forced
 #' in a second step to run the same analysis with the articles without abstracts.
 
-text <- Corpus_cleaned %>% 
-  filter(JEL_id == 1 &
-           Annee_Bibliographique <= 2007) %>% 
+text <- Corpus_topic %>% 
   mutate(have_abstract = ! is.na(abstract)) %>% 
   unite("word", Titre, abstract, sep = " ") %>% 
   select(ID_Art, word, have_abstract) %>% 
   mutate(word = str_remove(word, " NA$"),
          id = row_number()) %>% 
   mutate(word = str_replace_all(word, "EURO-", "EURO"))
+ 
 
 position_excluded <- c("PUNCT", 
                        "CCONJ", 
@@ -176,10 +224,41 @@ to_keep <- c("flows",
              "forecasts",
              "offers",
              "instantaneous",
-             "in1ationary")
+             "in1ationary",
+             "cause",
+             "wealth",
+             "inconsistency",
+             "risk",
+             "surpluses",
+             "reverting",
+             "restraint",
+             "targeting",
+             "committee",
+             "prices",
+             "fell",
+             "insurance",
+             "forward",
+             "inventory",
+             "shocks",
+             "needs",
+             "yields",
+             "constraint",
+             "budgets",
+             "individual",
+             "structure",
+             "unemployment",
+             "tradable",
+             "developed",
+             "multiplier")
+
+remove_pattern <- c("\\.\\(this", # Weird pattern that is not removed in the tokenization because of ".("
+                    "\"\\-that")
+# test if we are not removing words by position we want to
+# keep: `spacy_word %>% filter(pos == "CCONJ") %>% select(lemma) %>% unique()`
 
 spacy_initialize()
 spacy_word <- spacy_parse(text$word, entity = FALSE) %>% 
+  mutate(lemma = str_remove(lemma, paste0(remove_pattern, collapse = "|"))) %>%  
   filter(! (pos %in% position_excluded &
            ! lemma %in% to_keep)) %>% 
   select(doc_id, token, lemma) %>% 
@@ -201,7 +280,11 @@ to_correct <- data.table("to_correct" = c("experiments",
                                           "accommodative",
                                           "budgets",
                                           "in1ationary",
-                                          "markets"),
+                                          "markets",
+                                          "prices",
+                                          "shocks",
+                                          "needs",
+                                          "yields"),
                          "correction" = c("experiment",
                                           "forecast",
                                           "forecast",
@@ -212,7 +295,11 @@ to_correct <- data.table("to_correct" = c("experiments",
                                           "accommodate",
                                           "budget",
                                           "inflation",
-                                          "market"))
+                                          "market",
+                                          "price",
+                                          "shock",
+                                          "need",
+                                          "yield"))
 for(i in 1:nrow(to_correct)) {
   spacy_word[lemma == to_correct$to_correct[i]]$lemma <- to_correct$correction[i]
 }
