@@ -178,13 +178,29 @@ Corpus_topic <- Corpus_topic %>%
 #' proportion of macro articles in the late 1970s, early 1980s lack of an abstract, we will be forced
 #' in a second step to run the same analysis with the articles without abstracts.
 
+to_remove <- c("COPYRIGHT.*",
+               " \\* .*",
+               "PRESIDENTIAL ADDRESS DELIVERED.*",
+               "THIS ARTICLE ORIGINALLY APPEARED IN THE AMERICAN.*",
+               "PREPARED FOR THE ANNUAL MEETINGS OF THE AMERICAN ECONOMIC ASSOCIATION",
+               "\\(THIS ABSTRACT WAS BORROWED FROM ANOTHER VERSION OF THIS ITEM\\.\\)",
+               "JEL CLASSIFICATION:",
+               "KEY WORDS:")
+
 text <- Corpus_topic %>% 
-  mutate(have_abstract = ! is.na(abstract)) %>% 
+  mutate(have_abstract = ! is.na(abstract),
+         abstract = toupper(abstract)) %>% 
   unite("word", Titre, abstract, sep = " ") %>% 
   select(ID_Art, word, have_abstract) %>% 
   mutate(word = str_remove(word, " NA$"),
          id = row_number()) %>% 
-  mutate(word = str_replace_all(word, "EURO-", "EURO"))
+  mutate(word = str_replace_all(word, "EURO-", "EURO")) %>% 
+  mutate(word = str_remove(word, paste0(to_remove, collapse = "|"))) 
+
+test <- which(str_detect(text$word, "ABSTRACT"))
+test <- text %>% 
+  mutate(test = str_extract(word, "JEL CLASSIFICATION:.*")) %>% 
+  filter(! is.na(test))
  
 
 position_excluded <- c("PUNCT", 
@@ -359,16 +375,19 @@ term_list <- text %>%
   unite(term, word_1, word_2, word_3, sep = " ") %>% 
   mutate(term = str_trim(term, "both")) %>% 
   select(-unigram, -bigram)
-term_list <- merge(term_list, text[,c("ID_Art","have_abstract")], by = "ID_Art")
+term_list <- merge(term_list, text[,c("ID_Art","have_abstract")], by = "ID_Art") %>% 
+  as.data.table()
+
+saveRDS(term_list, paste0(data_path, "EER/EER_term_list.rds"))
 
 #' We will now produce different set of data depending on different filtering parameters:
 #' 
 hyper_grid <- expand.grid(
-  upper_share = c(0.4, 0.35),
-  lower_share = c(0.01, 0.02),
-  min_word = c(3, 6, 13),
-  max_word = Inf,
-  prop_word = 1)
+  upper_share = c(0.35), # remove a word if it is appearing in more than upper_share% of the docs
+  lower_share = c(0.01, 0.02), # remove a word if it is appearing in less than lower_share% of the docs
+  min_word = c(6, 12), # the min number of words in a doc
+  max_word = Inf, # the max number of words in a doc
+  prop_word = 1) # keep the top prop_word% of the words (in terms of occurrence)
 
 #' The first step is to use a function to create a list of words data depending on different
 #' feature selection criteria (listed in `hyper_grid`).
@@ -386,6 +405,8 @@ data_set_bigram <- create_topicmodels_dataset(hyper_grid,
 data_set_bigram[, trigram := FALSE]
 data_set <- rbind(data_set_trigram, data_set_bigram)
 
+saveRDS(data_set, paste0(data_path, "EER/EER_data_set.rds"))
+
 #' The second step is to use the different data sets to create stm objects and them to fit 
 #' topic models for different number of topics.
 #' 
@@ -395,7 +416,7 @@ nb_cores <- availableCores()/2 + 1
 plan(multicore, workers = 2)
 
 data_set <- create_stm(data_set) 
-topic_number <- seq(20, 90, 10) 
+topic_number <- seq(30, 90, 10) 
 many_models <- create_many_models(data_set, topic_number, max.em.its = 700, seed = 1989)
 
 #' The third step is to calculate different statistics for each model and produce 
@@ -412,23 +433,6 @@ tuning_results_test <- tuning_results %>%
   mutate(frex_data_0.3 = map(topic_model, average_frex, w = weight_1),
          frex_data_0.5 = map(topic_model, average_frex, w = weight_2))
 
-mix_measure <- tuning_results %>% 
-  mutate(frex_data_1 = map(topic_model, average_frex, w = weight_1, nb_terms = 20),
-         frex_data_2 = map(topic_model, average_frex, w = weight_2, nb_terms = 20)) %>% 
-  select(preprocessing_id, K, frex_data_1, frex_data_2)
-setnames(mix_measure, c("frex_data_1","frex_data_2"), c(paste0("frex_mean_",weight_1), paste0("frex_mean_",weight_2)))
-
-plot_mix_measure <- mix_measure %>% 
-  pivot_longer(cols = starts_with("frex"), names_to = "measure", values_to = "measure_value") %>% 
-  mutate(measure_value = unlist(measure_value)) %>% 
-  ggplot(aes(K, measure_value, color = as.factor(preprocessing_id), group = as.factor(preprocessing_id))) +
-  geom_point(size = size, alpha = 0.7) +
-  geom_line() +
-  facet_wrap(~measure, scales = "free_y") +
-  theme_bw() +
-  labs(x = "Number of topics",
-       y = "Frex mean",
-       title = "Frex mean value for different number of topics and preprocessing steps")
 #' We can now project the different statistics to choose the best model(s).
 plot_topic_models  <- plot_topicmodels_stat(tuning_results, nb_terms = 100)
 
@@ -454,8 +458,8 @@ plot_topic_models$exclusivity_coherence_mean %>%
 #' 
 #' ### Working with the chosen topic model: basic description
 
-id <- 24
-nb_topics <- 30 
+id <- 1
+nb_topics <- 60 
 
 #' Now we can add the covariates. It seems that it is not changing the topic
 #' model too much. The topics are the same, just the order of the words can
@@ -467,20 +471,29 @@ stm_data <- tuning_results[preprocessing_id == id & K == nb_topics]$stm[[1]]
 metadata <- data.table("ID_Art" = names(stm_data$documents))
 
 # merging with corpus data and selecting the covariates
-Corpus_merged <- merge(Corpus[, c("ID_Art", "Annee_Bibliographique")], 
-                       unique(Institutions[, c("ID_Art", "EU_US_collab")]),
-                       by = "ID_Art")
-metadata <- merge(metadata, Corpus_merged, by = "ID_Art")
+Collabs <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/collab_top5_EER.rds"))
+Corpus_merged <- merge(Corpus_topic[, c("ID_Art", "Annee_Bibliographique", "Journal")], 
+                       unique(Collabs[, c("ID_Art", "EU_US_collab")]),
+                       by = "ID_Art", all.x = TRUE)
+Corpus_merged <- Corpus_merged %>% 
+  mutate(Journal_type = ifelse(Journal == "EUROPEAN ECONOMIC REVIEW", "EER", "TOP5"))
+metadata <- merge(metadata, Corpus_merged, by = "ID_Art", all.x = TRUE)
+
+# temporary step to avoid NA data
+metadata <- metadata %>% 
+  mutate(EU_US_collab = ifelse(is.na(EU_US_collab), "Neither", EU_US_collab))
+
 stm_data$meta$Year <- as.integer(metadata$Annee_Bibliographique)
 stm_data$meta$Origin <- metadata$EU_US_collab
+stm_data$meta$Journal <- metadata$Journal_type
 
 #' We can now fit again the topic model for the same number of topics,
 #' but adding the covariates for topic prevalence and topic content.
 
 topic_model <- stm(stm_data$documents, 
                    stm_data$vocab, 
-                   prevalence = ~s(Year) + Origin,
-                   content = ~Origin,
+                   prevalence = ~s(Year) + Origin + Journal,
+                   content = ~Journal,
                    data = stm_data$meta,
                    K = nb_topics,
                    init.type = "Spectral",
@@ -497,17 +510,18 @@ top_terms <- extract_top_terms(topic_model,
                                tuning_results[preprocessing_id == id & K == nb_topics]$data[[1]],
                                nb_terms = 15,
                                frexweight = 0.3)
-topics <- name_topics(top_terms, method = "frex", nb_word = 4)
+topics <- name_topics(top_terms, method = "frex", nb_word = 5)
 
 # Setup Colors
 color <- data.table::data.table(
-  id = 1:30,
+  id = 1:nb_topics,
   color = c(scico(n = nb_topics/2 - 1, begin = 0, end = 0.3, palette = "roma"),
             scico(n = nb_topics/2 + 1, begin = 0.6, palette = "roma")))
 topics <- merge(topics, color, by = "id")
 
 #' We plot the terms with the highest FREX value for each topic:
-top_terms %>%
+
+top_terms_graph <- top_terms %>%
   filter(measure == "frex") %>% 
   inner_join(topics[, c("id", "color")], by = c("topic" = "id")) %>% 
   mutate(term = reorder_within(term, value, topic)) %>%
@@ -516,23 +530,42 @@ top_terms %>%
   geom_col(aes(fill = color), show.legend = FALSE) +
   facet_wrap(~ topic, scales = "free") +
   scale_y_reordered() +
-  coord_cartesian(xlim=c(0.93,1)) +
-  ggsave(paste0(picture_path,"topic_model_", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
-
+  coord_cartesian(xlim=c(0.93,1))
+  
+ragg::agg_png(paste0(picture_path, "topic_model_", id, "-", nb_topics, ".png"),
+                width = 50, height = 40, units = "cm", res = 300)
+top_terms_graph
+invisible(dev.off())
+  
 #' We now plot the frequency of each topics:
 #' 
 
-plot_frequency(topics, topic_model) +
-  ggsave(paste0(picture_path,"topic_model_frequency_", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
+plot_frequency <- plot_frequency(topics, topic_model) +
+  dark_theme_bw()
+
+ragg::agg_png(paste0(picture_path, "topic_model_frequency_", id, "-", nb_topics, ".png"), 
+              width = 40, 
+              height = 30, 
+              units = "cm", 
+              res = 300)
+plot_frequency
+invisible(dev.off())
 
 #' We now plot the topic correlation network:
 set.seed(1989)
 topic_corr_network <- ggraph_topic_correlation(topic_model, 
                                                nodes = select(topics, -color),
-                                               method = "simple", 
+                                               method = "huge", 
                                                size_label = 3) 
-topic_corr_network$plot +
-  ggsave(paste0(picture_path,"topic_correlation", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
+
+ragg::agg_png(paste0(picture_path, "topic_correlation", id, "-", nb_topics, ".png"), 
+              width = 40, 
+              height = 30, 
+              units = "cm", 
+              res = 300)
+topic_corr_network$plot
+invisible(dev.off())
+
 
 # add communities to the topics file:
 communities <- topic_corr_network$graph %>% 
@@ -540,6 +573,28 @@ communities <- topic_corr_network$graph %>%
   as.data.table %>% 
   select(topic, Com_ID)
 topics <- merge(topics, communities, by = "topic")
+
+#' naming communities
+#' 
+
+community_name <- tribble(
+  ~Com_ID, ~Com_name,
+  "02", "Public Finance and Agents Decisions",
+  "03", "Econometrics",
+  "04", "Money & Inflation",
+  "05", "Economic Activity & Comparative analysis",
+  "06", "Monetary Policy",
+  "07", "Finance, Financial Intermediation & Labor market",
+  "08", "Growth, Capital and Investment",
+  "09", "Search, Expectations & Information",
+  "10", "International Macroeconomics",
+  "11", "Production, Demand & Distribution",
+  "12", "Business Cycles",
+  "13", "Externality"
+)
+
+community_name$com_color <- c(mypalette[1:10], "gray", "gray")
+topics <- merge(topics, community_name, by = "Com_ID")
 
 #' We can look at some topics we find close to understand better their differences:
 #' 
@@ -563,14 +618,102 @@ for(i in 1:length(similar_topics)){
 }
 invisible(dev.off())
 
+#' ### Extracting the data from the topic model
+
+topic_gamma <- tidy(topic_model, matrix = "gamma") 
+topic_gamma <- merge(topic_gamma, topics[, c("id","topic_name")], 
+                     by.x = "topic",
+                     by.y = "id") %>% 
+  select(-topic) %>% 
+  mutate(topic_name = str_remove_all(str_replace(topic_name, "\\\n", " "), " \\/"))
+
+topic_gamma <- pivot_wider(topic_gamma,
+                           names_from = topic_name, 
+                           values_from = gamma) %>% 
+  mutate(ID_Art = names(stm_data$documents)) %>% 
+  inner_join(Corpus_topic) %>% 
+  select(document, ID_Art, Nom_ISI, Annee_Bibliographique, Titre, Journal, Journal_type, abstract, contains("Topic")) %>% 
+  as.data.table()
+
+topic_gamma_attributes <- merge(topic_gamma,
+                                unique(Collabs[, c("ID_Art", "EU_US_collab")]),
+                                by = "ID_Art", all.x = TRUE) %>% 
+  mutate(Nom_ISI = str_remove_all(as.character(Nom_ISI), "c\\(\"|\\)|\""))
+
+#' We will use this table for exploration
+#' 
+
+readr::write_csv2(topic_gamma_attributes, paste0("summary_topic_model_",id,"-",nb_topics,".csv"))
+
+#' ### Working with the chosen topic models: differences in terms of journals and affiliations
+#' 
+#' We will use covariates below to do that, but to have results easier to interpret, we also
+#' observe the journal and affiliation effect on topics just by looking at the difference 
+#' in the mean of each variable for each topic.
+#' 
+
+topic_diff <- pivot_longer(topic_gamma_attributes, 
+                           cols = contains("Topic"),
+                           names_to = "topic_name",
+                           values_to = "gamma") %>% 
+#  filter(gamma > 0.01) %>% 
+  as.data.table()
+
+topic_diff[, mean_affiliation := mean(gamma), by = c("topic_name", "EU_US_collab")] %>% 
+  .[, mean_journal := mean(gamma), by = c("topic_name", "Journal_type")] 
+topic_diff_summary <- topic_diff %>% 
+  filter(EU_US_collab %in% c("Europe Only", "USA Only")) %>% 
+  select(topic_name, EU_US_collab, mean_affiliation, Journal_type, mean_journal) %>% 
+  unique() 
+
+topic_diff_summary <- pivot_wider(topic_diff_summary, 
+            names_from = "EU_US_collab", 
+            values_from = "mean_affiliation") %>% 
+  pivot_wider(names_from = "Journal_type", 
+              values_from = "mean_journal") %>% 
+  mutate(diff_affiliation = `Europe Only` - `USA Only`,
+         diff_journal = EER - TOP5,
+         id = as.integer(str_extract(topic_name, "[:digit:]{1,2}")),
+         topic_label = str_wrap(topic_name, 15)) %>% 
+  left_join(topics[, c("id", "Com_name", "com_color")], by = "id") %>% 
+  as.data.table()
+
+mean_diff_plot <- ggplot(topic_diff_summary, aes(x = diff_journal, y = diff_affiliation,
+                                                  group = factor(Com_name),
+                                                  color = com_color, fill = com_color)) +
+  geom_vline(xintercept = 0, size = 1.5, alpha = 0.5) +
+  geom_hline(yintercept = 0, size = 1.5, alpha = 0.5) +
+  geom_label_repel(aes(label = topic_label), size = 3, alpha = 0.7, hjust = 0) +
+  geom_point(size = 4, alpha = 0.8) +
+  scale_color_identity() +
+  scale_fill_identity() +
+  labs(title = "Topic Prevalence over journals (Difference of Means method)",
+       x = "Top 5 (left) vs. EER (right)",
+       y = "US Only (down) vs. European Only (up)") +
+  dark_theme_bw()
+
+ragg::agg_png(paste0(picture_path, "mean_diff_plot", id, "-", nb_topics, ".png"), 
+              width = 40, 
+              height = 40, 
+              units = "cm", 
+              res = 300)
+mean_diff_plot
+invisible(dev.off())
+
+#' We can now plot the differences in a two dimension diagram:
+#' 
+
+
+
 #' ### Working with the chosen topic model: covariates
 #' 
 #' We fit regressions for our two covariates. We use a b-spline transformation
 #' for the year.
-prep <- estimateEffect(~s(Year) + Origin,
+prep <- estimateEffect(~s(Year) + Origin + Journal,
                topic_model,
-               metadata = stm_data$meta,
+               metadata = filter(stm_data$meta, ! is.na(Origin)),
                nsims = 50)
+
 
 #' We first look at the impact of year:
 tidyprep_year <- tidystm::extract.estimateEffect(prep, 
@@ -583,47 +726,36 @@ slope <- tidyprep_year %>%
            covariate.value == min(tidyprep_year$covariate.value)) %>% 
   select(topic_name, covariate.value, estimate) %>% 
   pivot_wider(values_from = estimate, names_from = covariate.value) %>% 
-  mutate(slope = `2007` - `1974`) %>% 
+  mutate(slope = `2007` - `1973`) %>% 
   select(topic_name, slope) %>% 
   arrange(slope)
 tidyprep_year <- merge(tidyprep_year, slope, by = "topic_name")
 tidyprep_year$topic_name <- factor(tidyprep_year$topic_name, levels = slope$topic_name)
 
 #' We plot the impact for each topics:
-ggplot(tidyprep_year, aes(x = covariate.value, y = estimate,
+topic_per_year <- ggplot(tidyprep_year, aes(x = covariate.value, y = estimate,
                    ymin = ci.lower, ymax = ci.upper,
                    group = factor(topic),
                    fill = color)) +
   scale_fill_identity() +
   facet_wrap(~ topic_name, nrow = 5) +
   geom_ribbon(alpha = .5, show.legend = FALSE) +
-  geom_line()
+  geom_line() +
+  theme(strip.text = element_text(size = 4)) +
+  dark_theme_bw()
 
-test <- tidyprep_year %>% 
-  mutate(year = str_remove(covariate.value, "\\..*")) %>% 
-  group_by(year, topic) %>% 
-  mutate(year_estimate = mean(estimate)) %>% 
-  select(topic_name, topic, year_estimate, year, color) %>% 
-  unique() %>% 
-  mutate(year_estimate = round(year_estimate, 3))
-
-
-  ungroup() %>% 
-  group_by(year) %>% 
-  mutate(sum = sum(year_estimate)) %>% 
-  ungroup() %>% 
-  mutate(rescaled_estimate = rescale)
-
-test %>% group_by %>% mutate(sum )
-
-plot <- ggplot(test, aes(x = year, y = year_estimate, fill = factor(topic_name), group = factor(topic_name))) +
-  geom_area(position = "stack")
-
-  ggplotly(plot)
+ragg::agg_png(paste0(picture_path, "topic_per_year_", id, "-", nb_topics, ".png"), 
+              width = 40, 
+              height = 30, 
+              units = "cm", 
+              res = 300)
+topic_per_year
+invisible(dev.off())
 
 #' We now look at the importance of the geographical institutions of authors. We
 #' focus on papers writtent by European-based economists only, or by US-based
 #' authors only.
+
 tidyprep_origin <- tidystm::extract.estimateEffect(prep, 
                                                    "Origin", 
                                                    model = topic_model, 
@@ -639,21 +771,105 @@ setDT(tidyprep_origin)
 tidyprep_origin$topic <- factor(tidyprep_origin$topic, levels = tidyprep_origin[order(estimate)]$topic)
 
 #' We plot the topic prevalence depending of the country of authors' affiliation:
-ggplot(tidyprep_origin, aes(x = estimate, y = topic,
+topic_per_origin <- ggplot(tidyprep_origin, aes(x = estimate, y = topic,
                             group = factor(topic_name),
                             color = color)) +
+  geom_vline(xintercept = 0, size = 1.5, alpha = 0.5) +
   geom_segment(aes(x = ci.lower, xend = ci.upper, yend = topic, size = 1.5, alpha = 0.9), show.legend = FALSE) +
   geom_point(show.legend = FALSE, size = 4) +
   theme(legend.position = "none") +
-  geom_label(aes(x = ci.upper + 0.001, label = topic_name), size = 3, hjust = 0) +
+  geom_label(aes(x = ci.upper + 0.001, label = topic_name), size = 2, hjust = 0, alpha = 0.6) +
   scale_color_identity() +
   expand_limits(x = c(0, max(tidyprep_origin$ci.upper) + 0.015)) +
   labs(title = "Topic Prevalence over authors' place",
        x = "US only (left) vs. Europe only (right)",
        y = "") +
+  dark_theme_bw()
+
+ragg::agg_png(paste0(picture_path, "topic_per_origin", id, "-", nb_topics, ".png"), 
+              width = 50, 
+              height = 40, 
+              units = "cm", 
+              res = 300)
+topic_per_origin
+invisible(dev.off())
+
+#' We now look at the importance of journals for topics.
+
+tidyprep_journal <- tidystm::extract.estimateEffect(prep, 
+                                                   "Journal", 
+                                                   model = topic_model, 
+                                                   method = "difference",
+                                                   cov.value1 = "EER",
+                                                   cov.value2 = "TOP5")
+
+tidyprep_journal <- merge(tidyprep_journal, 
+                         topics[, c("id", "topic_name", "color")], 
+                         by.x = "topic", 
+                         by.y = "id") 
+setDT(tidyprep_journal)
+tidyprep_journal$topic <- factor(tidyprep_journal$topic, levels = tidyprep_journal[order(estimate)]$topic)
+
+#' We plot the topic prevalence depending of the journal:
+topic_per_journal <- ggplot(tidyprep_journal, aes(x = estimate, y = topic,
+                                                group = factor(topic_name),
+                                                color = color)) +
+  geom_vline(xintercept = 0, size = 1.5, alpha = 0.5) +
+  geom_segment(aes(x = ci.lower, xend = ci.upper, yend = topic, size = 1.5, alpha = 0.9), show.legend = FALSE) +
+  geom_point(show.legend = FALSE, size = 4) +
+  theme(legend.position = "none") +
+  geom_label(aes(x = ci.upper + 0.001, label = topic_name), size = 2, hjust = 0) +
+  scale_color_identity() +
+  expand_limits(x = c(0, max(tidyprep_journal$ci.upper) + 0.015)) +
+  labs(title = "Topic Prevalence over journals",
+       x = "Top 5 (left) vs. EER (right)",
+       y = "") +
+  dark_theme_bw()
+
+ragg::agg_png(paste0(picture_path, "topic_per_journal", id, "-", nb_topics, ".png"), 
+              width = 40, 
+              height = 30, 
+              units = "cm", 
+              res = 300)
+topic_per_journal
+invisible(dev.off())
+
+tidyprep_merge <- merge(tidyprep_journal, tidyprep_origin, by = c("topic", "topic_name", "color"))
+mix_prevalence_plot <- ggplot(tidyprep_merge, aes(x = estimate.x, y = estimate.y,
+                             group = factor(topic_name),
+                             color = color)) +
+  geom_vline(xintercept = 0, size = 1.5, alpha = 0.5) +
+  geom_hline(yintercept = 0, size = 1.5, alpha = 0.5) +
+  geom_point(show.legend = FALSE, size = 4) +
+  theme(legend.position = "none") +
+  geom_label_repel(aes(label = str_wrap(topic_name, 15), fill = color), size = 2.5, alpha = 0.5, hjust = 0) +
+  scale_color_identity() +
+  scale_fill_identity() +
+  labs(title = "Topic Prevalence over journals",
+       x = "Top 5 (left) vs. EER (right)",
+       y = "US Only (down) vs. European Only (up)") +
   theme_bw()
 
---------------------------------------------------------------------------------
+ragg::agg_png(paste0(picture_path, "mix_prevalence_plot_", id, "-", nb_topics, ".png"), 
+              width = 40, 
+              height = 30, 
+              units = "cm", 
+              res = 300)
+mix_prevalence_plot
+invisible(dev.off())
+
+#' #### Extracting data for qualitative study
+#' 
+
+topic_gamma <- tidy(topic_model, matrix = "gamma") 
+topic_gamma <- merge(topic_gamma, topics[, c("id","term_label")], 
+                     by.x = "topic",
+                     by.y = "id") %>% 
+  select(-topic)
+topic_gamma <- pivot_wider(topic_gamma,
+                           names_from = term_label, 
+                           values_from = gamma)
+
 #' We now extract the gamma values of the topic model to see which article are in which
 #' topics, and to observe the links between communities and topics
 #' 

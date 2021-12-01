@@ -8,6 +8,7 @@
 *.csv
 *.png
 *.jar
+*.xlsx
 
 # Ignoring html (usually compiled from Rmd)
 *.html
