@@ -53,12 +53,7 @@ filter_terms <- function(data, upper_share = 1,
     .[between(nb_apparition, lower_share, upper_share) & between(nb_words, min_word, max_word)] %>% 
     slice_max(order_by = count, prop = prop_word) 
   } else {
-    count_unigram <- data_dt %>% 
-      filter(ngram == "unigram") %>% 
-      group_by(document) %>% 
-      count(document) %>% 
-      rename(nb_words = n) %>% 
-      as.data.table()
+    count_unigram <- data_dt[ngram == "unigram", nb_words = .N, by = "document"]
     data_dt <- merge(data_dt, count_unigram, by = "document")
     
     data_filtered <- data_dt %>% 

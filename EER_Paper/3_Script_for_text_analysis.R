@@ -178,13 +178,21 @@ Corpus_topic <- Corpus_topic %>%
 #' proportion of macro articles in the late 1970s, early 1980s lack of an abstract, we will be forced
 #' in a second step to run the same analysis with the articles without abstracts.
 
+to_remove <- c("COPYRIGHT.*",
+               " \\* .*",
+               "PRESIDENTIAL ADDRESS DELIVERED.*",
+               "THIS ARTICLE ORIGINALLY APPEARED IN THE AMERICAN.*",
+               "PREPARED FOR THE ANNUAL MEETINGS OF THE AMERICAN ECONOMIC ASSOCIATION")
+
 text <- Corpus_topic %>% 
-  mutate(have_abstract = ! is.na(abstract)) %>% 
+  mutate(have_abstract = ! is.na(abstract),
+         abstract = toupper(abstract)) %>% 
   unite("word", Titre, abstract, sep = " ") %>% 
   select(ID_Art, word, have_abstract) %>% 
   mutate(word = str_remove(word, " NA$"),
          id = row_number()) %>% 
-  mutate(word = str_replace_all(word, "EURO-", "EURO"))
+  mutate(word = str_replace_all(word, "EURO-", "EURO")) %>% 
+  mutate(word = str_remove(word, paste0(to_remove, collapse = "|"))) 
  
 
 position_excluded <- c("PUNCT", 
@@ -359,16 +367,19 @@ term_list <- text %>%
   unite(term, word_1, word_2, word_3, sep = " ") %>% 
   mutate(term = str_trim(term, "both")) %>% 
   select(-unigram, -bigram)
-term_list <- merge(term_list, text[,c("ID_Art","have_abstract")], by = "ID_Art")
+term_list <- merge(term_list, text[,c("ID_Art","have_abstract")], by = "ID_Art") %>% 
+  as.data.table()
+
+saveRDS(term_list, paste0(data_path, "EER/EER_term_list.rds"))
 
 #' We will now produce different set of data depending on different filtering parameters:
 #' 
 hyper_grid <- expand.grid(
-  upper_share = c(0.4, 0.35),
-  lower_share = c(0.01, 0.02),
-  min_word = c(3, 6, 13),
-  max_word = Inf,
-  prop_word = 1)
+  upper_share = c(0.35), # remove a word if it is appearing in more than upper_share% of the docs
+  lower_share = c(0.01, 0.02), # remove a word if it is appearing in less than lower_share% of the docs
+  min_word = c(6, 12), # the min number of words in a doc
+  max_word = Inf, # the max number of words in a doc
+  prop_word = 1) # keep the top prop_word% of the words (in terms of occurrence)
 
 #' The first step is to use a function to create a list of words data depending on different
 #' feature selection criteria (listed in `hyper_grid`).
@@ -386,6 +397,8 @@ data_set_bigram <- create_topicmodels_dataset(hyper_grid,
 data_set_bigram[, trigram := FALSE]
 data_set <- rbind(data_set_trigram, data_set_bigram)
 
+saveRDS(data_set, paste0(data_path, "EER/EER_data_set.rds"))
+
 #' The second step is to use the different data sets to create stm objects and them to fit 
 #' topic models for different number of topics.
 #' 
@@ -395,7 +408,7 @@ nb_cores <- availableCores()/2 + 1
 plan(multicore, workers = 2)
 
 data_set <- create_stm(data_set) 
-topic_number <- seq(20, 90, 10) 
+topic_number <- seq(30, 90, 10) 
 many_models <- create_many_models(data_set, topic_number, max.em.its = 700, seed = 1989)
 
 #' The third step is to calculate different statistics for each model and produce 
@@ -412,23 +425,6 @@ tuning_results_test <- tuning_results %>%
   mutate(frex_data_0.3 = map(topic_model, average_frex, w = weight_1),
          frex_data_0.5 = map(topic_model, average_frex, w = weight_2))
 
-mix_measure <- tuning_results %>% 
-  mutate(frex_data_1 = map(topic_model, average_frex, w = weight_1, nb_terms = 20),
-         frex_data_2 = map(topic_model, average_frex, w = weight_2, nb_terms = 20)) %>% 
-  select(preprocessing_id, K, frex_data_1, frex_data_2)
-setnames(mix_measure, c("frex_data_1","frex_data_2"), c(paste0("frex_mean_",weight_1), paste0("frex_mean_",weight_2)))
-
-plot_mix_measure <- mix_measure %>% 
-  pivot_longer(cols = starts_with("frex"), names_to = "measure", values_to = "measure_value") %>% 
-  mutate(measure_value = unlist(measure_value)) %>% 
-  ggplot(aes(K, measure_value, color = as.factor(preprocessing_id), group = as.factor(preprocessing_id))) +
-  geom_point(size = size, alpha = 0.7) +
-  geom_line() +
-  facet_wrap(~measure, scales = "free_y") +
-  theme_bw() +
-  labs(x = "Number of topics",
-       y = "Frex mean",
-       title = "Frex mean value for different number of topics and preprocessing steps")
 #' We can now project the different statistics to choose the best model(s).
 plot_topic_models  <- plot_topicmodels_stat(tuning_results, nb_terms = 100)
 
@@ -454,8 +450,8 @@ plot_topic_models$exclusivity_coherence_mean %>%
 #' 
 #' ### Working with the chosen topic model: basic description
 
-id <- 24
-nb_topics <- 30 
+id <- 1
+nb_topics <- 40 
 
 #' Now we can add the covariates. It seems that it is not changing the topic
 #' model too much. The topics are the same, just the order of the words can
@@ -467,20 +463,24 @@ stm_data <- tuning_results[preprocessing_id == id & K == nb_topics]$stm[[1]]
 metadata <- data.table("ID_Art" = names(stm_data$documents))
 
 # merging with corpus data and selecting the covariates
-Corpus_merged <- merge(Corpus[, c("ID_Art", "Annee_Bibliographique")], 
-                       unique(Institutions[, c("ID_Art", "EU_US_collab")]),
-                       by = "ID_Art")
-metadata <- merge(metadata, Corpus_merged, by = "ID_Art")
+Collabs <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/collab_top5_EER.rds"))
+Corpus_merged <- merge(Corpus_topic[, c("ID_Art", "Annee_Bibliographique", "Journal")], 
+                       unique(Collabs[, c("ID_Art", "EU_US_collab")]),
+                       by = "ID_Art", all.x = TRUE)
+Corpus_merged <- Corpus_merged %>% 
+  mutate(Journal_type = ifelse(Journal == "EUROPEAN ECONOMIC REVIEW", "EER", "TOP5"))
+metadata <- merge(metadata, Corpus_merged, by = "ID_Art", all.x = TRUE)
 stm_data$meta$Year <- as.integer(metadata$Annee_Bibliographique)
 stm_data$meta$Origin <- metadata$EU_US_collab
+stm_data$meta$Journal <- metadata$Journal_type
 
 #' We can now fit again the topic model for the same number of topics,
 #' but adding the covariates for topic prevalence and topic content.
 
 topic_model <- stm(stm_data$documents, 
                    stm_data$vocab, 
-                   prevalence = ~s(Year) + Origin,
-                   content = ~Origin,
+                   prevalence = ~s(Year) + Journal,
+                   content = ~Journal,
                    data = stm_data$meta,
                    K = nb_topics,
                    init.type = "Spectral",
@@ -497,17 +497,18 @@ top_terms <- extract_top_terms(topic_model,
                                tuning_results[preprocessing_id == id & K == nb_topics]$data[[1]],
                                nb_terms = 15,
                                frexweight = 0.3)
-topics <- name_topics(top_terms, method = "frex", nb_word = 4)
+topics <- name_topics(top_terms, method = "frex", nb_word = 5)
 
 # Setup Colors
 color <- data.table::data.table(
-  id = 1:30,
+  id = 1:40,
   color = c(scico(n = nb_topics/2 - 1, begin = 0, end = 0.3, palette = "roma"),
             scico(n = nb_topics/2 + 1, begin = 0.6, palette = "roma")))
 topics <- merge(topics, color, by = "id")
 
 #' We plot the terms with the highest FREX value for each topic:
-top_terms %>%
+
+top_terms_graph <- top_terms %>%
   filter(measure == "frex") %>% 
   inner_join(topics[, c("id", "color")], by = c("topic" = "id")) %>% 
   mutate(term = reorder_within(term, value, topic)) %>%
@@ -516,14 +517,25 @@ top_terms %>%
   geom_col(aes(fill = color), show.legend = FALSE) +
   facet_wrap(~ topic, scales = "free") +
   scale_y_reordered() +
-  coord_cartesian(xlim=c(0.93,1)) +
-  ggsave(paste0(picture_path,"topic_model_", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
-
+  coord_cartesian(xlim=c(0.93,1))
+  
+ragg::agg_png(paste0(picture_path, "topic_model_", id, "-", nb_topics, ".png"),
+                width = 40, height = 30, units = "cm", res = 300)
+top_terms_graph
+invisible(dev.off())
+  
 #' We now plot the frequency of each topics:
 #' 
 
-plot_frequency(topics, topic_model) +
-  ggsave(paste0(picture_path,"topic_model_frequency_", id, "-", nb_topics, ".png"), width = 40, height = 30, units = "cm")
+plot_frequency <- plot_frequency(topics, topic_model)
+
+ragg::agg_png(paste0(picture_path, "topic_model_frequency_", id, "-", nb_topics, ".png"), 
+              width = 40, 
+              height = 30, 
+              units = "cm", 
+              res = 300)
+plot_frequency
+invisible(dev.off())
 
 #' We now plot the topic correlation network:
 set.seed(1989)
