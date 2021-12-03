@@ -56,7 +56,7 @@ filter_terms <- function(data, upper_share = 1,
     count_unigram <- data_dt[ngram == "unigram", nb_words := .N, by = "document"][! is.na(nb_words), c("document","nb_words")] %>% 
       unique()
     data_dt <- merge(data_dt[,-"nb_words"], count_unigram, by = "document")
-    
+
     data_filtered <- data_dt %>% 
       .[, count := .N, by = term] %>%
       .[, count_per_doc := .N, by = c("term", "document")] %>% 
