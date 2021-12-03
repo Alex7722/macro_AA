@@ -456,7 +456,6 @@ plot_topic_models$exclusivity_coherence_mean %>%
 id <- 1
 nb_topics <- 60 
 
-
 #' Now we can add the covariates. It seems that it is not changing the topic
 #' model too much. The topics are the same, just the order of the words can
 #' change. Perhaps that is not changing it at all and the small changes
