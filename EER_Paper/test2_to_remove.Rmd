@@ -1,0 +1,207 @@
+---
+title: "Complexity"
+output: 
+  html_document:
+    theme: united
+    toc: true
+    number_sections: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: hide
+---
+
+
+```{r, include=FALSE, set.seed(333)}
+library(knitr)
+# knitr::opts_knit$set(root.dir = "/projects/data/macro_AA")
+library(png)
+library(grid)
+library(ggnewscale)
+library(vite)
+library(RMySQL)
+library(NetworkToolbox)
+library(broom)
+library(igraph)
+# library(dplyr)
+library(data.table)
+library(ggplot2)
+library(magrittr)
+library(tm)
+library(tidyr)
+library(tidytext)
+library('cluster')
+library('ggraph')
+library('tibble')
+library('tidygraph')
+library(ggrepel)
+library(readr)
+# library(leiden)
+library(ggraph)
+library(ggnewscale)
+library(remotes)
+library(vite)
+# library("reticulate")
+# library(reticulate)
+library(tidygraph)
+library(rlang)
+library(ggforce)
+library(d3Network)
+library(scales)
+library(RColorBrewer)
+require(DescTools)
+require(stringr)
+library(docstring)
+library(quanteda)
+library(pander)
+library(DT)
+library(forcats)
+require(Polychrome)
+source("/home/alexandre/functions_networks.R")
+require(plotly)
+require(biblionetwork)
+require(Rforceatlas)
+library(kableExtra)
+`%notin%` <- Negate(`%in%`)
+require(rmdformats)
+
+knitr::opts_chunk$set(cache = T)
+
+
+# setwd("/projects/data/macro_AA")
+data_path <- "/projects/data/macro_AA/"
+
+# source("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R")
+# source("~/macro_AA/functions/functions_for_network_analysis.R")
+source("/home/alexandre/functions_dynamics_networks.R")
+source("/home/alexandre/functions_networks.R")
+source("~/macro_AA/logins_DO_NOT_UPLOAD.R")
+
+ESH <- dbConnect(MySQL(),
+                 user = usr, password = pswd, dbname = "OST_Expanded_SciHum",
+                 host = "127.0.0.1"
+)
+
+
+knitr::opts_chunk$set(cache = T)
+```
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+require(rmdformats)
+ setwd("/projects/data/macro_AA")
+
+# Corpus1 <- readRDS(file = paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpus.rds"))
+# Institutions <- readRDS(file = paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Institutions.rds"))
+# Authors <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Authors.rds"))
+# Refs1 <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Refs.rds"))
+# Refs1 <- Refs1[ItemID_Ref_Target!=0]
+
+Corpus2 <- readRDS("/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/JEL_matched_corpus_nodes.rds")
+Refs2 <- readRDS(file = "/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/JEL_matched_corpus_references_info.rds")
+
+Refs3 <- readRDS(file = "/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/Old_JEL_matched_corpus_references_info.rds")
+Corpus3 <- readRDS("/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/Old_JEL_matched_corpus_nodes.rds")
+
+Institution <- fread(file = "/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/Macro_AA_Institutions_Cleaned.csv",fill=TRUE)
+
+
+
+UE <- fread("/projects/data/macro_AA/EER/Europe_continent.csv") %>% data.table 
+
+
+Authors2 <- readRDS("/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/JEL_matched_corpus_authors.rds")
+Authors3 <- readRDS("/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/Old_JEL_matched_corpus_authors.rds")
+Authors <- rbind(Authors2, Authors3, fill=TRUE)
+Authors[,ID_Art:=as.character(ID_Art)]
+
+# Refs2 <- Refs2[ItemID_Ref!=0]
+# Refs3 <- Refs3[ItemID_Ref!=0]
+# Corpus
+
+Corpus <- rbind(Corpus2, Corpus3, fill=TRUE)
+Refs <- rbind(Refs2, Refs3, fill=TRUE)
+Corpus <- Corpus[Code_Revue=="9662" | Code_Revue=="13694" | Code_Revue=="4695" | Code_Revue=="13992" | Code_Revue=="758" | Code_Revue=="5200"]
+Refs <- Refs[ID_Art %in% Corpus$ID_Art]
+# Label column
+Refs <- merge(Refs, Corpus[,.(ID_Art,Annee_Bibliographique)], by="ID_Art",all.x = TRUE)
+Refs <- Refs[, name_short:=  gsub("-.*","",Nom)]
+Refs$name_short <- toupper(Refs$name_short)
+Refs <- Refs[,Label_Target:=paste0(name_short,",",Annee_Bibliographique)]
+Refs[, c("name_short"):=NULL]
+
+# Top5_abstract <- fread("EER/Top5/TOP5_AB.csv")
+# long_ab <- spread(Top5_abstract, Ordre, Abstract)
+# long_ab <- tidyr::unite(long_ab, Abstract, -Id_Art) 
+# 
+# Top5_art <- fread("EER/Top5/TOP5_ART.csv")
+
+
+Corpus_EER <- Corpus[Code_Revue=="5200"]
+Corpus_top5 <- Corpus[Code_Revue=="9662" | Code_Revue=="13694" | Code_Revue=="4695" | Code_Revue=="13992" | Code_Revue=="758"]
+Refs_top5 <- Refs[ID_Art %in% Corpus_top5$ID_Art]
+Refs_EER <- Refs[ID_Art %in% Corpus_EER$ID_Art]
+
+all_EER <- readRDS(file = "EER/1_Corpus_Prepped_and_Merged/Corpus.rds")
+all_top5 <- dbGetQuery(ESH, paste0("SELECT * FROM OST_Expanded_SciHum.Articles WHERE Code_Revue=9662 OR Code_Revue=13694 OR Code_Revue=4695 OR Code_Revue=13992 OR Code_Revue=758;")) %>% data.table()
+
+```
+
+# Corpus
+
+## Exploring the Corpus
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Collaborations ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+institutions <- merge(Corpus[,.(ID_Art, Annee_Bibliographique)], Institution, by="ID_Art",all.x = TRUE)
+# institutions <- institutions[,head(.SD, 1),.(ID_Art,Institution)]
+institutions <- institutions[Pays=="PEOPLES-R-CHINA", Pays:="CHINA"]
+institutions[Pays=="FED-REP-GER", Pays:="GERMANY"]
+institutions[Pays=="WEST-GERMANY", Pays:="GERMANY"]
+institutions[Pays=="CZECHOSLOVAKIA" | Pays=="CZECH-REPUBLIC", Pays:="CZECH REPUBLIC"]
+institutions_unique <- institutions[,head(.SD, 1),.(ID_Art,Institution)]
+institutions_unique <- institutions_unique[Institution!="NULL" | Pays!="NULL" ]
+institutions_unique[, Countries_grouped:=Pays]
+institutions_unique[Countries_grouped=="CZECHOSLOVAKIA" | Countries_grouped=="CZECH-REPUBLIC", Countries_grouped:="CZECH REPUBLIC"]
+institutions_unique[Countries_grouped=="FED-REP-GER", Countries_grouped:="GERMANY"]
+
+institutions_unique[toupper(Pays) %in% toupper(UE$Countries), Countries_grouped:="Europe"]
+# Identifying Collaborations
+institutions_unique[,EU:=0][Countries_grouped=="Europe", EU:=1][,EU:=sum(EU),ID_Art]
+institutions_unique[,US:=0][Countries_grouped=="USA", US:=1][,US:=sum(US),ID_Art]
+institutions_unique[EU>=1 & US>=1, EU_US_collab:= "Collaborations", ID_Art]
+institutions_unique[EU==0 & US>=1, EU_US_collab:= "Americans\n(No Europeans)", ID_Art]
+institutions_unique[EU>=1 & US==0, EU_US_collab:= "Europeans\n(No Americans)", ID_Art]
+institutions_unique[EU==0 & US==0, EU_US_collab:= "Neither", ID_Art]
+institutions_unique[,ID_Art:=as.character(ID_Art)]
+require(dplyr)
+count_year <- institutions_unique[, head(.SD, 1), .(ID_Art)][Annee_Bibliographique>=1980]
+count_year <- count_year %>% group_by(Annee_Bibliographique, EU_US_collab) %>% summarise(n = n()) %>%  mutate(freq = n / sum(n)) %>% as.data.table()
+count_year[Annee_Bibliographique==1989]
+count_year <- complete(count_year, Annee_Bibliographique, EU_US_collab) %>% as.data.table
+count_year[is.na(n),n:=1]
+count_year[is.na(freq),freq:=0]
+
+ggplot(count_year, aes(x=Annee_Bibliographique, y=freq, group=EU_US_collab, color=EU_US_collab)) +
+  geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.4) +
+  # geom_point() +
+  labs(fill = "Countries (Top 7)") +
+  scale_x_continuous("Years") +
+  scale_y_continuous("Share of Papers Authored by European and American Economists", limits = c(0, 0.8), breaks = seq(0,.8,0.2)) +
+  theme_minimal() +
+  scale_fill_manual(values = c(rev(brewer.pal(n = 9, name = "Paired")))) +
+  scale_color_discrete(guide = FALSE) +
+  ggrepel::geom_label_repel(aes(label = EU_US_collab), data = count_year[Annee_Bibliographique==2016], nudge_x = 1, segment.color = NA) +
+  coord_cartesian(xlim = c(NA, 2024)) 
+# ggsave("Graphs/Collab.png", width=286, height=215, units = "mm")
+
+institutions_unique <- institutions_unique[,ID_Art:=as.integer(ID_Art)]
+Corpus <- merge(Corpus, institutions_unique[,.N,.(EU_US_collab,ID_Art)][,.N,.(EU_US_collab,ID_Art)][,.(EU_US_collab,ID_Art)], by="ID_Art",all.x=TRUE)
+institutions_unique <- institutions_unique[,ID_Art:=as.character(ID_Art)]
+```
+
+
+
