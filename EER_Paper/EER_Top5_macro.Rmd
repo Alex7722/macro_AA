@@ -1,0 +1,649 @@
+---
+title: "EER"
+output: 
+  html_document:
+    theme: united
+    toc: true
+    number_sections: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: hide
+---
+
+
+```{r, include=FALSE, set.seed(333)}
+library(knitr)
+knitr::opts_knit$set(root.dir = "/projects/data/macro_AA")
+library(png)
+library(grid)
+library(ggnewscale)
+library(vite)
+library(RMySQL)
+library(NetworkToolbox)
+library(broom)
+library(igraph)
+# library(dplyr)
+library(data.table)
+library(ggplot2)
+library(magrittr)
+library(tm)
+library(tidyr)
+library(tidytext)
+library('cluster')
+library('ggraph')
+library('tibble')
+library('tidygraph')
+library(ggrepel)
+library(readr)
+# library(leiden)
+library(ggraph)
+library(ggnewscale)
+library(remotes)
+library(vite)
+# library("reticulate")
+# library(reticulate)
+library(tidygraph)
+library(rlang)
+library(ggforce)
+library(d3Network)
+library(scales)
+library(RColorBrewer)
+require(DescTools)
+require(stringr)
+library(docstring)
+library(quanteda)
+library(pander)
+library(DT)
+library(forcats)
+require(Polychrome)
+source("/home/alexandre/functions_networks.R")
+require(plotly)
+require(biblionetwork)
+require( Rforceatlas )
+library(kableExtra)
+require(rmdformats)
+
+`%notin%` <- Negate(`%in%`)
+
+knitr::opts_chunk$set(cache = T)
+
+
+setwd("/projects/data/macro_AA")
+data_path <- "/projects/data/macro_AA/"
+# 
+# source("~/macro_AA/EER_Paper/Script_paths_and_basic_objects_EER.R")
+# source("~/macro_AA/functions/functions_for_network_analysis.R")
+source("/home/alexandre/functions_dynamics_networks.R")
+source("/home/alexandre/functions_networks.R")
+source("~/macro_AA/logins_DO_NOT_UPLOAD.R")
+ESH <- dbConnect(MySQL(),
+                 user = usr, password = pswd, dbname = "OST_Expanded_SciHum",
+                 host = "127.0.0.1"
+)
+# Corpus1 <- readRDS(file = paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpus.rds"))
+# Institutions <- readRDS(file = paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Institutions.rds"))
+# Authors <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Authors.rds"))
+# Refs1 <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Refs.rds"))
+# Refs1 <- Refs1[ItemID_Ref_Target!=0]
+
+Corpus2 <- readRDS("/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/JEL_matched_corpus_nodes.rds")
+Refs2 <- readRDS(file = "/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/JEL_matched_corpus_references_info.rds")
+
+Refs3 <- readRDS(file = "/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/Old_JEL_matched_corpus_references_info.rds")
+Corpus3 <- readRDS("/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/Old_JEL_matched_corpus_nodes.rds")
+
+Institution <- fread(file = "/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/Macro_AA_Institutions_Cleaned.csv",fill=TRUE)
+
+
+
+UE <- fread("EER/Europe_continent.csv") %>% data.table 
+
+
+Authors2 <- readRDS("/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/JEL_matched_corpus_authors.rds")
+Authors3 <- readRDS("/projects/data/macro_AA/Corpus_Econlit_Matched_WoS/Old_JEL_matched_corpus_authors.rds")
+Authors <- rbind(Authors2, Authors3, fill=TRUE)
+Authors[,ID_Art:=as.character(ID_Art)]
+
+# Refs2 <- Refs2[ItemID_Ref!=0]
+# Refs3 <- Refs3[ItemID_Ref!=0]
+# Corpus
+
+Corpus <- rbind(Corpus2, Corpus3, fill=TRUE)
+Refs <- rbind(Refs2, Refs3, fill=TRUE)
+Corpus <- Corpus[Code_Revue=="9662" | Code_Revue=="13694" | Code_Revue=="4695" | Code_Revue=="13992" | Code_Revue=="758" | Code_Revue=="5200"]
+Refs <- Refs[ID_Art %in% Corpus$ID_Art]
+# Label column
+Refs <- merge(Refs, Corpus[,.(ID_Art,Annee_Bibliographique)], by="ID_Art",all.x = TRUE)
+Refs <- Refs[, name_short:=  gsub("-.*","",Nom)]
+Refs$name_short <- toupper(Refs$name_short)
+Refs <- Refs[,Label_Target:=paste0(name_short,",",Annee_Bibliographique)]
+Refs[, c("name_short"):=NULL]
+
+Top5_abstract <- fread("EER/Top5/TOP5_AB.csv")
+long_ab <- spread(Top5_abstract, Ordre, Abstract)
+long_ab <- tidyr::unite(long_ab, Abstract, -Id_Art) 
+
+Top5_art <- fread("EER/Top5/TOP5_ART.csv")
+
+
+Corpus_EER <- Corpus[Code_Revue=="5200"]
+Corpus_top5 <- Corpus[Code_Revue=="9662" | Code_Revue=="13694" | Code_Revue=="4695" | Code_Revue=="13992" | Code_Revue=="758"]
+Refs_top5 <- Refs[ID_Art %in% Corpus_top5$ID_Art]
+Refs_EER <- Refs[ID_Art %in% Corpus_EER$ID_Art]
+
+all_EER <- readRDS(file = "EER/1_Corpus_Prepped_and_Merged/Corpus.rds")
+all_top5 <- dbGetQuery(ESH, paste0("SELECT * FROM OST_Expanded_SciHum.Articles WHERE Code_Revue=9662 OR Code_Revue=13694 OR Code_Revue=4695 OR Code_Revue=13992 OR Code_Revue=758;")) %>% data.table()
+
+
+
+```
+
+
+```{r, include=FALSE, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Collaborations ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+institutions <- merge(Corpus[,.(ID_Art, Annee_Bibliographique)], Institution, by="ID_Art",all.x = TRUE)
+# institutions <- institutions[,head(.SD, 1),.(ID_Art,Institution)]
+institutions <- institutions[Pays=="PEOPLES-R-CHINA", Pays:="CHINA"]
+institutions[Pays=="FED-REP-GER", Pays:="GERMANY"]
+institutions[Pays=="WEST-GERMANY", Pays:="GERMANY"]
+institutions[Pays=="CZECHOSLOVAKIA" | Pays=="CZECH-REPUBLIC", Pays:="CZECH REPUBLIC"]
+institutions_unique <- institutions[,head(.SD, 1),.(ID_Art,Institution)]
+institutions_unique <- institutions_unique[Institution!="NULL" | Pays!="NULL" ]
+institutions_unique[, Countries_grouped:=Pays]
+institutions_unique[Countries_grouped=="CZECHOSLOVAKIA" | Countries_grouped=="CZECH-REPUBLIC", Countries_grouped:="CZECH REPUBLIC"]
+institutions_unique[Countries_grouped=="FED-REP-GER", Countries_grouped:="GERMANY"]
+
+institutions_unique[toupper(Pays) %in% toupper(UE$Countries), Countries_grouped:="Europe"]
+# Identifying Collaborations
+institutions_unique[,EU:=0][Countries_grouped=="Europe", EU:=1][,EU:=sum(EU),ID_Art]
+institutions_unique[,US:=0][Countries_grouped=="USA", US:=1][,US:=sum(US),ID_Art]
+institutions_unique[EU>=1 & US>=1, EU_US_collab:= "Collaborations", ID_Art]
+institutions_unique[EU==0 & US>=1, EU_US_collab:= "Americans\n(No Europeans)", ID_Art]
+institutions_unique[EU>=1 & US==0, EU_US_collab:= "Europeans\n(No Americans)", ID_Art]
+institutions_unique[EU==0 & US==0, EU_US_collab:= "Neither", ID_Art]
+institutions_unique[,ID_Art:=as.character(ID_Art)]
+require(dplyr)
+count_year <- institutions_unique[, head(.SD, 1), .(ID_Art)][Annee_Bibliographique>=1980]
+count_year <- count_year %>% group_by(Annee_Bibliographique, EU_US_collab) %>% summarise(n = n()) %>%  mutate(freq = n / sum(n)) %>% as.data.table()
+count_year[Annee_Bibliographique==1989]
+count_year <- complete(count_year, Annee_Bibliographique, EU_US_collab) %>% as.data.table
+count_year[is.na(n),n:=1]
+count_year[is.na(freq),freq:=0]
+
+ggplot(count_year, aes(x=Annee_Bibliographique, y=freq, group=EU_US_collab, color=EU_US_collab)) +
+  geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.4) +
+  # geom_point() +
+  labs(fill = "Countries (Top 7)") +
+  scale_x_continuous("Years") +
+  scale_y_continuous("Share of Papers Authored by European and American Economists", limits = c(0, 0.8), breaks = seq(0,.8,0.2)) +
+  theme_minimal() +
+  scale_fill_manual(values = c(rev(brewer.pal(n = 9, name = "Paired")))) +
+  scale_color_discrete(guide = FALSE) +
+  ggrepel::geom_label_repel(aes(label = EU_US_collab), data = count_year[Annee_Bibliographique==2016], nudge_x = 1, segment.color = NA) +
+  coord_cartesian(xlim = c(NA, 2024)) 
+  # ggsave("Graphs/Collab.png", width=286, height=215, units = "mm")
+
+institutions_unique <- institutions_unique[,ID_Art:=as.integer(ID_Art)]
+Corpus <- merge(Corpus, institutions_unique[,.N,.(EU_US_collab,ID_Art)][,.N,.(EU_US_collab,ID_Art)][,.(EU_US_collab,ID_Art)], by="ID_Art",all.x=TRUE)
+institutions_unique <- institutions_unique[,ID_Art:=as.character(ID_Art)]
+
+
+```
+
+# Corpus
+
+## Exploring the Corpus
+
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Share of Refs####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+# Refs EER in top 5
+
+Refs_top5[ItemID_Ref %in% all_EER$ItemID_Ref][,.N,Revue_Abbrege]
+Refs_top5[,EER_ref:=0]
+Refs_top5[Revue_Abbrege %like% "EUR ECON REV%" | 
+            Revue_Abbrege %like% "EUROPEAN EC REV%" | 
+            Revue_Abbrege %like% "EUROPEAN ECONOMIC RE%" | 
+            Revue_Abbrege %like% "EUR EC REV%",
+          EER_ref:=1]
+
+# Refs_top5 <- merge(Refs_top5, Corpus_top5[,.(ID_Art,Annee_Bibliographique)], by="ID_Art",all.x = TRUE)
+
+share_EER_Refs <- Refs_top5[,sum(EER_ref)/.N,Annee_Bibliographique]
+
+# n_ref <- Refs_top5[, .N, .(Annee_Bibliographique)]
+# share_ref_EER <- Refs_top5[, sum(EER_ref), .(Annee_Bibliographique)]
+
+ggplot(share_EER_Refs, aes(x=Annee_Bibliographique, y=V1)) +
+  geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.75)+
+  # geom_point() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.75)) +
+  scale_x_continuous("Years") +
+  scale_y_continuous("Share of EER in Top 5 Macro Refs") +
+  coord_cartesian(ylim = c(0,NA), xlim = c(NA, 2022)) +
+  scale_color_discrete(guide = FALSE) +
+  theme_minimal() 
+
+
+
+# Refs top 5 in EER
+
+Refs_EER[ItemID_Ref %in% all_top5$ItemID_Ref][,.N,Revue_Abbrege]
+Refs_EER[,top5_ref:=0]
+Refs_EER[Revue_Abbrege %in% Refs_EER[ItemID_Ref %in% all_top5$ItemID_Ref][,.N,Revue_Abbrege]$Revue_Abbrege, top5_ref:=1]
+
+Corpus_EER[,ID_Art:=as.character(ID_Art)]
+Refs_EER[,ID_Art:=as.character(ID_Art)]
+
+# Refs_EER <- merge(Refs_EER, Corpus_EER[,.(ID_Art,Annee_Bibliographique)], by="ID_Art",all.x = TRUE)
+
+share_top5_Refs <- Refs_EER[,sum(top5_ref)/.N,Annee_Bibliographique]
+
+ggplot(share_top5_Refs, aes(x=Annee_Bibliographique, y=V1)) +
+  geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.75)+
+  geom_point() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.75)) +
+  scale_x_continuous("Years") +
+  scale_y_continuous("Share of Top 5 in EEN Macro Refs") +
+  coord_cartesian(ylim = c(0,NA), xlim = c(NA, 2022)) +
+  scale_color_discrete(guide = FALSE) +
+  theme_minimal() 
+
+
+library(latticeExtra)
+# --> construct separate plots for each series
+obj1 <- xyplot(V1 ~ Annee_Bibliographique, share_top5_Refs[order(Annee_Bibliographique)], type = "l" , lwd=2, col="steelblue")
+obj2 <- xyplot(V1 ~ Annee_Bibliographique, share_EER_Refs[order(Annee_Bibliographique)], type = "l", lwd=2, col="#69b3a2")
+
+# --> Make the plot with second y axis:
+doubleYScale(obj1, obj2, add.ylab2 = TRUE, use.style=FALSE )
+
+EER_top5 <- merge(share_top5_Refs,share_EER_Refs, by="Annee_Bibliographique",all.x = TRUE,all.y = TRUE)
+EER_top5 <- melt(EER_top5, id.vars=c("Annee_Bibliographique"),  measure.vars=c("V1.x","V1.y"))
+EER_top5[variable=="V1.x", variable:="Top 5 in EER"]
+EER_top5[variable=="V1.y", variable:="EER in Top 5"]
+
+ggplot(EER_top5, aes(x=Annee_Bibliographique, y=value, group=variable, color=variable)) +
+  geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.2)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.75)) +
+  scale_x_continuous("Years") +
+  scale_y_continuous("Share of EER in Top 5 Macro Refs") +
+  coord_cartesian(ylim = c(0,NA), xlim = c(NA, 2022)) +
+  scale_color_discrete(guide = FALSE) +
+  ggrepel::geom_label_repel(aes(label = as.character(variable)), data = EER_top5[Annee_Bibliographique==2016], nudge_x = 1, segment.color = NA) +
+  theme_minimal() 
+
+```
+
+# Dynamics Networks
+
+```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Dynamic Networks and Communities ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+Refs <- Refs[ItemID_Ref!=0]
+
+time_window <- 7
+first_year <- Corpus[order(Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique
+last_year <- (as.numeric(Corpus[order(-Annee_Bibliographique), head(.SD, 1)]$Annee_Bibliographique) - time_window + 1) # +1 to get the very last year in the window
+last_year <- 1990
+all_years <- first_year:last_year
+all_years <- c(1975,1980,1985,1990,1995,2000,2005)
+
+Corpus <- Corpus[Annee_Bibliographique>=1975]
+Corpus[,ID_Art:=as.character(ID_Art)]
+Corpus[,ItemID_Ref:=as.character(ItemID_Ref)]
+Refs[,ID_Art:=as.character(ID_Art)]
+Refs[,ItemID_Ref:=as.character(ItemID_Ref)]
+
+
+# Refs[,ID_Art:=ID_Art_Source]
+# Refs[,ItemID_Ref:=ItemID_Ref_Target]
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Coupling####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+tbl_coup_list <- dynamics_coupling_networks(corpus = Corpus, 
+                                            references = Refs, 
+                                            source = "ID_Art", 
+                                            target = "ItemID_Ref", 
+                                            time_variable = Annee_Bibliographique,
+                                            time_window = time_window, 
+                                            weight_treshold_value = 2)
+
+
+tbl_coup_list <- lapply(tbl_coup_list, function(tbl){tbl %>% activate(nodes) %>% mutate(Revue_EER_bin = ifelse(Code_Revue==5200,"EER","Top5"))})
+tbl_coup_list <- lapply(tbl_coup_list, function(tbl){tbl %>% activate(edges) %>% mutate(EER_bin_to = .N()$Revue_EER_bin[to], EER_bin_from = .N()$Revue_EER_bin[from])})
+tbl_coup_list <- lapply(tbl_coup_list, function(tbl){tbl %>% activate(edges) %>% mutate(EU_US_collab_to = .N()$EU_US_collab[to], EU_US_collab_from = .N()$EU_US_collab[from])})
+
+# inwardness <- function(tbl)
+# {
+#   separateness <- tbl %>% activate(edges) %>% as.data.table()
+#   nodes <- tbl %>% activate(nodes) %>% as.data.table()
+#   
+#   separateness[,EER_bin_from:=as.character(EER_bin_from)]
+#   separateness[,EER_bin_to:=as.character(EER_bin_to)]
+#   separateness <- separateness[EER_bin_from > EER_bin_to, c("EER_bin_to", "EER_bin_from") := list(EER_bin_from, EER_bin_to)]
+#   separateness[,tot_weight:=sum(weight)]
+#   
+#   separateness_couple <- separateness[,.(sum(weight), .N),.(EER_bin_from, EER_bin_to)]
+#   
+#   matrix <- as.matrix(get.adjacency(graph.data.frame(separateness_couple, directed=FALSE), type = "both", attr = "V1"))
+#   matrix <- scale(matrix, center = FALSE, scale = colSums(matrix))
+#   
+#   matrix <- melt(matrix) %>% as.data.table()
+#   return(matrix)
+# }
+# 
+# 
+# list_inwardness <- lapply(tbl_coup_list, inwardness)
+# list_inwardness <- rbindlist(list_inwardness, idcol = "Year")
+# list_inwardness[,couple:=paste0(Var1,"-",Var2)]
+# 
+# ggplot(list_inwardness,
+#        aes(x=as.numeric(Year), y=value, group=couple, color=couple)) +
+#   geom_point() +
+#   geom_smooth(se=FALSE) +
+#   ylab("Share of Weighted Links Between Articles of the Same Category") +
+#   xlab(NULL) +
+#   # facet_wrap(~fct_rev(aut_id), scales = "free_y", nrow = 3) +
+#   geom_vline(xintercept = 1984, linetype="dashed",alpha=0.8) +
+#   geom_vline(xintercept = 1991, linetype="dashed",alpha=0.8) +
+#   # scale_fill_brewer(palette = "Set1",name = "Inwardness of:", labels = c("Economics Articles", "Non-Economics Articles")) + 
+#   # scale_color_brewer(palette = "Set1",name = "Inwardness of:", labels = c("Economics Articles", "Non-Economics Articles")) +
+#   theme_minimal() +
+#   coord_cartesian(ylim = c(0,1)) +
+#   theme(legend.position =  "bottom", legend.justification = "center") +
+#   guides(fill = guide_legend(title.position = "top", ncol= 2, title.hjust =0.5, byrow = TRUE))
+# 
+# 
+
+
+# tbl %>% #mix color
+#   activate(edges) %>%
+#   mutate(com_ID_to = .N()$color[to], com_ID_from = .N()$color[from]) %>%
+
+# Main components and com
+tbl_coup_list <- lapply(tbl_coup_list, main_components)
+tbl_coup_list <- lapply(tbl_coup_list, detect_leiden_igraph)
+#' We name communities:
+tbl_coup_list <- intertemporal_naming_function(tbl_coup_list, treshold_similarity = 0.55)
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Alluvial ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+alluv_dt <- make_into_alluv_dt(tbl_coup_list)
+alluv_dt <- merge(alluv_dt, institutions_unique[,.N,.(EU_US_collab,ID_Art)][,.N,.(EU_US_collab,ID_Art)][,.(EU_US_collab,ID_Art)], by.x = "Id", by.y = "ID_Art",all.x=TRUE)
+
+test <- alluv_as_network(alluv_dt)
+test <- test %>% activate(edges) %>% as.data.table()
+ggplot(test, aes(x=max_cosine_strength)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.75)) +
+  scale_x_continuous("Edges Strength") +
+  scale_y_continuous("Density") +
+  theme_minimal() 
+
+
+alluv_dt <- minimize_crossing(alluv_dt)
+
+
+
+alluv_dt <- meta_grouping(alluv_dt, treshold_meta_groups=0.40)
+##### Labels
+label <- copy(alluv_dt)
+label <- label[,.N,.(new_Id_com, share_leiden_max)][order(share_leiden_max)]
+label[,Label_com:=new_Id_com]
+
+##### Colors
+# Add colors to main dt
+alluv_dt_graph <- alluv_dt
+
+n_colors_groups <- alluv_dt[,.N,new_Id_com][order(-N)][,.N]
+qual_col_pals <- brewer.pal.info[brewer.pal.info$category == 'qual',]
+col_vector  <- unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+individuals_colors <- sample(col_vector, n_colors_groups,replace=TRUE)
+unique_ids_color <- data.table(
+  new_Id_com = as.character(alluv_dt[,.N,new_Id_com][order(new_Id_com)]$new_Id_com), 
+  individuals_colors = individuals_colors,
+  color = individuals_colors)
+
+alluv_dt_graph[,color:="grey"]
+
+
+##### Keep only one label per community as the average year
+label_mean <- merge(alluv_dt, label[,.(new_Id_com, Label_com)], by="new_Id_com", all.x = TRUE)
+label_mean <- copy(label_mean)
+label_mean <- label_mean[,Window:=round(mean(as.numeric(Window))),new_Id_com][, head(.SD, 1), .(new_Id_com)]
+alluv_dt_graph <- merge(alluv_dt_graph,label_mean[,.(new_Id_com,Window,Label_com)], by = c("new_Id_com","Window"), all.x = TRUE )
+alluv_dt_graph <- alluv_dt_graph %>% rename(Label_com_unique = Label_com)
+
+# Keep a column with communities as label
+alluv_dt_graph <- merge(alluv_dt_graph, label[,.(new_Id_com, Label_com)], by = "new_Id_com", all.x = TRUE) %>% as.data.table()
+alluv_dt_graph <- alluv_dt_graph %>% rename(com_as_label = Label_com)
+alluv_dt_graph[is.na(com_as_label),com_as_label:=new_Id_com]
+
+
+
+
+# merge(unique_ids_color, label[,.(new_Id_com,Label_com)], by="new_Id_com")
+# merge(unique_ids_color, label[,.(new_Id_com,Label_com)], by="new_Id_com") %>% as.data.table %>% .[order(Label_com)]
+
+
+
+require(ggalluvial)
+require(ggrepel)
+alluv_dt_graph$new_Id_com <- fct_reorder(alluv_dt_graph$new_Id_com, alluv_dt_graph$order,min, .desc = TRUE)
+
+
+ggplot(alluv_dt_graph, aes(x = Window, y=share, stratum = new_Id_com, alluvium = Id, fill = color, label = new_Id_com)) +
+  geom_stratum(alpha =1, size=1/10) +
+  geom_flow() +
+  theme(legend.position = "none") +
+  theme_minimal() +
+  scale_fill_identity() +
+  ggtitle("") +
+  geom_label_repel(stat = "stratum", size = 5, aes(label = Label_com_unique)) 
+
+```
+
+
+## tf-idf of communities over time
+
+```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%', fig.dim = c(10, 10)}
+
+tf_idf_table <- copy(alluv_dt)
+tf_idf_table <- tf_idf_table[,share_leiden:=share_leiden_max]
+tf_idf_table <- merge(tf_idf_table, label, by = "new_Id_com", all.x = TRUE) %>% as.data.table()
+tf_idf_table[,Leiden1:=Label_com]
+tf_idf_table[is.na(Label_com),Leiden1:=new_Id_com]
+tf_idf_table <- tbl_graph(tf_idf_table)
+
+tf_idf_color <- copy(unique_ids_color)
+tf_idf_color <- merge(tf_idf_color, label, by = "new_Id_com", all.x = TRUE) %>% as.data.table()
+tf_idf_color[,Leiden1:=Label_com]
+tf_idf_color[is.na(Label_com),Leiden1:=new_Id_com]
+
+tf_idf_results <- tf_idf(tf_idf_table, tf_idf_color, 15, 4, treshold_com = 0.05, size_title_wrap=10, unstemming = TRUE)
+
+# tf_idf_results$plot
+# tf_idf_results$list_words
+
+```
+
+```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
+nb_cit <- Refs[, .N, ItemID_Ref_Target]
+colnames(nb_cit)[colnames(nb_cit) == "N"] <- "size"
+nb_cit_all <- merge(Corpus, nb_cit, by.x = "ItemID_Ref", by.y = "ItemID_Ref_Target", all.x = TRUE)
+nb_cit_all[is.na(size),size:=0]
+
+alluv_dt_as_nodes <- copy(alluv_dt_graph)
+alluv_dt_as_nodes[,nodes_n_time_com := .N, .(new_Id_com,Id)]
+alluv_dt_as_nodes <- merge(alluv_dt_as_nodes, nb_cit_all[,.(size, Id, Annee_Bibliographique, Label, Revue)], by="Id", all.x = TRUE)
+
+most_influential_nodes <- copy(alluv_dt_as_nodes)
+most_influential_nodes[,weighted_size:=size*nodes_n_time_com]
+most_influential_nodes <- most_influential_nodes[, head(.SD, 1), .(new_Id_com,Id)]
+most_influential_nodes <- most_influential_nodes[order(-weighted_size)]
+
+com_to_inspect <- alluv_dt_as_nodes[share_leiden_max>=0.05, .N, com_as_label][order(-N)]$com_as_label
+com_to_inspect <- gsub("([()])","\\\\\\1", com_to_inspect)
+
+euro_com_stat_list <- list()
+
+for (com in com_to_inspect) {
+  alluv_com  <- alluv_dt_as_nodes[com_as_label  %like% paste0(com)]
+  window <- as.integer(c(min(unique(alluv_com$Window)), as.integer(max(unique(alluv_com$Window))) + (time_window - 1)))
+  window <- as.integer(c(min(unique(alluv_com$Window)), as.integer(max(unique(alluv_com$Window)))))
+  
+  share_europeans_authors <- Corpus[Annee_Bibliographique>=window[1] & Annee_Bibliographique<=window[2]] %>%
+    group_by(EU_US_collab) %>%
+    summarise(n = n()) %>%
+    mutate(freq = n / sum(n)) %>% as.data.table() %>% 
+    .[EU_US_collab=="Europeans\n(No Americans)"] %>% 
+    .[,freq]
+  
+  share_europeans_authors_cluster <- alluv_com %>%
+    group_by(EU_US_collab) %>%
+    summarise(n = n()) %>%
+    mutate(freq = n / sum(n)) %>% as.data.table() %>% 
+    .[EU_US_collab=="Europeans\n(No Americans)"] %>% 
+    .[,freq]
+  
+  share_EER_articles <- Corpus[Annee_Bibliographique>=window[1] & Annee_Bibliographique<=window[2]] %>%
+    group_by(Revue) %>%
+    summarise(n = n()) %>%
+    mutate(freq = n / sum(n)) %>% as.data.table() %>% 
+    .[Revue =="EUROPEAN ECONOMIC REVIEW"] %>% 
+    .[,freq]
+  
+  share_EER_articles_cluster <- alluv_com %>%
+    group_by(Revue) %>%
+    summarise(n = n()) %>%
+    mutate(freq = n / sum(n)) %>% as.data.table() %>% 
+    .[Revue=="EUROPEAN ECONOMIC REVIEW"] %>% 
+    .[,freq]
+  
+  europeans_authors_diff <- share_europeans_authors_cluster-share_europeans_authors
+  EER_articles_diff <- share_EER_articles_cluster-share_EER_articles
+
+  
+  euro_com_stat <- data.table(
+    new_Id_com = com, 
+    share_europeans_authors_cluster = share_europeans_authors_cluster,
+    share_europeans_authors = share_europeans_authors,
+    share_EER_articles = share_EER_articles,
+    share_EER_articles_cluster=share_EER_articles_cluster,
+    europeans_authors_diff = europeans_authors_diff,
+    EER_articles_diff = EER_articles_diff,
+    sum_diff=europeans_authors_diff+EER_articles_diff
+    )
+  
+  euro_com_stat_list[[as.character(com)]] <- euro_com_stat
+}
+
+diff_stat_euro_com <- rbindlist(euro_com_stat_list)
+
+com_to_inspect <- diff_stat_euro_com[order(-sum_diff), .N, new_Id_com]$new_Id_com
+com_to_inspect <- gsub("([()])","\\\\\\1", com_to_inspect)
+
+```
+
+# A Look at Dynamic Communities
+
+```{r,results = "asis", eval=TRUE, echo=FALSE}
+
+# com_to_inspect <- diff_stat_euro_com[order(-sum_diff), .N, new_Id_com]$new_Id_com
+# com_to_inspect <- gsub("([()])","\\\\\\1", com_to_inspect)
+
+for (com in com_to_inspect) {
+  
+  ####################### Preparing the data to put in the template
+  # time_window <- 7
+  # restricting alluv_dt to the community at stake
+  alluv_com  <- alluv_dt_as_nodes[com_as_label  %like% paste0(com)]
+  
+  most_influential_nodes_com  <- most_influential_nodes[com_as_label %like% paste0(com)]
+  
+  most_productive_journals <- most_influential_nodes_com[,.N,Revue][order(-N)]
+
+  
+  n_nodes_com <- most_influential_nodes_com[,.N]
+  
+  most_influential_refs_com <- merge(most_influential_nodes_com[,.(Id,weighted_size)], Refs, by="Id")
+  most_influential_refs_com <- most_influential_refs_com[ItemID_Ref_Target!="NULL"]
+  most_influential_refs_com[,n_cit_ref:=.N, ItemID_Ref_Target]
+  most_influential_refs_com[,n_nodes:=n_nodes_com]
+  most_influential_refs_com[,share:=n_cit_ref/n_nodes*100]
+  most_influential_refs_com <- most_influential_refs_com[order(-share), head(.SD, 1), .(ItemID_Ref_Target)]
+  
+  most_productive_authors <- merge(alluv_com[,.(Id)], Authors, by.x= "Id", by.y= "ID_Art")
+  most_productive_authors <- most_productive_authors[,.N, Nom]
+  most_productive_authors <- most_productive_authors[order(-N)]
+  
+  most_productive_institutions <- merge(alluv_com[,.(Id)], institutions[,.(ID_Art, Institution)], by.x= "Id", by.y= "ID_Art")
+  most_productive_institutions <- most_productive_institutions[,.N, Institution]
+  most_productive_institutions <- most_productive_institutions[order(-N)]
+
+  # extracting the first year and last year of the community
+  window <- as.integer(c(min(unique(alluv_com$Window)), as.integer(max(unique(alluv_com$Window))) + (time_window - 1)))
+  window <- as.integer(c(min(unique(alluv_com$Window)), as.integer(max(unique(alluv_com$Window)))))
+  
+  
+  ################ Beginning of the template ######################
+  cat("##","Community:", com, "\n")
+  cat(paste0("  \nThe community exists from ", window[1]," to ", window[2],". \n"))
+  cat("It's most distinctive words are: ",tf_idf_results$list_words[Leiden1 %like% paste0(com)]$term)
+  # cat("During this period there was a difference of european authors of", diff_stat_euro_com[new_Id_com==com]$europeans_authors_diff, "points and of EER pub of", diff_stat_euro_com[new_Id_com==com]$EER_articles_diff,"points. For a total of ", diff_stat_euro_com[new_Id_com==com]$EER_articles_diff)
+
+  cat("The most influential nodes of the community:")
+  cat("\n\n")
+  print(kable(most_influential_nodes_com[,.(Label, Titre, weighted_size)][, head(.SD, 20)]) %>% 
+          kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+  cat("\n\n")
+  
+  cat("The most productive journals:")
+  cat("\n\n")
+  print(kable(most_productive_journals[, head(.SD, 20)]) %>% 
+          kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+  cat("\n\n")
+  
+  cat("The most common refs:")
+  cat("\n\n")
+  print(kable(most_influential_refs_com[,.(Label_Target,Titre, share)][, head(.SD, 20)]) %>% 
+          kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+  cat("\n\n")
+  
+  cat("The most productive authors of the community:")
+  cat("\n\n")
+  print(kable(most_productive_authors[,.(Nom, N)][, head(.SD, 10)]) %>% 
+          kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+  cat("\n\n")
+  
+  cat("The most productive Institutions of the community:")
+  cat("\n\n")
+  print(kable(most_productive_institutions[,.(Institution, N)][, head(.SD, 10)]) %>% 
+          kable_styling(bootstrap_options =     c("striped", "condensed", full_width = F)))
+  cat("\n\n")
+  
+  # cat(sprintf("  \n## Community %s (`%s`) \n\n", unique(alluv_com[com_as_label  == com]$com_as_label ),com))
+  
+  cat("  \n")
+}
+
+```
+
+
+
+
+
+

@@ -160,8 +160,8 @@ ggplot(mean_jel[V1!=0 & Annee_Bibliographique!="2016"], aes(x=as.numeric(Annee_B
   scale_x_continuous("Years") +
   scale_y_continuous("Share of Macro_JEL") +
   coord_cartesian(ylim = c(0,1)) +
-  theme_minimal() +
-  ggsave("EER/Graphs/mean_jel.png", width=30, height=20, units = "cm")
+  theme_minimal() 
+  ggsave("EER/Graphs/mean_jel.png", width=35, height=20, units = "cm")
 
 jel_evolution <- Jel_info[, head(.SD, 1), .(ID_Art,code_original)]
 jel_evolution[,ID_Art:=as.character(ID_Art)]
@@ -257,28 +257,100 @@ ggplot(count_year, aes(x=as.numeric(Annee_Bibliographique), y=freq, group=Countr
   theme_minimal() +
   scale_fill_manual(values = c(rev(brewer.pal(n = 9, name = "Paired")))) +
   scale_color_discrete(guide = FALSE) +
-  geom_label_repel(aes(label = Countries_grouped), data = count_year[Annee_Bibliographique==2019], nudge_x = 1, segment.color = NA) +
+  ggrepel::geom_label_repel(aes(label = Countries_grouped), data = count_year[Annee_Bibliographique==2019], nudge_x = 1, segment.color = NA) +
   coord_cartesian(xlim = c(NA, 2022)) 
   # ggsave("Graphs/country_time_stacked.png", scale = 1)
 
 
-count_year <- Institutions[, head(.SD, 1), .(ID_Art)][Annee_Bibliographique>=1974]
+count_year <- Institutions[, head(.SD, 1), .(ID_Art)][Annee_Bibliographique<=2007]
 count_year <- count_year %>% group_by(Annee_Bibliographique, EU_US_collab) %>% summarise(n = n()) %>%  mutate(freq = n / sum(n)) %>% as.data.table()
+count_year <- complete(count_year, Annee_Bibliographique, EU_US_collab) %>% as.data.table
+count_year[is.na(n),n:=1]
+count_year[is.na(freq),freq:=0]
 
 ggplot(count_year, aes(x=as.numeric(Annee_Bibliographique), y=freq, group=EU_US_collab, color=EU_US_collab)) +
-  geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.3) +
-  geom_point() +
+  geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.4) +
+  # geom_point() +
   labs(fill = "Countries (Top 7)") +
   scale_x_continuous("Years") +
-  scale_y_continuous("Collaborations Europe/USA Within Papers") +
+  scale_y_continuous("Share of Papers Authored by European and American Economists", limits = c(0,1), breaks = seq(0,1,0.2)) +
   theme_minimal() +
   scale_fill_manual(values = c(rev(brewer.pal(n = 9, name = "Paired")))) +
   scale_color_discrete(guide = FALSE) +
-  geom_label_repel(aes(label = EU_US_collab), data = count_year[Annee_Bibliographique==2019], nudge_x = 1, segment.color = NA) +
-  coord_cartesian(xlim = c(NA, 2022)) 
-  # ggsave("Graphs/country_time_stacked.png", scale = 1)
+  ggrepel::geom_label_repel(aes(label = EU_US_collab), data = count_year[Annee_Bibliographique==2007], nudge_x = 1, segment.color = NA) +
+  coord_cartesian(xlim = c(NA, 2014)) 
+  ggsave("EER/Graphs/Collab_strict.png", width=35, height=20, units = "cm")
+
 ```
 
+```{r, message=FALSE, warning=FALSE, error=FALSE, results=TRUE, cache=FALSE}
+setwd("/projects/data/macro_AA")
+
+institutions <- Institutions
+# institutions <- institutions[,head(.SD, 1),.(ID_Art,Institution)]
+institutions <- institutions[Pays=="PEOPLES-R-CHINA", Pays:="CHINA"]
+institutions[Pays=="FED-REP-GER", Pays:="GERMANY"]
+institutions[Pays=="WEST-GERMANY", Pays:="GERMANY"]
+institutions[Pays=="CZECHOSLOVAKIA" | Pays=="CZECH-REPUBLIC", Pays:="CZECH REPUBLIC"]
+institutions_unique <- institutions[,head(.SD, 1),.(ID_Art,Institution)]
+institutions_unique <- institutions_unique[Institution!="NULL" | Pays!="NULL" ]
+institutions_unique[, Countries_grouped:=Pays]
+institutions_unique[Countries_grouped=="CZECHOSLOVAKIA" | Countries_grouped=="CZECH-REPUBLIC", Countries_grouped:="CZECH REPUBLIC"]
+institutions_unique[Countries_grouped=="FED-REP-GER", Countries_grouped:="GERMANY"]
+
+UE <- fread("EER/Europe_continent.csv") %>% data.table 
+institutions_unique[toupper(Pays) %in% toupper(UE$Countries), Countries_grouped:="Europe"]
+# Identifying Collaborations
+institutions_unique[,EU:=0][Countries_grouped=="Europe", EU:=1][,EU:=sum(EU),ID_Art]
+institutions_unique[,US:=0][Countries_grouped=="USA", US:=1][,US:=sum(US),ID_Art]
+institutions_unique[EU>=1 & US>=1, EU_US_collab:= "Collaborations", ID_Art]
+institutions_unique[EU==0 & US>=1, EU_US_collab:= "Americans\n(No Europeans)", ID_Art]
+institutions_unique[EU>=1 & US==0, EU_US_collab:= "Europeans\n(No Americans)", ID_Art]
+institutions_unique[EU==0 & US==0, EU_US_collab:= "Neither", ID_Art]
+institutions_unique[,ID_Art:=as.character(ID_Art)]
+require(dplyr)
+count_year <- institutions_unique[, head(.SD, 1), .(ID_Art)][Annee_Bibliographique<=2007]
+count_year <- count_year %>% group_by(Annee_Bibliographique, EU_US_collab) %>% summarise(n = n()) %>%  mutate(freq = n / sum(n)) %>% as.data.table()
+count_year[Annee_Bibliographique==1989]
+count_year <- complete(count_year, Annee_Bibliographique, EU_US_collab) %>% as.data.table
+count_year[is.na(n),n:=1]
+count_year[is.na(freq),freq:=0]
+
+ggplot(count_year, aes(x=as.numeric(Annee_Bibliographique), y=freq, group=EU_US_collab, color=EU_US_collab)) +
+  geom_smooth(method="auto", se=FALSE, fullrange=FALSE, level=0.95, span = 0.4) +
+  # geom_point() +
+  labs(fill = "Countries (Top 7)") +
+  scale_x_continuous("Years") +
+  scale_y_continuous("Share of Papers Authored by European and American Economists", limits = c(0, 0.8), breaks = seq(0,.8,0.2)) +
+  theme_minimal() +
+  scale_fill_manual(values = c(rev(brewer.pal(n = 9, name = "Paired")))) +
+  scale_color_discrete(guide = FALSE) +
+  ggrepel::geom_label_repel(aes(label = EU_US_collab), data = count_year[Annee_Bibliographique==2007], nudge_x = 1, segment.color = NA) +
+  coord_cartesian(xlim = c(NA, 2014)) 
+  ggsave("EER/Graphs/Collab_non_strict.png", width=35, height=20, units = "cm")
+
+
+```
+
+
+```{r echo=FALSE,  message=FALSE, warning=FALSE, error=FALSE, results=TRUE, out.width='100%'}
+
+bridges_collab <- institutions_unique[EU_US_collab== "Collaborations"][,list(Target = rep(Institution[1:(length(Institution)-1)],(length(Institution)-1):1),
+                                                                             Source = rev(Institution)[sequence((length(Institution)-1):1)]),
+                                                                       by= ID_Art]
+bridges_collab <- bridges_collab[Source > Target, c("Target", "Source") := list(Source, Target)] # exchanging
+bridges_collab[Target!=Source,.N,.(Target,Source)][order(-N)] %>% top_n(20)
+
+bridges_collab <- institutions_unique[EU_US_collab== "Collaborations"][,list(Target =
+                                                                               rep(Pays[1:(length(Pays)-1)],(length(Pays)-1):1),
+                                                                             Source = rev(Pays)[sequence((length(Pays)-1):1)]),
+                                                                       by= ID_Art]
+bridges_collab <- bridges_collab[Source > Target, c("Target", "Source") := list(Source, Target)] # exchanging
+bridges_collab[Target!=Source,.N,.(Target,Source)][order(-N)] %>% top_n(20)
+
+
+
+```
 
 # A Look at References
 
@@ -338,8 +410,8 @@ ggplot(eco_ref_year, aes(x=as.numeric(Annee_Bibliographique_Source), y=n_eco_ref
   scale_x_continuous("Years") +
   scale_y_continuous("Share of Economics and Management in References") +
   coord_cartesian(ylim = c(0,1)) +
-  theme_minimal() +
-  ggsave("EER/Graphs/coc.png", width=30, height=20, units = "cm")
+  theme_minimal() 
+  ggsave("EER/Graphs/coc.png", width=35, height=20, units = "cm")
 
 
 
@@ -376,7 +448,7 @@ ggplot(disc_ref_year[ESpecialite_custom!="Economics"], aes(x=as.numeric(Annee_Bi
   coord_cartesian(ylim = c(0,NA), xlim = c(NA, 2022)) +
   scale_color_discrete(guide = FALSE) +
   geom_label_repel(aes(label = label_graph), nudge_x = 1, segment.color = NA) +
-  theme_minimal() +
+  theme_minimal() 
   ggsave("EER/Graphs/disc_ref_time.png", width=30, height=20, units = "cm")
 
 
@@ -488,7 +560,7 @@ ggplot(alluv_dt_graph, aes(x = Window, y=share, stratum = new_Id_com, alluvium =
   theme_minimal() +
   scale_fill_identity() +
   ggtitle("") +
-  geom_label_repel(stat = "stratum", size = 5, aes(label = Label_com_unique)) +
+  geom_label_repel(stat = "stratum", size = 5, aes(label = Label_com_unique)) 
   ggsave("EER/Graphs/Intertemporal_communities2.png", width=30, height=20, units = "cm")
 
 

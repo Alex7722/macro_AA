@@ -90,6 +90,9 @@ dt_MS_art_ID_ART <- merge(dt_MS_art, all_art[,.(ID_Art, ID_by_pub)], by="ID_by_p
 saveRDS(dt_MS_art_ID_ART, "EER/1_Corpus_Prepped_and_Merged/abstracts_MS_with_ID_Art.RDS")
 saveRDS(top_5_AB, "EER/1_Corpus_Prepped_and_Merged/abstracts_MS_RAW.RDS")
 
+readRDS("EER/Top5/TOP5_AB")
 
-
+missing_ID_Art <- readRDS("EER/1_Corpus_Prepped_and_Merged/abstracts_MS_with_ID_Art.RDS")
+ggplot(missing_ID_Art[is.na(ID_Art),.N,YEAR], aes(x=as.character(YEAR),y=N)) + geom_bar(stat="identity")
+ggplot(missing_ID_Art[is.na(ID_Art)], aes(x=as.character(YEAR))) + geom_bar() +  facet_wrap(~JOURNAL, ncol = 2, scales = "fixed")
                                                         
