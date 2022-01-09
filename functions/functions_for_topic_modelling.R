@@ -485,9 +485,12 @@ name_topics <- function(data,
 
 ggraph_topic_correlation <- function(model,
                                      nodes = NULL,
+                                     id_column = "id",
                                      top_terms = NULL, 
                                      method = c("simple", "huge"), 
-                                     size_label = 4){
+                                     size_label = 4,
+                                     nb_topics = NULL,
+                                     resolution = 1){
 correlation <- topicCorr(model, method = method)
 
 if(is.null(nodes)){
@@ -496,13 +499,17 @@ nodes <- name_topics(top_terms, "frex", nb_word = 4)
 
 edges <- as.data.frame(as.matrix(correlation$poscor)) %>% 
   mutate(from = row_number()) %>% 
-  pivot_longer(cols = 1:30, names_to = "to", values_to = "weight") %>% 
-  mutate(to = str_remove(to, "V")) %>% 
+  pivot_longer(cols = 1:nb_topics, names_to = "to", values_to = "weight") %>% 
+  mutate(to = str_remove(to, "V"),
+         from = as.character(from)) %>% 
   filter(weight != 0) %>% 
   unique()
 
+nodes <- nodes %>% 
+  mutate(id = as.character(id))
+
 graph_corr <- tbl_graph(nodes = nodes, edges = edges, directed = FALSE)
-graph_corr <- leiden_workflow(graph_corr)
+graph_corr <- leiden_workflow(graph_corr, res_1 = resolution, niter = 3000)
 graph_corr <- community_colors(graph_corr, palette = scico(n = length(unique((V(graph_corr)$Com_ID))), palette = "roma", begin = 0.1))
 graph_corr <- vite::complete_forceatlas2(graph_corr, first.iter = 5000)
 graph_plot <- ggraph(graph_corr, layout = "manual", x = x, y = y) +
@@ -510,7 +517,7 @@ graph_plot <- ggraph(graph_corr, layout = "manual", x = x, y = y) +
   scale_edge_width_continuous(range = c(0.5,12)) +
   scale_edge_colour_identity() +
   scale_fill_identity() +
-  geom_node_label(aes(label = topic_name, fill = color), size = size_label, alpha = 0.85)
+  geom_node_label(aes(label = topic_name, fill = color), size = size_label, alpha = 0.7)
 
 list <- list("graph" = graph_corr,
              "plot" = graph_plot)

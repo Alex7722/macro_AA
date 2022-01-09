@@ -505,7 +505,7 @@ top_terms <- extract_top_terms(topic_model,
                                tuning_results[preprocessing_id == id & K == nb_topics]$data[[1]],
                                nb_terms = 15,
                                frexweight = 0.3)
-topics <- name_topics(top_terms, method = "frex", nb_word = 5)
+topics <- name_topics(top_terms, method = "frex", nb_word = 4)
 
 # Setup Colors
 color <- data.table::data.table(
@@ -550,16 +550,10 @@ invisible(dev.off())
 set.seed(1989)
 topic_corr_network <- ggraph_topic_correlation(topic_model, 
                                                nodes = select(topics, -color),
-                                               method = "huge", 
-                                               size_label = 3) 
+                                               method = "simple", 
+                                               size_label = 2.5,
+                                               nb_topics = nb_topics) 
 
-ragg::agg_png(paste0(picture_path, "topic_correlation", id, "-", nb_topics, ".png"), 
-              width = 40, 
-              height = 30, 
-              units = "cm", 
-              res = 300)
-topic_corr_network$plot
-invisible(dev.off())
 
 
 # add communities to the topics file:
@@ -569,27 +563,56 @@ communities <- topic_corr_network$graph %>%
   select(topic, Com_ID)
 topics <- merge(topics, communities, by = "topic")
 
-#' naming communities
+#' #### naming communities
 #' 
+#' We can look at the composition of the different community: `View(topics)`
 
 community_name <- tribble(
   ~Com_ID, ~Com_name,
-  "02", "Public Finance and Agents Decisions",
-  "03", "Econometrics",
-  "04", "Money & Inflation",
-  "05", "Economic Activity & Comparative analysis",
-  "06", "Monetary Policy",
-  "07", "Finance, Financial Intermediation & Labor market",
-  "08", "Growth, Capital and Investment",
+  "02", "Public Finance, Distribution and Agents Decisions",
+  "03", "Inflation & Business Cycles",
+  "04", "International Macroeconomics",
+  "05", "Fiscal & Monetary policies",
+  "06", "Econometrics",
+  "07", "Growth & Economic Activity",
+  "08", "Investment, Capital & Permanent Income",
   "09", "Search, Expectations & Information",
-  "10", "International Macroeconomics",
-  "11", "Production, Demand & Distribution",
-  "12", "Business Cycles",
-  "13", "Externality"
+  "10", "Finance, Financial Intermediation & Demand",
+  "11", "Econometrics_bis",
+  "12", "Money Demand",
+  "13", "Econometrics_ter"
 )
 
-community_name$com_color <- c(mypalette[1:10], "gray", "gray")
+#' #### Plotting network with communities
+
+community_name$com_color <- c(mypalette[1:9], "gray", "gray", "gray")
 topics <- merge(topics, community_name, by = "Com_ID")
+network <- topic_corr_network$graph 
+network <- network %>% 
+  activate(nodes) %>% 
+  left_join(unique(topics[, c("Com_ID", "Com_name", "com_color")]))
+network <- network %>% # mix color
+  activate(edges) %>%
+  mutate(color_com_ID_to = .N()$com_color[to], color_com_ID_from = .N()$com_color[from]) %>%
+  mutate(color_edges = DescTools::MixColor(color_com_ID_to, color_com_ID_from, amount1 = 0.5))
+
+graph_plot <- ggraph(network, layout = "manual", x = x, y = y) +
+  geom_edge_arc0(aes(color = color_edges, width = weight), strength = 0.3, alpha = 0.6, show.legend = FALSE) +
+  scale_edge_width_continuous(range = c(0.5,12)) +
+  scale_edge_colour_identity() +
+  scale_fill_identity() +
+  geom_node_label(aes(label = topic_name, fill = com_color), size = 2.5, alpha = 0.7) +
+  dark_theme_bw()
+  
+
+
+ragg::agg_png(paste0(picture_path, "topic_correlation", id, "-", nb_topics, ".png"), 
+              width = 40, 
+              height = 30, 
+              units = "cm", 
+              res = 300)
+graph_plot
+invisible(dev.off())
 
 #' We can look at some topics we find close to understand better their differences:
 #' 
@@ -638,6 +661,7 @@ topic_gamma_attributes <- merge(topic_gamma,
 #' We will use this table for exploration
 #' 
 
+saveRDS(topic_gamma_attributes, paste0(data_path, "EER/topic_model_",id,"-",nb_topics,".rds"))
 readr::write_csv2(topic_gamma_attributes, paste0("summary_topic_model_",id,"-",nb_topics,".csv"))
 
 #' ### Working with the chosen topic models: differences in terms of journals and affiliations
@@ -669,36 +693,36 @@ topic_diff_summary <- pivot_wider(topic_diff_summary,
   mutate(diff_affiliation = `Europe Only` - `USA Only`,
          diff_journal = EER - TOP5,
          id = as.integer(str_extract(topic_name, "[:digit:]{1,2}")),
-         topic_label = str_wrap(topic_name, 15)) %>% 
+         topic_label = str_wrap(topic_name, 15),
+         topic_label_2 = str_wrap(str_remove(topic_name, "Topic [:digit:]{1,2} "), 15)) %>% 
   left_join(topics[, c("id", "Com_name", "com_color")], by = "id") %>% 
   as.data.table()
-
-mean_diff_plot <- ggplot(topic_diff_summary, aes(x = diff_journal, y = diff_affiliation,
-                                                  group = factor(Com_name),
-                                                  color = com_color, fill = com_color)) +
-  geom_vline(xintercept = 0, size = 1.5, alpha = 0.5) +
-  geom_hline(yintercept = 0, size = 1.5, alpha = 0.5) +
-  geom_label_repel(aes(label = topic_label), size = 3, alpha = 0.7, hjust = 0) +
-  geom_point(size = 4, alpha = 0.8) +
-  scale_color_identity() +
-  scale_fill_identity() +
-  labs(title = "Topic Prevalence over journals (Difference of Means method)",
-       x = "Top 5 (left) vs. EER (right)",
-       y = "US Only (down) vs. European Only (up)") +
-  dark_theme_bw()
-
-ragg::agg_png(paste0(picture_path, "mean_diff_plot", id, "-", nb_topics, ".png"), 
-              width = 40, 
-              height = 40, 
-              units = "cm", 
-              res = 300)
-mean_diff_plot
-invisible(dev.off())
 
 #' We can now plot the differences in a two dimension diagram:
 #' 
 
+mean_diff_plot <- ggplot(topic_diff_summary, aes(x = diff_affiliation, y = diff_journal)) +
+  geom_vline(xintercept = 0, size = 1.5, alpha = 0.9) +
+  geom_hline(yintercept = 0, size = 1.5, alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE, linetype = "dashed", color = "gray", alpha = 0.5) +
+  geom_label_repel(aes(label = topic_label_2, group = factor(Com_name),
+                       color = com_color, fill = com_color), size = 8, alpha = 0.7, hjust = 0) +
+  geom_point(aes(group = factor(Com_name),
+                 color = com_color, fill = com_color), size = 5, alpha = 0.8) +
+  scale_color_identity() +
+  scale_fill_identity() +
+  labs(title = "Topic Prevalence over journals (Difference of Means method)",
+       x = "US Only (left) vs. European Only (right)",
+       y = "Top 5 (down) vs. EER (up)") +
+  dark_theme_classic()
 
+ragg::agg_png(paste0(picture_path, "mean_diff_plot", id, "-", nb_topics, ".png"), 
+              width = 50, 
+              height = 40, 
+              units = "cm", 
+              res = 400)
+mean_diff_plot
+invisible(dev.off())
 
 #' ### Working with the chosen topic model: covariates
 #' 
@@ -707,7 +731,7 @@ invisible(dev.off())
 prep <- estimateEffect(~s(Year) + Origin + Journal,
                topic_model,
                metadata = filter(stm_data$meta, ! is.na(Origin)),
-               nsims = 50)
+               nsims = 100)
 
 
 #' We first look at the impact of year:
@@ -853,41 +877,4 @@ ragg::agg_png(paste0(picture_path, "mix_prevalence_plot_", id, "-", nb_topics, "
 mix_prevalence_plot
 invisible(dev.off())
 
-#' #### Extracting data for qualitative study
-#' 
-
-topic_gamma <- tidy(topic_model, matrix = "gamma") 
-topic_gamma <- merge(topic_gamma, topics[, c("id","term_label")], 
-                     by.x = "topic",
-                     by.y = "id") %>% 
-  select(-topic)
-topic_gamma <- pivot_wider(topic_gamma,
-                           names_from = term_label, 
-                           values_from = gamma)
-
-#' We now extract the gamma values of the topic model to see which article are in which
-#' topics, and to observe the links between communities and topics
-#' 
-
-topic_gamma <- tidy(topic_model, matrix = "gamma") 
-saveRDS(topic_gamma, paste0(data_path, "topic_model_EER_50_gamma.rds"))
-
-topic_and_community <- merge(topic_gamma, 
-                             alluv_with_abstract[, c("Id","Leiden1")],
-                             by.x = "document",
-                             by.y = "Id") %>% 
-  as.data.table()
-topic_and_community <- topic_and_community[, mean_gamma := mean(gamma), 
-                                           by = c("Leiden1","topic")] %>% 
-  .[, c("Leiden1","topic","gamma")] %>% 
-  unique()
-
-topic_and_community %>%
-  mutate(Leiden1 = reorder(Leiden1, gamma * topic)) %>%
-  ggplot(aes(factor(topic), gamma, color = factor(topic), fill = factor(topic))) +
-  geom_boxplot(outlier.size = 0, show.legend = FALSE) +
-  facet_wrap(~ Leiden1) +
-  theme_minimal() +
-  labs(x = "topic", y = expression(gamma)) +
-  ggsave(paste0(picture_path,"topic_model_by_com.png"), width = 50, height = 40, units = "cm")
 
