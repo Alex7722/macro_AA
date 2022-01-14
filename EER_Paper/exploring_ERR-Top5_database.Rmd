@@ -1,0 +1,157 @@
+---
+title: "EER-Top5 Database Exploration"
+author: "Aurélien Goutsmedt and Alexandre Truc"
+date: "12/01/2022"
+output: 
+  html_document:
+    theme: 
+      version: 5
+      bootswatch: vapor
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(DT)
+```
+
+```{r loading}
+# load packages, paths, and the macro plateform data
+source(here::here("EER_Paper", "Script_paths_and_basic_objects_EER.R"))
+
+# load topics
+article_topics <- readRDS(paste0(eer_data, "topic_model_1-60.rds")) %>% 
+  mutate(gamma = round(gamma, 3),
+         topic_gamma = paste0(topic_name, " (", gamma, ")")) %>% 
+  group_by(ID_Art) %>% 
+  slice_max(gamma, n = 2) %>%
+  arrange(desc(gamma)) %>% 
+  mutate(topics = paste0(topic_gamma, collapse = "; ")) %>% 
+  select(ID_Art, topics) %>% 
+  as.data.table() %>% 
+  unique()
+
+# load bibliographic communities
+networks_top5 <- readRDS(paste0(eer_data, "2_raw_Networks_and_Alluv/list_networks_EER_Top5_Macro.rds")) %>%
+  lapply(function(tbl) (tbl %>% activate(nodes) %>% as.data.table())) %>%
+  rbindlist(idcol = "window", fill = TRUE) %>%
+  mutate(window = paste0(window, "-", as.integer(window) + 9)) %>%
+  select(ID_Art, new_Id_com, window) %>%
+  mutate(ID_Art = as.integer(ID_Art)) %>%
+  unique()
+
+community_name <- tribble(
+  ~new_Id_com, ~community_name,
+  "yyL6YW7G", "Keynesian Economics & Disequilibrium",
+  "Qwu7xDUm", "Political Economy of Central Banks",
+  "G6fFxm2O", "Macro Time Series: Trends, Disturbances & Cycles",
+  "8ljfcYnr", "Real Exchange Rate & Pricing",
+  "QcfNSgcH", "Financial Intermediation & Monetary Policy",
+  "piHtlAjF", "Public Finance: Optimal Taxation",
+  "oTz25N6R", "Sunspots & Coordination",
+  "vpvjT1UD", "Indexation & Monopolistic Competition",
+  "c6Nqp2v2", "Demand for Money",
+  "EEEzS4Be", "Consumption: intertemporal substitution & permanent income",
+  "b5XZ9r9c", "New theoretical approaches of Money: search, random-matching",
+  "DnbEqB4A", "RBC, fluctuations & time series"
+)
+
+networks_top5 <- networks_top5 %>% 
+  left_join(community_name) %>% 
+  mutate(community_name = ifelse(is.na(community_name), new_Id_com, community_name),
+         ID_Art = as.character(ID_Art)) %>%
+  select(-new_Id_com) %>% 
+  group_by(ID_Art) %>% 
+  add_count(community_name, name = "nb_window") %>% 
+  slice_max(order_by = nb_window, n = 2, with_ties = TRUE) %>% 
+  arrange(desc(nb_window)) %>% 
+  select(-window) %>% 
+  unique() %>% 
+  mutate(top_communities = paste0(community_name, " (", nb_window, ")")) %>% 
+  mutate(communities = paste0(top_communities, collapse = "; ")) %>% 
+  select(ID_Art, communities) %>% 
+  as.data.table() %>% 
+  unique()
+
+# merge institutions data for EER and top5
+institutions_eer <- readRDS(paste0(eer_data, "1_Corpus_Prepped_and_Merged/Institutions_cleaned.rds")) %>%
+  select(ID_Art, Institution, Pays)
+institutions_top5 <- authors_JEL %>%
+  select(ID_Art, Institution, Pays) %>%
+  filter(!ID_Art %in% institutions_eer$ID_Art)
+institutions <- rbind(institutions_eer, institutions_top5) %>%
+  filter(across(everything(), ~ !is.na(.))) %>%
+  group_by(ID_Art) %>% 
+  mutate(institutions = paste0(Institution, " (", Pays, ")", collapse = "; ")) %>% 
+  select(ID_Art, institutions) %>% 
+  unique
+
+# merge authors
+authors_eer <- readRDS(paste0(eer_data, "1_Corpus_Prepped_and_Merged/Authors.rds")) %>%
+  select(ID_Art, Nom_ISI) %>% 
+  rename("author" = Nom_ISI)
+authors_top5 <- authors_JEL %>%
+  select(ID_Art, Nom) %>%
+  rename("author" = Nom) %>% 
+  filter(!ID_Art %in% institutions_eer$ID_Art)
+authors <- rbind(authors_eer, authors_top5) %>%
+  filter(across(everything(), ~ !is.na(.))) %>%
+  group_by(ID_Art) %>% 
+  mutate(authors = paste0(author, collapse = "; ")) %>% 
+  select(ID_Art, authors) %>% 
+  unique
+
+# load the corpus EER-top5
+corpus <- readRDS(paste0(eer_data, "1_Corpus_Prepped_and_Merged/corpus_top5_ERR.rds")) %>% 
+  left_join(article_topics) %>% 
+  left_join(networks_top5) %>% 
+  left_join(institutions) %>% 
+  left_join(authors) %>% 
+  select(-Nom_ISI, -abstract, -Journal_type) %>% 
+  as.data.table
+
+# load the refs
+refs_top5 <- edges_JEL %>% 
+  filter(ID_Art %in% corpus$ID_Art) %>%
+  mutate(ID_Art = as.character(ID_Art)) %>% 
+  select(ID_Art, Annee, Nom, Revue_Abbrege, Titre)
+ 
+refs_eer <- readRDS(paste0(eer_data, "1_Corpus_Prepped_and_Merged/Refs.rds")) %>% 
+  filter(str_detect(ID_Art_Source, "^S")) %>% 
+    select(ID_Art, Annee, Nom, Revue_Abbrege, Titre)
+
+refs <- rbind(refs_eer, refs_top5) %>% 
+ right_join(select(corpus, ID_Art, Journal, authors, Annee_Bibliographique)) %>% 
+  select(ID_Art, Journal, authors, Annee_Bibliographique, Annee, Nom, Revue_Abbrege, Titre) %>% 
+  unique
+
+```
+
+# Data on the Corpus
+
+```{r DT-corpus}
+datatable(corpus[, -"ID_Art"], 
+          class = "display",
+          filter = "top",
+          options = list(
+            pageLength = 20,
+            autoWidth = TRUE
+          ))
+```
+
+\bigskip
+
+# Data on the references
+
+```{r DT-ref}
+datatable(refs, 
+          class = "display",
+          filter = "top",
+          options = list(
+            pageLength = 20,
+            autoWidth = TRUE
+          ))
+```
+

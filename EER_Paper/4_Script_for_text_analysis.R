@@ -23,6 +23,7 @@
 #+ r setup, include = FALSE
 knitr::opts_chunk$set(eval = FALSE)
 
+################# Loading packages, paths and data ################### ------
 #' # Loading packages, paths and data
 #' 
 #' 
@@ -30,7 +31,7 @@ source("EER_Paper/Script_paths_and_basic_objects_EER.R")
 source("functions/functions_for_network_analysis.R")
 source("functions/functions_for_topic_modelling.R")
 
-# EER data
+# importing corpus
 Corpus_EER <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpus.rds"))
 alluv_dt <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/alluv_dt.rds"))
 
@@ -38,141 +39,13 @@ alluv_dt <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/alluv_dt.rds"
 Corpus_top5 <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/abstracts_MS_with_ID_Art.RDS"))
 Corpus_top5 <- Corpus_top5[ID_Art %in% nodes_JEL$ID_Art]
 
-#' # TF-IDF at the community level
-#' 
-#' We merge the alluv data table with the abstract in the corpus. Then we unite titles
-#' and abstracts for each article, before to compute the tf-idf with communities as
-#' "documents". 
-alluv_with_abstract <- merge(alluv_dt, Corpus[, c("Id","abstract")], by = "Id") %>% 
-  .[share_leiden_max >=0.05] %>% 
-  unite("words", Titre, abstract, sep = " ")
-
-# removing NA value for abstract (at the end of the column)
-alluv_with_abstract <- alluv_with_abstract %>% 
-  mutate(words = str_remove(words, " NA$"))
-
-# adding colors (temporary)
-color <- data.table(color = scico(length(unique(alluv_with_abstract$Leiden1)), palette = "roma"),
-                    Leiden1 = unique(alluv_with_abstract$Leiden1))
-alluv_com <- merge(alluv_with_abstract, color, by = "Leiden1")
-
-tf_idf_com <- tf_idf(nodes = alluv_com, 
-         title_column = "words", 
-         com_column = "Leiden1",
-         com_name_column = "new_Id_com", 
-         com_size_column = "share_leiden_total", 
-         color_column = "color",
-         threshold_com = 0.005, 
-         number_of_words = 12,
-         size_title_wrap = 8, 
-         lemmatize_bigrams = FALSE)
-
-saveRDS(tf_idf_com, paste0(data_path, "EER/2_Raw_Networks_and_Alluv/tf_idf_communities.rds"))
-
-#' # TF-IDF at the window level
-#' 
-#' Now, documents will be the windows.
-
-# adding colors
-color <- data.table(color_window = scico(length(unique(alluv_with_abstract$Window)), palette = "hawaii"),
-                    Window = unique(alluv_with_abstract$Window))
-alluv_window <- merge(alluv_with_abstract, color, by = "Window") %>% 
-  select(Window, Id, words, color_window) %>% 
-  unique()
-alluv_window <- alluv_window[, size_window := .N/length(alluv_with_abstract$Id), by = "Window"] %>% 
-  .[, window_name := paste0(Window,"-",as.integer(Window) + (time_window - 1))]
-
-tf_idf_window <- tf_idf(nodes = alluv_window,  # we remove the color column for communities to avoid doublons
-                     title_column = "words", 
-                     com_column = "Window",
-                     com_name_column = "window_name", 
-                     com_size_column = "size_window", 
-                     color_column = "color_window",
-                     threshold_com = 0.001, 
-                     number_of_words = 12,
-                     size_title_wrap = 8, 
-                     lemmatize_bigrams = FALSE)
-
-saveRDS(tf_idf_window, paste0(data_path, "EER/2_Raw_Networks_and_Alluv/tf_idf_windows.rds"))
+################# Topic modelling on titles and abstracts ################### ------
+###### Choosing the preprocessing steps and the number of topics ######## ----
 
 #' # Topic modelling on titles and abstracts
 #' 
-#' We will work with two different topic models: one with just the abstract + title of
-#' articles that have an abstract, using the standard
-#' LDA methods (working better for document with more than 50 words). We will then
-#' use the Gibbs sampling method for all the articles but with just the title.
 #' 
-#' ## Checking abstract distribution
-#' 
-#' The first thing is to check which articles have no abstract. If the articles without abstracts
-#' have a stable distribution over time, it will make our results stronger. For this, we have
-#' to clean the corpus from articles that are mere comment/discussion, as they obviously
-#' have no abstracts and have a title that is redundant (for instance, in ISoM special
-#' issues, you have two discussions for each paper). These discussion/comment papers
-#' have a particular format of the type "- COMENT", to be distinguished from papers 
-#' with abstract that are more generally answering to another paper. 
-#' 
-Corpus_cleaned <- Corpus_EER %>% 
-  filter(! str_detect(Titre, "- COMMENT$|- COMMENTS$|- REPLY$")) 
-
-stat_abstract  <- copy(Corpus_cleaned)
-stat_abstract  <- stat_abstract[JEL_id == 1][, nb_article := .N, by = Annee_Bibliographique][! is.na(abstract)]
-stat_abstract  <- stat_abstract[, abstract := round(.N/nb_article,2), by = Annee_Bibliographique][, abstract := as.double(abstract)] %>%
-  .[, no_abstract := (1 - abstract)] %>%
-  pivot_longer(cols = ends_with("abstract"), names_to = "abstract", values_to = "proportion") %>% 
-  select(Annee_Bibliographique, abstract, proportion) %>% 
-  unique()
-
-stat_abstract %>% 
-  ggplot(aes(Annee_Bibliographique, proportion, fill = abstract)) +
-  geom_bar(stat = "identity")
-
-#' ## stm on abstracts only
-#' 
-#' ### Preparing the corpus of EER and top5
-#' 
-
-# merging both
-
-#' For the moment, we keep only the top 5 articles from MS that we have matched with WoS,
-#' as we need the affiliations data from WoS.
-
-
-Corpus_cleaned <-Corpus_cleaned %>% 
-  filter(JEL_id == 1 &
-           Annee_Bibliographique <= 2007) %>% 
-  mutate(have_abstract = ! is.na(abstract))
-
-Corpus_cleaned <- Corpus_cleaned[, c("ID_Art", 
-                             "Titre", 
-                             "Annee_Bibliographique", 
-                             "Nom_ISI",
-                             "abstract")]
-Corpus_cleaned$Journal <- "EUROPEAN ECONOMIC REVIEW"
-
-Corpus_top5_cleaned <- Corpus_top5 %>% 
-  select("ID_Art",
-         "TITLE",
-         "YEAR",
-         "AUTHOR",
-         "ABSTRACT",
-         "JOURNAL") %>% 
-  filter(between(YEAR,1973,2007)) %>% 
-  mutate(TITLE = toupper(TITLE)) %>% 
-  filter(! str_detect(TITLE, ": COMMENT$|: COMMENT \\[|- REPLY$")) 
-
-colnames(Corpus_top5_cleaned) <- colnames(Corpus_cleaned)
-Corpus_topic <- rbind(Corpus_top5_cleaned,Corpus_cleaned)
-
-# nettoyage des doublons
-Corpus_topic <- Corpus_topic %>% 
-  mutate(test_doublon = paste(Titre, Annee_Bibliographique, Journal)) %>% 
-  mutate(doublon = duplicated(test_doublon)) %>% 
-  filter(doublon == FALSE) %>% 
-  select(-contains("doublon"))
-
-#' 
-#' ### Choosing the preprocessing steps and the number of topics
+#' ## Choosing the preprocessing steps and the number of topics
 #' 
 #' We will run the topic model analysis only on the articles with an abstract. As a significant
 #' proportion of macro articles in the late 1970s, early 1980s lack of an abstract, we will be forced
@@ -466,12 +339,6 @@ stm_data <- tuning_results[preprocessing_id == id & K == nb_topics]$stm[[1]]
 metadata <- data.table("ID_Art" = names(stm_data$documents))
 
 # merging with corpus data and selecting the covariates
-Collabs <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/collab_top5_EER.rds"))
-Corpus_merged <- merge(Corpus_topic[, c("ID_Art", "Annee_Bibliographique", "Journal")], 
-                       unique(Collabs[, c("ID_Art", "EU_US_collab")]),
-                       by = "ID_Art", all.x = TRUE)
-Corpus_merged <- Corpus_merged %>% 
-  mutate(Journal_type = ifelse(Journal == "EUROPEAN ECONOMIC REVIEW", "EER", "TOP5"))
 metadata <- merge(metadata, Corpus_merged, by = "ID_Art", all.x = TRUE)
 
 # temporary step to avoid NA data
@@ -505,6 +372,10 @@ top_terms <- extract_top_terms(topic_model,
                                tuning_results[preprocessing_id == id & K == nb_topics]$data[[1]],
                                nb_terms = 15,
                                frexweight = 0.3)
+#' We will use this table for exploration
+#' `saveRDS(top_terms, paste0(data_path, "EER/topic_model_",id,"-",nb_topics,"_top_terms.rds"))`
+
+
 topics <- name_topics(top_terms, method = "frex", nb_word = 4)
 
 # Setup Colors
@@ -604,8 +475,6 @@ graph_plot <- ggraph(network, layout = "manual", x = x, y = y) +
   geom_node_label(aes(label = topic_name, fill = com_color), size = 2.5, alpha = 0.7) +
   dark_theme_bw()
   
-
-
 ragg::agg_png(paste0(picture_path, "topic_correlation", id, "-", nb_topics, ".png"), 
               width = 40, 
               height = 30, 
@@ -614,27 +483,31 @@ ragg::agg_png(paste0(picture_path, "topic_correlation", id, "-", nb_topics, ".pn
 graph_plot
 invisible(dev.off())
 
+#' We will use this table for exploration
+#' `saveRDS(topics, paste0(data_path, "EER/topic_model_",id,"-",nb_topics,"_topics_summary.rds"))`
+#' 
+
 #' We can look at some topics we find close to understand better their differences:
 #' 
-similar_topics <- list(c(4,22),
-                       c(9,16),
-                       c(23,7),
-                       c(17,23),
-                       c(24, 1),
-                      c(5, 26))
-ragg::agg_png(paste0(picture_path,"topic_comparison", id, "-", nb_topics, ".png"), 
-              width = 40, 
-              height = 30, 
-              res = 400, 
-              units = "cm")
-par(mfrow = c(3, 2))
-for(i in 1:length(similar_topics)){
-  plot.STM(topic_model, type = "perspectives", 
-           topics = similar_topics[[i]], 
-           n = 30, 
-           text.cex = 1.5)
-}
-invisible(dev.off())
+#similar_topics <- list(c(4,22),
+ #                      c(9,16),
+  #                     c(23,7),
+   #                    c(17,23),
+    #                   c(24, 1),
+     #                 c(5, 26))
+#ragg::agg_png(paste0(picture_path,"topic_comparison", id, "-", nb_topics, ".png"), 
+ #             width = 40, 
+  #            height = 30, 
+   #           res = 400, 
+    #          units = "cm")
+#par(mfrow = c(3, 2))
+#for(i in 1:length(similar_topics)){
+#  plot.STM(topic_model, type = "perspectives", 
+ #          topics = similar_topics[[i]], 
+  #         n = 30, 
+   #        text.cex = 1.5)
+#}
+#invisible(dev.off())
 
 #' ### Extracting the data from the topic model
 
@@ -649,8 +522,8 @@ topic_gamma <- pivot_wider(topic_gamma,
                            names_from = topic_name, 
                            values_from = gamma) %>% 
   mutate(ID_Art = names(stm_data$documents)) %>% 
-  inner_join(Corpus_topic) %>% 
-  select(document, ID_Art, Nom_ISI, Annee_Bibliographique, Titre, Journal, Journal_type, abstract, contains("Topic")) %>% 
+  inner_join(Corpus_merged) %>% 
+  select(document, ID_Art, Nom_ISI, Annee_Bibliographique, Titre, Journal, Journal_type, contains("Topic")) %>% 
   as.data.table()
 
 topic_gamma_attributes <- merge(topic_gamma,
@@ -658,11 +531,15 @@ topic_gamma_attributes <- merge(topic_gamma,
                                 by = "ID_Art", all.x = TRUE) %>% 
   mutate(Nom_ISI = str_remove_all(as.character(Nom_ISI), "c\\(\"|\\)|\""))
 
-#' We will use this table for exploration
-#' 
+topic_gamma_attributes <- pivot_longer(topic_gamma_attributes, 
+                           cols = contains("Topic"),
+                           names_to = "topic_name",
+                           values_to = "gamma") %>% 
+  as.data.table()
 
-saveRDS(topic_gamma_attributes, paste0(data_path, "EER/topic_model_",id,"-",nb_topics,".rds"))
-readr::write_csv2(topic_gamma_attributes, paste0("summary_topic_model_",id,"-",nb_topics,".csv"))
+#' We will use this table for exploration
+#' `saveRDS(topic_gamma_attributes, paste0(data_path, "EER/topic_model_",id,"-",nb_topics,".rds"))`
+#' `topic_gamma_attributes <- readr::write_csv2(topic_gamma_attributes, paste0("summary_topic_model_",id,"-",nb_topics,".csv"))`
 
 #' ### Working with the chosen topic models: differences in terms of journals and affiliations
 #' 
@@ -671,12 +548,8 @@ readr::write_csv2(topic_gamma_attributes, paste0("summary_topic_model_",id,"-",n
 #' in the mean of each variable for each topic.
 #' 
 
-topic_diff <- pivot_longer(topic_gamma_attributes, 
-                           cols = contains("Topic"),
-                           names_to = "topic_name",
-                           values_to = "gamma") %>% 
-#  filter(gamma > 0.01) %>% 
-  as.data.table()
+topic_diff <- copy(topic_gamma_attributes)
+
 
 topic_diff[, mean_affiliation := mean(gamma), by = c("topic_name", "EU_US_collab")] %>% 
   .[, mean_journal := mean(gamma), by = c("topic_name", "Journal_type")] 
@@ -697,6 +570,11 @@ topic_diff_summary <- pivot_wider(topic_diff_summary,
          topic_label_2 = str_wrap(str_remove(topic_name, "Topic [:digit:]{1,2} "), 15)) %>% 
   left_join(topics[, c("id", "Com_name", "com_color")], by = "id") %>% 
   as.data.table()
+
+#' We will use this table for exploration
+#' `saveRDS(unique(topic_diff_summary[, c("topic_name", "diff_affiliation", "diff_journal")]), paste0(data_path, "EER/topic_model_",id,"-",nb_topics,"_topics_diff.rds"))`
+
+
 
 #' We can now plot the differences in a two dimension diagram:
 #' 
@@ -877,4 +755,71 @@ ragg::agg_png(paste0(picture_path, "mix_prevalence_plot_", id, "-", nb_topics, "
 mix_prevalence_plot
 invisible(dev.off())
 
+#' ## Describing topics with communities
+#' 
+#' 
+
+communities <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/list_networks_EER_top5_Macro.rds"))
+
+
+
+#' # TF-IDF at the community level
+#' 
+#' We merge the alluv data table with the abstract in the corpus. Then we unite titles
+#' and abstracts for each article, before to compute the tf-idf with communities as
+#' "documents". 
+#' 
+alluv_dt <- readRDS(paste0(data_path, "EER/2_Raw_Networks_and_Alluv/alluv_dt.rds"))
+
+alluv_with_abstract <- merge(alluv_dt, Corpus[, c("Id","abstract")], by = "Id") %>% 
+  .[share_leiden_max >=0.05] %>% 
+  unite("words", Titre, abstract, sep = " ")
+
+# removing NA value for abstract (at the end of the column)
+alluv_with_abstract <- alluv_with_abstract %>% 
+  mutate(words = str_remove(words, " NA$"))
+
+# adding colors (temporary)
+color <- data.table(color = scico(length(unique(alluv_with_abstract$Leiden1)), palette = "roma"),
+                    Leiden1 = unique(alluv_with_abstract$Leiden1))
+alluv_com <- merge(alluv_with_abstract, color, by = "Leiden1")
+
+tf_idf_com <- tf_idf(nodes = alluv_com, 
+                     title_column = "words", 
+                     com_column = "Leiden1",
+                     com_name_column = "new_Id_com", 
+                     com_size_column = "share_leiden_total", 
+                     color_column = "color",
+                     threshold_com = 0.005, 
+                     number_of_words = 12,
+                     size_title_wrap = 8, 
+                     lemmatize_bigrams = FALSE)
+
+saveRDS(tf_idf_com, paste0(data_path, "EER/2_Raw_Networks_and_Alluv/tf_idf_communities.rds"))
+
+#' # TF-IDF at the window level
+#' 
+#' Now, documents will be the windows.
+
+# adding colors
+color <- data.table(color_window = scico(length(unique(alluv_with_abstract$Window)), palette = "hawaii"),
+                    Window = unique(alluv_with_abstract$Window))
+alluv_window <- merge(alluv_with_abstract, color, by = "Window") %>% 
+  select(Window, Id, words, color_window) %>% 
+  unique()
+alluv_window <- alluv_window[, size_window := .N/length(alluv_with_abstract$Id), by = "Window"] %>% 
+  .[, window_name := paste0(Window,"-",as.integer(Window) + (time_window - 1))]
+
+tf_idf_window <- tf_idf(nodes = alluv_window,  # we remove the color column for communities to avoid doublons
+                        title_column = "words", 
+                        com_column = "Window",
+                        com_name_column = "window_name", 
+                        com_size_column = "size_window", 
+                        color_column = "color_window",
+                        threshold_com = 0.001, 
+                        number_of_words = 12,
+                        size_title_wrap = 8, 
+                        lemmatize_bigrams = FALSE)
+
+saveRDS(tf_idf_window, paste0(data_path, "EER/2_Raw_Networks_and_Alluv/tf_idf_windows.rds"))
 
