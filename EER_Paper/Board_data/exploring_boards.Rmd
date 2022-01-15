@@ -1,0 +1,78 @@
+---
+title: "Analysing EER editorial boards"
+author: "Aurélien Goutsmedt and Alexandre Truc"
+date: "14/01/2022"
+output: 
+  html_document:
+    theme: 
+      version: 5
+      bootswatch: darkly
+    toc: true
+    number_sections: true
+    toc_float: true
+    toc_depth: 2
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(DT)
+```
+
+```{r loading-boards}
+# load packages, paths, and the macro plateform data
+source(here::here("EER_Paper", "Script_paths_and_basic_objects_EER.R"))
+
+boards <- read_csv(paste0(boards_path, "Members_EB_by_year.csv"))
+members <- read_csv(paste0(boards_path, "List_Members_EB.csv"))
+
+```
+
+# Board Members
+```{r members}
+datatable(members, 
+          class = "display",
+          filter = "top",
+          options = list(
+            pageLength = 20,
+            autoWidth = TRUE
+          ))
+```
+
+# Top countries in the boards
+
+```{r plot-country}
+boards %>% 
+  filter(Year < 2007) %>% 
+ggplot(aes(Year, after_stat(count), fill = fct_lump(Country, n = 10))) +
+  geom_density(position = "fill") +
+  labs(fill = "Countries (Top 7)") +
+  scale_x_continuous("Years") +
+  scale_y_continuous("Countries Identified by Unique Institution by Paper") +
+  scale_fill_scico_d(palette = "hawaii", end = 1, direction = 1) +
+  theme_classic()
+```
+
+# Top institutions in the boards
+
+```{r plot-institution}
+institutions <- boards %>% 
+  filter(! is.na(University_name)) %>% 
+  group_by(University_name) %>% 
+  add_count %>% 
+  select(University_name, n) %>% 
+  ungroup() %>% 
+  unique() %>% 
+  slice_max(order_by = n, n = 30)
+
+datatable(institutions, 
+          class = "display",
+          filter = "top",
+          options = list(
+            pageLength = 30,
+            autoWidth = TRUE
+          ))
+```
+
+
+

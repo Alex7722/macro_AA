@@ -2,13 +2,13 @@
 ############################## LOADING PACKAGES, PATHS AND OBJECTS ####################################--------------
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
-source("./EER_Paper/Script_paths_and_basic_objects_EER.R")
+source(here::here("EER_Paper", "Script_paths_and_basic_objects_EER.R"))
 
 
 # Loading the .txt of editorial Boards (EB)----------
 list_txt <- list.files(path = boards_path)
 
-EB <- readtext(paste0(boards_path, list_txt))
+EB <- readtext(paste0(boards_path, list_txt), encoding = "UTF8")
 EB <- EB %>% mutate(Year = str_extract(doc_id, "[0-9]{4}"))
 
 # crating an empty table to put the data at the end of the loop
@@ -176,11 +176,11 @@ for (i in c(18, 20:22, 24:25, 29:36)) {
 
 Members_EB$Type <- "Editorial Board"
 
-write_csv(Members_EB, paste0(boards_path, "Members_EB.csv"))
+#' Save and load if necessary
+#' `write_csv(Members_EB, paste0(boards_path, "Members_EB.csv"))`
+#' `Members_EB <- read_csv(paste0(boards_path, "Members_EB.csv")) %>% as.data.table()`
 
 #########  Cleaning the data ############
-Members_EB <- read_csv(paste0(boards_path, "Members_EB.csv")) %>% as.data.table()
-
 
 # Cleaning countries
 wrong_country <- c(
@@ -241,7 +241,8 @@ Members_EB <- Members_EB[, Institution := toupper(Institution)]
 Members_EB <- Members_EB[, Institution := gsub("É", "E", Institution)][, Institution := gsub("Ö", "O", Institution)]
 
 Institutions <- as.data.table(sort(unique(Members_EB$Institution)))
-Institutions <- Institutions[, Institution_ID := 1:.N]
+Institutions <- Institutions[, Institution_ID := 1:.N] %>% 
+  filter(V1 != "NA")
 
 write_csv(Institutions, paste0(boards_path, "Institutions.csv"))
 
@@ -249,7 +250,8 @@ write_csv(Institutions, paste0(boards_path, "Institutions.csv"))
 Members_EB <- merge(Members_EB, Institutions, by.x = "Institution", by.y = "V1", all.x = TRUE)
 
 # Loading cleaned institutions and merging
-Institutions <- fread(paste0(boards_path, "Institutions_cleaned.csv")) %>% as.data.table()
+Institutions <- fread(paste0(boards_path, "Institutions_cleaned.csv")) %>% 
+  as.data.table()
 Members_EB <- merge(Members_EB, Institutions, by = "Institution_ID", all.x = TRUE)
 
 Members_EB <- Members_EB[, c("Name", "Initials", "Surname", "Institution_name", "Institution_Label", "University_name", "Country", "Year", "Type", "Pays_bis")]
@@ -260,15 +262,57 @@ Members_EB <- read_csv(paste0(boards_path, "Members_EB.csv")) %>% as.data.table(
 Members_EB <- Members_EB[Pays_bis != "", Country := Pays_bis][, -"Pays_bis"]
 
 # Completing missing Institutions
-# extracting institutions per individuals to see if they have several
-Individuals_institution <- unique(Members_EB[order(Name), c("Name", "Institution_name", "Institution_Label", "University_name")])
-Individuals_institution <- Individuals_institution[order(Name) & !is.na(Institution_name)]
-doublons <- unique(Individuals_institution[c(which(duplicated(Individuals_institution$Name)), which(duplicated(Individuals_institution$Name)) - 1)])
-doublons <- doublons[order(Name)]
-Unique_individuals_institution <- Individuals_institution[!Name %in% doublons$Name]
+Members_EB <- Members_EB %>% 
+mutate(across(where(is.character), ~ toupper(.)))
 
-Members_EB <- merge(Members_EB, Unique_individuals_institution, by = "Name", all.x = TRUE)
-Members_EB <- Members_EB[is.na(Institution_name.x), `:=`(Institution_name.x = Institution_name.y, Institution_Label.x = Institution_Label.y, University_name.x = University_name.y, Check = "Yes")]
+ref_institutions <- Members_EB %>% 
+  filter(! is.na(Institution_name)) %>% 
+  group_by(Name, Institution_name) %>% 
+  mutate(Min_Year = min(Year),
+         Max_Year = max(Year)) %>% 
+  select(Name, Institution_name, Institution_Label, University_name, Min_Year, Max_Year)
 
-# Saving to clean in excel
-write_csv(Members_EB, paste0(boards_path, "Members_EB.csv"))
+missing_institutions <- Members_EB %>% 
+  filter(is.na(Institution_name)) %>% 
+  select(Name, Year) %>% 
+  inner_join(ref_institutions) %>% 
+  mutate(across(contains("Year"), ~ as.integer(.))) %>% 
+  filter(Year >= Min_Year & Year <= Max_Year) %>% 
+  select(Name, Year, Institution_name, Institution_Label, University_name) %>% 
+  unique
+  
+Members_EB <- merge(Members_EB, 
+                    missing_institutions, 
+                    by = c("Name", "Year"), 
+                    all.x = TRUE)
+
+Members_EB <- Members_EB %>% 
+  mutate(Institution_name.x = ifelse(is.na(Institution_name.x), Institution_name.y, Institution_name.x),
+         Institution_Label.x = ifelse(is.na(Institution_Label.x), Institution_Label.y, Institution_Label.x),
+         University_name.x = ifelse(is.na(University_name.x), University_name.y, University_name.x)) %>% 
+  select(-ends_with(".y")) 
+colnames(Members_EB)[str_which(colnames(Members_EB), "\\.x")] <- colnames(Members_EB)[str_which(colnames(Members_EB), "\\.x")] %>% 
+  str_remove(".x")
+
+
+# Separating between individuals in boards and university/country data of boards
+
+List_Members <- Members_EB %>%
+  group_by(Name, Institution_name) %>% 
+  mutate(affiliation_data = paste0(Institution_Label, " ", min(Year), "-", max(Year))) %>% 
+  ungroup() %>%
+  group_by(Name) %>% 
+  mutate(start_year = min(Year),
+         end_year = max(Year),
+         nb_years = end_year - start_year + 1) %>% 
+  select(-Year) %>% 
+  unique %>% 
+  mutate(information = paste0(affiliation_data, collapse = "; "),
+         countries = paste0(Country, collapse = "; ")) %>% 
+  select(Name, Initials, Surname, start_year, end_year, nb_years, information, countries) %>% 
+  unique()
+  
+# Saving in excel (possibility to clean again)
+
+write_csv(Members_EB, paste0(boards_path, "Members_EB_by_year.csv"))
+write_csv(List_Members, paste0(boards_path, "List_Members_EB.csv"))
