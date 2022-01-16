@@ -27,17 +27,20 @@ knitr::opts_chunk$set(eval = FALSE)
 #' # Loading packages, paths and data
 #' 
 #' 
-source("EER_Paper/Script_paths_and_basic_objects_EER.R")
-source("functions/functions_for_network_analysis.R")
-source("functions/functions_for_topic_modelling.R")
+source(here::here("EER_Paper", 
+                  "Script_paths_and_basic_objects_EER.R"))
+source(here("functions", 
+            "functions_for_network_analysis.R"))
+source(here("functions", 
+            "functions_for_topic_modelling.R"))
 
 # importing corpus
-Corpus_EER <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/Corpus.rds"))
-alluv_dt <- readRDS(paste0(data_path,"EER/2_Raw_Networks_and_Alluv/alluv_dt.rds"))
-
-# Top 5 data
-Corpus_top5 <- readRDS(paste0(data_path,"EER/1_Corpus_Prepped_and_Merged/abstracts_MS_with_ID_Art.RDS"))
-Corpus_top5 <- Corpus_top5[ID_Art %in% nodes_JEL$ID_Art]
+Corpus_EER <- readRDS(here(eer_data, 
+                           "1_Corpus_Prepped_and_Merged",
+                           "corpus_top5_ERR.rds"))
+alluv_dt <- readRDS(here(eer_data, 
+                         "2_Raw_Networks_and_Alluv",
+                         "alluv_dt.rds"))
 
 ################# Topic modelling on titles and abstracts ################### ------
 ###### Choosing the preprocessing steps and the number of topics ######## ----
@@ -246,7 +249,9 @@ term_list <- text %>%
 term_list <- merge(term_list, text[,c("ID_Art","have_abstract")], by = "ID_Art") %>% 
   as.data.table()
 
-saveRDS(term_list, paste0(data_path, "EER/EER_term_list.rds"))
+saveRDS(term_list, here(eer_data,
+                        "3_Topic_modelling", 
+                        "EER_term_list.rds"))
 
 #' We will now produce different set of data depending on different filtering parameters:
 #' 
@@ -273,7 +278,9 @@ data_set_bigram <- create_topicmodels_dataset(hyper_grid,
 data_set_bigram[, trigram := FALSE]
 data_set <- rbind(data_set_trigram, data_set_bigram)
 
-saveRDS(data_set, paste0(data_path, "EER/EER_data_set.rds"))
+saveRDS(data_set, here(eer_data, 
+                       "3_Topic_modelling",
+                       "EER_data_set.rds"))
 
 #' The second step is to use the different data sets to create stm objects and them to fit 
 #' topic models for different number of topics.
@@ -292,10 +299,10 @@ many_models <- create_many_models(data_set, topic_number, max.em.its = 700, seed
 
 tuning_results <- stm_results(many_models)
 #' If needed, we can save the result: 
-#' `saveRDS(tuning_results, (paste0(data_path, "EER/topic_models.rds")))`.
+#' `saveRDS(tuning_results, here(eer_data, "3_Topic_modelling", "topic_models.rds"))`.
 #' 
 #' And reload them at the beginning of a new session: 
-#' `tuning_results <- readRDS(paste0(data_path, "EER/topic_models.rds"))`.
+#' `tuning_results <- readRDS(here(eer_data, "3_Topic_modelling", "topic_models.rds"))`.
 
 tuning_results_test <- tuning_results %>% 
   mutate(frex_data_0.3 = map(topic_model, average_frex, w = weight_1),
@@ -306,7 +313,7 @@ plot_topic_models  <- plot_topicmodels_stat(tuning_results, nb_terms = 100)
 
 plot_topic_models$summary %>%
   ggplotly() %>% 
-  htmlwidgets::saveWidget(paste0(picture_path, "tuning_topicmodels_summary.html"))
+  htmlwidgets::saveWidget(here(picture_path, "tuning_topicmodels_summary.html"))
 
 ragg::agg_png(paste0(picture_path, "tuning_topicmodels_coherence_vs_exclusivity.png"),
         width = 20, height = 15, units = "cm", res = 300)
@@ -315,7 +322,7 @@ invisible(dev.off())
 
 plot_topic_models$exclusivity_coherence_mean %>%
   ggplotly() %>% 
-  htmlwidgets::saveWidget(paste0(picture_path, "tuning_topicmodels_frex_general.html"))
+  htmlwidgets::saveWidget(here(picture_path, "tuning_topicmodels_frex_general.html"))
 
 #' If we want to look at the stat in an interactive framework, we can do:
 #' 
@@ -373,7 +380,7 @@ top_terms <- extract_top_terms(topic_model,
                                nb_terms = 15,
                                frexweight = 0.3)
 #' We will use this table for exploration
-#' `saveRDS(top_terms, paste0(data_path, "EER/topic_model_",id,"-",nb_topics,"_top_terms.rds"))`
+#' `saveRDS(top_terms, paste0(eer_data, "3_Topic_modelling/topic_model_",id,"-",nb_topics,"_top_terms.rds"))`
 
 
 topics <- name_topics(top_terms, method = "frex", nb_word = 4)

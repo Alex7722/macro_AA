@@ -26,14 +26,18 @@ knitr::opts_chunk$set(eval = FALSE)
 #' # Loading packages, paths and data
 #'
 #'
-source("EER_Paper/Script_paths_and_basic_objects_EER.R")
+source(here::here("EER_Paper", 
+                  "Script_paths_and_basic_objects_EER.R"))
 
 # EER data
-Corpus_EER <- readRDS(paste0(data_path, "EER/1_Corpus_Prepped_and_Merged/Corpus.rds"))
+Corpus_EER <- readRDS(here(eer_data, 
+                           "1_Corpus_Prepped_and_Merged", 
+                           "Corpus.rds"))
 
 # Top 5 data
-Corpus_top5 <- readRDS(paste0(data_path, "EER/1_Corpus_Prepped_and_Merged/abstracts_MS_with_ID_Art.RDS"))
-
+Corpus_top5 <- readRDS(here(eer_data, 
+                            "1_Corpus_Prepped_and_Merged", 
+                            "abstracts_MS_with_ID_Art.RDS"))
 
 #' # Creating the corpus for topic-modelling
 #'
@@ -60,9 +64,9 @@ Corpus_top5 <- Corpus_top5[ID_Art %in% nodes_JEL$ID_Art] %>%
   select(ID_Art, TITLE, YEAR, AUTHOR, ABSTRACT, JOURNAL) %>%
   filter(!str_detect(TITLE, ": COMMENT$|: COMMENT \\[|- REPLY$"))
 
-colnames(Corpus_top5_cleaned) <- colnames(Corpus_cleaned)
-Corpus_topic <- rbind(Corpus_top5_cleaned, Corpus_cleaned) %>%
-  filter(between(Annee_Bibliographique, 1973, 2007)) %>%
+colnames(Corpus_top5) <- colnames(Corpus_EER)
+Corpus_topic <- rbind(Corpus_top5, Corpus_EER) %>%
+  filter(between(Annee_Bibliographique, 1973, 2002)) %>%
   mutate(across(contains(c("abstract", "Titre", "Nom")), ~ toupper(.)))
 
 
@@ -79,14 +83,18 @@ Corpus_topic <- Corpus_topic %>%
 #' - Type of journal (EER or Top5)
 #'
 
-Collabs <- readRDS(paste0(data_path, "EER/1_Corpus_Prepped_and_Merged/collab_top5_EER.rds"))
+Collabs <- readRDS(here(eer_data, 
+                        "1_Corpus_Prepped_and_Merged", 
+                        "collab_top5_EER.rds"))
 Corpus_topic <- Corpus_topic %>%
   left_join(Collabs) %>%
   mutate(Journal_type = ifelse(Journal == "EUROPEAN ECONOMIC REVIEW", "EER", "TOP5"))
 
 saveRDS(
   Corpus_topic,
-  paste0(data_path, "EER/1_Corpus_Prepped_and_Merged/corpus_top5_ERR.rds")
+  here(eer_data, 
+       "1_Corpus_Prepped_and_Merged",
+       "corpus_top5_ERR.rds")
 )
 
 #' ## Checking abstract distribution

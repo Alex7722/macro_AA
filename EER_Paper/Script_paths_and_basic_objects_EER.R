@@ -39,15 +39,15 @@ for (p in github_list) {
 ######################### Paths ##########################################------------
 
 if (stringr::str_detect(getwd(), "MEGA")) {
-  data_path <- path.expand("~/data/macro_AA/")
+  data_path <- path.expand("~/data/macro_AA")
 } else {
-  data_path <- "/projects/data/macro_AA/"
+  data_path <- "/projects/data/macro_AA"
 }
 
 picture_path <- here("EER_Paper", "Pictures")
-eer_data <- paste0(data_path, "EER/")
-boards_path <- paste0(eer_data, "editorial_boards/")
-macro_data <- paste0(data_path, "Corpus_Econlit_Matched_WoS/")
+eer_data <- here(data_path, "EER")
+boards_path <- here(eer_data, "editorial_boards")
+macro_data <- here(data_path, "Corpus_Econlit_Matched_WoS")
 
 ######################### data ##########################################------------
 
