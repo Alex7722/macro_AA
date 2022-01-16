@@ -108,7 +108,7 @@ corpus <- readRDS(paste0(eer_data, "1_Corpus_Prepped_and_Merged/corpus_top5_ERR.
   left_join(article_topics) %>% 
   left_join(networks_top5) %>% 
   left_join(institutions) %>% 
-  left_join(authors) %>% 
+  left_join(authors) %>%
   select(-Nom_ISI, -abstract, -Journal_type) %>% 
   as.data.table
 

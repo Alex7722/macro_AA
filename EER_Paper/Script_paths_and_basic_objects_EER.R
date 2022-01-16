@@ -38,8 +38,13 @@ for (p in github_list) {
 
 ######################### Paths ##########################################------------
 
+<<<<<<< HEAD
 if (stringr::str_detect(getwd(), "MEGA")) {
   data_path <- path.expand("~/data/macro_AA")
+=======
+if (stringr::str_detect(getwd(), "goutsmedt")) {
+  data_path <- path.expand("~/data/macro_AA/")
+>>>>>>> c38db255a4e07bb9ff64a836d20e55237a43c65b
 } else {
   data_path <- "/projects/data/macro_AA"
 }
