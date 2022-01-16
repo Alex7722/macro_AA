@@ -38,7 +38,7 @@ for (p in github_list) {
 
 ######################### Paths ##########################################------------
 
-if (stringr::str_detect(getwd(), "MEGA")) {
+if (stringr::str_detect(getwd(), "goutsmedt")) {
   data_path <- path.expand("~/data/macro_AA/")
 } else {
   data_path <- "/projects/data/macro_AA/"
