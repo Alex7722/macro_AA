@@ -117,8 +117,12 @@ create_topicmodels_dataset <- function(tuning_parameters,
 #' 
 create_stm <- function(data, min_word_number = 200){ 
   data_set <- data %>% 
-    mutate(dfm = furrr::future_map(data, ~tidytext::cast_dfm(data = ., document, term, count_per_doc))) %>% 
-    mutate(stm = furrr::future_map(dfm, ~quanteda::convert(x = ., to = "stm")),
+    mutate(dfm = furrr::future_map(data, 
+                                   ~tidytext::cast_dfm(data = ., document, term, count_per_doc),
+                                   .progress = TRUE)) %>% 
+    mutate(stm = furrr::future_map(dfm, 
+                                   ~quanteda::convert(x = ., to = "stm"),
+                                   .progress = TRUE),
            preprocessing_id = row_number())
   
   list_document <- list()
@@ -151,12 +155,15 @@ create_many_models <- function(data, nb_topics, max.em.its, seed) {
   list_models <- list()
   for(i in 1:nrow(data_set)) {
     topic_model <- tibble(K = nb_topics) %>%
-      mutate(topic_model = furrr::future_map(K, ~stm(data$stm[[i]][[1]],
+      mutate(topic_model = furrr::future_map(K, 
+                                             ~stm(data$stm[[i]][[1]],
                                                      data$stm[[i]][[2]],
                                                      init.type = "Spectral",
                                                      K = .,
                                                      max.em.its = max.em.its,
-                                                     seed = seed)))
+                                                     seed = seed),
+                                             .progress = TRUE,
+                                             .options = furrr_options(seed = seed)))
     list_models[[i]] <- topic_model 
   }
   

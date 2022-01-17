@@ -257,7 +257,7 @@ saveRDS(term_list, here(eer_data,
 #' 
 hyper_grid <- expand.grid(
   upper_share = c(0.35), # remove a word if it is appearing in more than upper_share% of the docs
-  lower_share = c(0.01, 0.02), # remove a word if it is appearing in less than lower_share% of the docs
+  lower_share = c(0.01, 0.02, 0.04), # remove a word if it is appearing in less than lower_share% of the docs
   min_word = c(6, 12), # the min number of words in a doc
   max_word = Inf, # the max number of words in a doc
   prop_word = 1) # keep the top prop_word% of the words (in terms of occurrence)
@@ -287,12 +287,12 @@ saveRDS(data_set, here(eer_data,
 #' 
 
 # setting up parallel process
-nb_cores <- availableCores()/2 + 1
-plan(multicore, workers = 2)
+nb_cores <- availableCores()/2
+plan(multisession, workers = nb_cores)
 
 data_set <- create_stm(data_set) 
-topic_number <- seq(30, 90, 10) 
-many_models <- create_many_models(data_set, topic_number, max.em.its = 700, seed = 1989)
+topic_number <- seq(30, 110, 10) 
+many_models <- create_many_models(data_set, topic_number, max.em.its = 800, seed = 1989)
 
 #' The third step is to calculate different statistics for each model and produce 
 #' different plots summarising these statistics.
