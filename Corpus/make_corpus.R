@@ -132,8 +132,8 @@ saveRDS(dt_Old_JEL_Articles, file = "Corpus_Econlit/dt_Old_JEL_Articles.rds")
 
 ######################### Getting the BD ***************************
 
-# all art
-all_art <- dbGetQuery(ESH, paste0("SELECT * FROM OST_Expanded_SciHum.Articles WHERE ItemID_Ref != 0;")) %>% data.table()
+# all art no differences whether ItemID_Ref != 0 or not
+all_art <- dbGetQuery(ESH, paste0("SELECT * FROM OST_Expanded_SciHum.Articles WHERE ItemID_Ref != 0;")) %>% data.table() 
 issueID <- fread("Corpus_Econlit/revueID.csv", quote = "") %>% data.table()
 # Disciplines and Journals
 revues <- dbGetQuery(ESH, "SELECT Code_Revue, Revue, Code_Discipline FROM OST_Expanded_SciHum.Revues;") %>% data.table()
