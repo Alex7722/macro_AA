@@ -244,11 +244,73 @@ harmonic_mean_exclusivity_coherence <- function(weight, semantic_coherence_mean,
   measure <- (weight/semantic_coherence_mean + (1 - weight)/exclusivity_mean)^(-1)
 }
 
+#' ## Building multiple plots for summing up the topic models statistics
+#' 
+plot_topicmodels_stat <- function(data, size = 1, weight_1 = 0.5, weight_2 = 0.3, nb_terms = 10){
+  
+  results_summary <- data %>%
+    transmute(K,
+              preprocessing_id,
+              upper_share,
+              lower_share,
+              min_word,
+              max_word,
+              prop_word,
+              residual,
+              semantic_coherence_mean,
+              heldout_likelihood,
+              exclusivity_mean,
+              lbound) %>%
+    gather(Metric, Value, -c(preprocessing_id,upper_share,lower_share,min_word,max_word,prop_word,K))
+  
+  
+  plot_summary <- ggplot(results_summary, aes(K, Value, color = as.factor(preprocessing_id))) +
+    geom_point(size = size) + 
+    geom_line(size = size, alpha = 0.8) +
+    facet_wrap(~Metric, scales = "free_y", ncol = 3) +
+    theme_bw() +
+    labs(x = "K (number of topics)",
+         y = NULL,
+         title = "Model diagnostics by number of topics and preprocessing type") +
+    theme(legend.position = "bottom")
+  
+  plot_exclusivity_coherence <- data %>% 
+    mutate(id = paste0(preprocessing_id, "-", K)) %>% 
+    ggplot(aes(semantic_coherence_mean, exclusivity_mean, group = id, color = as.factor(K))) +
+    geom_label(aes(label = as.factor(preprocessing_id))) +
+    theme_bw() +
+    labs(x = "Semantic Coherence",
+         y = "Exclusivity",
+         title = "Exclusivity versus Coherence by number of topics and preprocessing type")
+  
+  mix_measure <- tuning_results %>% 
+    mutate(frex_data_1 = map(topic_model, average_frex, w = weight_1, nb_terms = nb_terms),
+           frex_data_2 = map(topic_model, average_frex, w = weight_2, nb_terms = nb_terms)) %>% 
+    select(preprocessing_id, K, frex_data_1, frex_data_2)
+  setnames(mix_measure, c("frex_data_1","frex_data_2"), c(paste0("frex_mean_",weight_1), paste0("frex_mean_",weight_2)))
+  
+  plot_mix_measure <- mix_measure %>% 
+    pivot_longer(cols = starts_with("frex"), names_to = "measure", values_to = "measure_value") %>% 
+    mutate(measure_value = unlist(measure_value)) %>% 
+    ggplot(aes(K, measure_value, color = as.factor(preprocessing_id), group = as.factor(preprocessing_id))) +
+    geom_point(size = size, alpha = 0.7) +
+    geom_line() +
+    facet_wrap(~measure, scales = "free_y") +
+    theme_bw() +
+    labs(x = "Number of topics",
+         y = "Frex mean",
+         title = "Frex mean value for different number of topics and preprocessing steps")
+  
+  plot_list <- list("summary" = plot_summary, 
+                    "exclusivity_coherence" = plot_exclusivity_coherence, 
+                    "exclusivity_coherence_mean" = plot_mix_measure)
+}
+
 #' ## Calculate FREX measure
 #' 
 #' Inspired by the STM package but a bit revisited to fit with our goals
 
-calculate_frex <- function(model, nb_terms = 10, w = 0.5) {
+calculate_frex <- function(model, nb_terms = nb_terms, w = w) {
 logbeta <- model$beta$logbeta[[1]]
 
 col.lse <- function(mat) {
@@ -274,7 +336,7 @@ frex <- data.table("term" = model$vocab,
 
 #' Calculate Frex mean
 #' 
-average_frex <- function(model, nb_terms = 10, w = 0.5) {
+average_frex <- function(model, nb_terms = nb_terms, w = w) {
   frex_mean <- calculate_frex(model, nb_terms = nb_terms, w = w) %>% 
     select(topic, mean) %>% 
     unique()
@@ -348,67 +410,7 @@ extract_top_terms <- function(model, list_terms, nb_terms = 10, frexweight = 0.5
     rename(value = lift)
   top_terms <- rbind(frex_value, beta_value, score_value, lift_value)
 }
-#' ## Building multiple plots for summing up the topic models statistics
-#' 
-plot_topicmodels_stat <- function(data, size = 1, weight_1 = 0.5, weight_2 = 0.3, nb_terms = 10){
-  
-  results_summary <- data %>%
-    transmute(K,
-              preprocessing_id,
-              upper_share,
-              lower_share,
-              min_word,
-              max_word,
-              prop_word,
-              residual,
-              semantic_coherence_mean,
-              heldout_likelihood,
-              exclusivity_mean,
-              lbound) %>%
-    gather(Metric, Value, -c(preprocessing_id,upper_share,lower_share,min_word,max_word,prop_word,K))
-  
-  
-  plot_summary <- ggplot(results_summary, aes(K, Value, color = as.factor(preprocessing_id))) +
-    geom_point(size = size) + 
-    geom_line(size = size, alpha = 0.8) +
-    facet_wrap(~Metric, scales = "free_y", ncol = 3) +
-    theme_bw() +
-    labs(x = "K (number of topics)",
-         y = NULL,
-         title = "Model diagnostics by number of topics and preprocessing type") +
-    theme(legend.position = "bottom")
-  
-  plot_exclusivity_coherence <- data %>% 
-    mutate(id = paste0(preprocessing_id, "-", K)) %>% 
-    ggplot(aes(semantic_coherence_mean, exclusivity_mean, group = id, color = as.factor(K))) +
-    geom_label(aes(label = as.factor(preprocessing_id))) +
-    theme_bw() +
-    labs(x = "Semantic Coherence",
-         y = "Exclusivity",
-         title = "Exclusivity versus Coherence by number of topics and preprocessing type")
-  
-  mix_measure <- tuning_results %>% 
-    mutate(frex_data_1 = map(topic_model, average_frex, w = weight_1, nb_terms = nb_terms),
-           frex_data_2 = map(topic_model, average_frex, w = weight_2, nb_terms = nb_terms)) %>% 
-    select(preprocessing_id, K, frex_data_1, frex_data_2)
-  setnames(mix_measure, c("frex_data_1","frex_data_2"), c(paste0("frex_mean_",weight_1), paste0("frex_mean_",weight_2)))
-  
-  plot_mix_measure <- mix_measure %>% 
-    pivot_longer(cols = starts_with("frex"), names_to = "measure", values_to = "measure_value") %>% 
-    mutate(measure_value = unlist(measure_value)) %>% 
-    ggplot(aes(K, measure_value, color = as.factor(preprocessing_id), group = as.factor(preprocessing_id))) +
-    geom_point(size = size, alpha = 0.7) +
-    geom_line() +
-    facet_wrap(~measure, scales = "free_y") +
-    theme_bw() +
-    labs(x = "Number of topics",
-         y = "Frex mean",
-         title = "Frex mean value for different number of topics and preprocessing steps")
-  
-  plot_list <- list("summary" = plot_summary, 
-                    "exclusivity_coherence" = plot_exclusivity_coherence, 
-                    "exclusivity_coherence_mean" = plot_mix_measure)
-}
+
 
 #' # Studying a topic model
 #' 

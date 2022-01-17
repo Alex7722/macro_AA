@@ -39,7 +39,9 @@ library(kableExtra)
 source(here::here("EER_Paper", "Script_paths_and_basic_objects_EER.R"))
 
 # load communities data
-networks_top5 <- readRDS(paste0(eer_data, "2_raw_Networks_and_Alluv/list_networks_EER_Top5_Macro.rds")) %>%
+networks_top5 <- readRDS(here(eer_data, 
+                              "2_raw_Networks_and_Alluv",
+                              "list_networks_EER_Top5_Macro.rds")) %>%
   lapply(function(tbl) (tbl %>% activate(nodes) %>% as.data.table())) %>%
   rbindlist(idcol = "window", fill = TRUE) %>%
   mutate(window = paste0(window, "-", as.integer(window) + 9)) %>%
@@ -67,9 +69,13 @@ networks_top5 <- networks_top5 %>%
   mutate(community_name = ifelse(is.na(community_name), new_Id_com, community_name))
 
 # load the topics stats and gamma attributes
-topic_diff <- readRDS(paste0(data_path, "EER/topic_model_1-60_topics_diff.rds"))
+topic_diff <- readRDS(here(eer_data, 
+                           "3_Topic_modelling",
+                           "topic_model_1-50_topics_diff.rds"))
 
-topics <- readRDS(paste0(data_path, "EER/topic_model_1-60.rds")) %>%
+topics <- readRDS(here(eer_data, 
+                           "3_Topic_modelling",
+                           "topic_model_1-50_gamma_values.rds")) %>%
   filter(gamma > 0.1) %>%
   left_join(topic_diff) %>%
   mutate(
@@ -81,12 +87,16 @@ topics <- readRDS(paste0(data_path, "EER/topic_model_1-60.rds")) %>%
   as.data.table()
 
 # load the highest frex value terms for each topics
-top_terms <- readRDS(paste0(data_path, "EER/topic_model_1-60_top_terms.rds")) %>%
+top_terms <- readRDS(here(eer_data, 
+                          "3_Topic_modelling",
+                          "topic_model_1-50_top_terms.rds")) %>%
   rename("topic_n" = topic) %>%
   filter(measure == "frex")
 
 # merge institutions data for EER and top5
-institutions_eer <- readRDS(paste0(data_path, "EER/1_Corpus_Prepped_and_Merged/Institutions_cleaned.rds")) %>%
+institutions_eer <- readRDS(here(eer_data, 
+                                 "1_Corpus_Prepped_and_Merged",
+                                 "Institutions_cleaned.rds")) %>%
   select(ID_Art, Institution, Pays)
 institutions_top5 <- authors_JEL %>%
   select(ID_Art, Institution, Pays) %>% 
@@ -113,7 +123,7 @@ cited_corpus <- merge(cited_corpus, edges_JEL[, c("ItemID_Ref", "nb_cit")], by =
 # General difference in affiliations and journals
 
 ```{r}
-knitr::include_graphics(paste0(here::here(), "/EER_Paper/Pictures/mean_diff_plot1-60.png"))
+knitr::include_graphics(paste0(here::here(), "/EER_Paper/Pictures/mean_diff_plot1-50.png"))
 ```
 
 

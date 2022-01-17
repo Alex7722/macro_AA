@@ -26,18 +26,40 @@ knitr::opts_chunk$set(eval = FALSE)
 #' # Loading packages, paths and data
 #'
 #'
-source(here::here("EER_Paper", 
-                  "Script_paths_and_basic_objects_EER.R"))
+source(here::here(
+  "EER_Paper",
+  "Script_paths_and_basic_objects_EER.R"
+))
 
 # EER data
-Corpus_EER <- readRDS(here(eer_data, 
-                           "1_Corpus_Prepped_and_Merged", 
-                           "Corpus.rds"))
+Corpus_EER <- readRDS(here(
+  eer_data,
+  "1_Corpus_Prepped_and_Merged",
+  "Corpus.rds"
+))
 
-# Top 5 data
-Corpus_top5 <- readRDS(here(eer_data, 
-                            "1_Corpus_Prepped_and_Merged", 
-                            "abstracts_MS_with_ID_Art.RDS"))
+#' We load the merged top 5 articles with Microsoft Academic. But we merge it with
+#' the macro corpus of the top 5 articles to keep article which have not been matched
+#' with Microsoft Academic.
+
+Corpus_top5_microsoft <- readRDS(here(
+  eer_data,
+  "1_Corpus_Prepped_and_Merged",
+  "abstracts_MS_with_ID_Art.RDS"
+)) %>% 
+  filter(! is.na(ID_Art)) %>% 
+  select(ID_Art, ABSTRACT) %>%
+  mutate(ID_Art = as.character(ID_Art)) %>% 
+  unique()
+
+top_5 <- c("AMERICAN ECONOMIC REVIEW",
+           "ECONOMETRICA",
+           "JOURNAL OF POLITICAL ECONOMY",
+           "QUARTERLY JOURNAL OF ECONOMICS",
+           "REVIEW OF ECONOMIC STUDIES")
+Corpus_top5_macro <- nodes_JEL %>% 
+  filter(Revue %in% top_5)
+  
 
 #' # Creating the corpus for topic-modelling
 #'
@@ -49,7 +71,7 @@ Corpus_top5 <- readRDS(here(eer_data,
 #' set the lower and upper year depending on our article project and data disponibility. We
 #' want to stop before the Great Financial Crisis, and abstracts for top 5 and EER are
 #' scarce and weirdly distributed before 1973.
-#' 
+#'
 #' > Outside of the presence of abstracts before 1973, there is also the issue that
 #' > we don't have JEL code for EER before 1973 and so we cannot classify these papers as
 #' > macroeconomics.
@@ -60,9 +82,10 @@ Corpus_EER <- Corpus_EER %>%
   select(ID_Art, Titre, Annee_Bibliographique, Nom_ISI, abstract) %>%
   mutate(Journal = "EUROPEAN ECONOMIC REVIEW")
 
-Corpus_top5 <- Corpus_top5[ID_Art %in% nodes_JEL$ID_Art] %>%
-  select(ID_Art, TITLE, YEAR, AUTHOR, ABSTRACT, JOURNAL) %>%
-  filter(!str_detect(TITLE, ": COMMENT$|: COMMENT \\[|- REPLY$"))
+Corpus_top5 <- Corpus_top5_macro %>% 
+  left_join(Corpus_top5_microsoft) %>% 
+  select(ID_Art, Titre, Annee_Bibliographique, Nom, ABSTRACT, Revue) %>%
+  filter(!str_detect(Titre, ": COMMENT$|: COMMENT \\[|- REPLY$"))
 
 colnames(Corpus_top5) <- colnames(Corpus_EER)
 Corpus_topic <- rbind(Corpus_top5, Corpus_EER) %>%
@@ -83,18 +106,22 @@ Corpus_topic <- Corpus_topic %>%
 #' - Type of journal (EER or Top5)
 #'
 
-Collabs <- readRDS(here(eer_data, 
-                        "1_Corpus_Prepped_and_Merged", 
-                        "collab_top5_EER.rds"))
+Collabs <- readRDS(here(
+  eer_data,
+  "1_Corpus_Prepped_and_Merged",
+  "collab_top5_EER.rds"
+))
 Corpus_topic <- Corpus_topic %>%
   left_join(Collabs) %>%
   mutate(Journal_type = ifelse(Journal == "EUROPEAN ECONOMIC REVIEW", "EER", "TOP5"))
 
 saveRDS(
   Corpus_topic,
-  here(eer_data, 
-       "1_Corpus_Prepped_and_Merged",
-       "corpus_top5_ERR.rds")
+  here(
+    eer_data,
+    "1_Corpus_Prepped_and_Merged",
+    "corpus_top5_ERR.rds"
+  )
 )
 
 #' ## Checking abstract distribution

@@ -39,7 +39,7 @@ for (p in github_list) {
 ######################### Paths ##########################################------------
 
 if (stringr::str_detect(getwd(), "goutsmedt")) {
-  data_path <- path.expand("~/data/macro_AA/")
+  data_path <- path.expand("~/data/macro_AA")
 } else {
   data_path <- "/projects/data/macro_AA"
 }
@@ -52,18 +52,24 @@ macro_data <- here(data_path, "Corpus_Econlit_Matched_WoS")
 ######################### data ##########################################------------
 
 # Loading Macro articles
-nodes_JEL <- readRDS(paste0(macro_data, "JEL_matched_corpus_nodes.rds"))
-nodes_old_JEL <- readRDS(paste0(macro_data, "Old_JEL_matched_corpus_nodes.rds"))
+nodes_JEL <- readRDS(here(macro_data, 
+                          "JEL_matched_corpus_nodes.rds"))
+nodes_old_JEL <- readRDS(here(macro_data, 
+                              "Old_JEL_matched_corpus_nodes.rds"))
 nodes_JEL <- rbind(nodes_JEL, nodes_old_JEL)
 rm("nodes_old_JEL")
 
-edges_JEL <- readRDS(paste0(macro_data, "JEL_matched_corpus_edges.rds"))
-edges_old_JEL <- readRDS(paste0(macro_data, "Old_JEL_matched_corpus_edges.rds"))
+edges_JEL <- readRDS(here(macro_data, 
+                          "JEL_matched_corpus_edges.rds"))
+edges_old_JEL <- readRDS(here(macro_data, 
+                              "Old_JEL_matched_corpus_edges.rds"))
 edges_JEL <- rbind(edges_JEL, edges_old_JEL)
 rm("edges_old_JEL")
 
-authors_JEL <- readRDS(paste0(macro_data, "JEL_matched_corpus_authors.rds"))
-authors_old_JEL <- readRDS(paste0(macro_data, "Old_JEL_matched_corpus_authors.rds"))
+authors_JEL <- readRDS(here(macro_data, 
+                            "JEL_matched_corpus_authors.rds"))
+authors_old_JEL <- readRDS(here(macro_data, 
+                                "Old_JEL_matched_corpus_authors.rds"))
 authors_JEL <- rbind(authors_JEL, authors_old_JEL)
 
 # Cleaning ID of edges:
@@ -100,10 +106,14 @@ edges_JEL <- edges_JEL %>%
   left_join(check_id[, c("ItemID_Ref", "new_id")]) %>%
   mutate(new_id = ifelse(is.na(new_id), New_id2, new_id))
 
-institutions_info_JEL <- fread(paste0(macro_data, "Macro_AA_Institutions_Cleaned.csv"), quote = "", fill = TRUE) %>% data.table()
+institutions_info_JEL <- read_csv2(here(macro_data, 
+                                        "Macro_AA_Institutions_Cleaned.csv")) %>% 
+  data.table()
 
-ref_info_JEL <- readRDS(paste0(macro_data, "JEL_matched_corpus_references_info.rds"))
-ref_info_old_JEL <- readRDS(paste0(macro_data, "Old_JEL_matched_corpus_references_info.rds"))
+ref_info_JEL <- readRDS(here(macro_data, 
+                             "JEL_matched_corpus_references_info.rds"))
+ref_info_old_JEL <- readRDS(here(macro_data, 
+                                 "Old_JEL_matched_corpus_references_info.rds"))
 ref_info_JEL <- unique(rbind(ref_info_JEL, ref_info_old_JEL))
 
 # keeping only refs with a title and a ESpecialite, then removing doublons
@@ -116,8 +126,14 @@ if (length(doublons) != 0) {
 
 
 # Adding info to references
-edges_JEL <- merge(unique(edges_JEL), unique(ref_info_JEL[Titre != "NA" & ESpecialite != "NA", c("New_id2", "Titre", "ESpecialite")]), by = "New_id2", all.x = TRUE)
-edges_JEL <- merge(edges_JEL, unique(nodes_JEL[, c("ID_Art", "Annee_Bibliographique")]), by = "ID_Art", all.x = TRUE)
+edges_JEL <- merge(unique(edges_JEL), 
+                   unique(ref_info_JEL[Titre != "NA" & ESpecialite != "NA", c("New_id2", "Titre", "ESpecialite")]), 
+                   by = "New_id2", 
+                   all.x = TRUE)
+edges_JEL <- merge(edges_JEL, 
+                   unique(nodes_JEL[, c("ID_Art", "Annee_Bibliographique")]), 
+                   by = "ID_Art", 
+                   all.x = TRUE)
 
 # Adding institutions to Articles
 institutions_info_JEL$ID_Art <- as.integer(institutions_info_JEL$ID_Art)

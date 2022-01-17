@@ -1,5 +1,5 @@
 #' ---
-#' title: "Script for working on titles and abstracts of EER articles"
+#' title: "Script for topic-modelling analysis of the EER/Top5 corpus"
 #' author: "Aurélien Goutsmedt and Alexandre Truc"
 #' date: "/ Last compiled on `r format(Sys.Date())`"
 #' output: 
@@ -9,12 +9,6 @@
 #' ---
 #' 
 #' # What is this script for?
-#' 
-#' This script takes the `alluv_dt` data built in 
-#' [2_Script_EER_dynamic_networks.md](/EER_Paper/2_Script_EER_dynamic_networks.md) 
-#' and merge it with titles and abstracts of corresponding articles. We can then
-#' work on the words associated to each article, and notably calculate highest 
-#' tf-idf for communities and windows.
 #' 
 #' 
 #' > WARNING: This script still needs a lot of cleaning
@@ -35,15 +29,12 @@ source(here("functions",
             "functions_for_topic_modelling.R"))
 
 # importing corpus
-Corpus_EER <- readRDS(here(eer_data, 
+Corpus <- readRDS(here(eer_data, 
                            "1_Corpus_Prepped_and_Merged",
                            "corpus_top5_ERR.rds"))
 alluv_dt <- readRDS(here(eer_data, 
                          "2_Raw_Networks_and_Alluv",
                          "alluv_dt.rds"))
-
-################# Topic modelling on titles and abstracts ################### ------
-###### Choosing the preprocessing steps and the number of topics ######## ----
 
 #' # Topic modelling on titles and abstracts
 #' 
@@ -53,6 +44,9 @@ alluv_dt <- readRDS(here(eer_data,
 #' We will run the topic model analysis only on the articles with an abstract. As a significant
 #' proportion of macro articles in the late 1970s, early 1980s lack of an abstract, we will be forced
 #' in a second step to run the same analysis with the articles without abstracts.
+
+################# Topic modelling on titles and abstracts ################### ------
+###### Choosing the preprocessing steps and the number of topics ######## ----
 
 to_remove <- c("COPYRIGHT.*",
                " \\* .*",
@@ -150,13 +144,17 @@ spacy_word <- spacy_parse(text$word, entity = FALSE) %>%
            ! lemma %in% to_keep)) %>% 
   select(doc_id, token, lemma) %>% 
   mutate(doc_id = as.integer(str_remove(doc_id, "text")),
-         lemma = str_trim(str_replace_all(lemma, "[:punct:]|[:digit:]", " "), "both")) %>% 
+         lemma = str_trim(str_replace_all(lemma, "[:punct:]|[:digit:]|", " "), "both"),
+         lemma = toupper(lemma)) %>% 
   rename(id = doc_id) %>%
   filter(! lemma == " " & 
            ! lemma == "" &
            str_count(lemma) > 1) %>% 
     as.data.table()
   
+
+spacy_word %>% filter(token == "PRICE")
+
 to_correct <- data.table("to_correct" = c("experiments",
                                           "forecasts",
                                           "forecasting",
@@ -187,12 +185,48 @@ to_correct <- data.table("to_correct" = c("experiments",
                                           "shock",
                                           "need",
                                           "yield"))
+
+
 for(i in 1:nrow(to_correct)) {
   spacy_word[lemma == to_correct$to_correct[i]]$lemma <- to_correct$correction[i]
 }
 
+
+relemmatized_spacy_word <- spacy_word %>% 
+  mutate(former_lemma = lemma,
+         lemma = textstem::lemmatize_words(token),
+         lemma = toupper(lemma),
+         lemma = str_trim(str_replace_all(lemma, "[:punct:]|[:digit:]|\\^", " "), "both"))
+
+lemme_to_correct <- data.table("to_correct" = c("EQUILIBRIA",
+                                                "CEILING",
+                                                "DEVELOPING",
+                                                "DEVELOPES",
+                                                "DISINFLATIONS",
+                                                "FUNDAMENTALS",
+                                                "GOVERNEMENTS",
+                                                "KEYNESIANS",
+                                                "MICROFOUNDATIONS",
+                                                "MISALLOCATIONS",
+                                                "MODELLINGS"),
+                               "correction" = c("EQUILIBRIA",
+                                                "CEILING",
+                                                "DEVELOPING",
+                                                "DEVELOP",
+                                                "DISINFLATION",
+                                                "FUNDAMENTALS",
+                                                "GOVERNEMENT",
+                                                "KEYNESIAN",
+                                                "MICROFOUNDATION",
+                                                "MISALLOCATION",
+                                                "MODELLINGS"))
+
+for(i in 1:nrow(lemme_to_correct)) {
+  relemmatized_spacy_word[token == to_correct$to_correct[i]]$lemma <- to_correct$correction[i]
+}
+
 text <- merge(text[, c("id", "ID_Art", "have_abstract")], 
-              spacy_word, 
+              relemmatized_spacy_word, 
               by = "id") %>% 
   group_by(ID_Art) %>% 
   mutate(word = paste0(lemma, collapse = " ")) %>% 
@@ -216,6 +250,7 @@ remove_words <- data.table(word = c("paper",
                                     "characterize",
                                     "conclusion",
                                     "demonstrate",
+                                    "lead",
                                     "finally",
                                     "significantly",
                                     "explore",
@@ -303,19 +338,15 @@ tuning_results <- stm_results(many_models)
 #' 
 #' And reload them at the beginning of a new session: 
 #' `tuning_results <- readRDS(here(eer_data, "3_Topic_modelling", "topic_models.rds"))`.
-
-tuning_results_test <- tuning_results %>% 
-  mutate(frex_data_0.3 = map(topic_model, average_frex, w = weight_1),
-         frex_data_0.5 = map(topic_model, average_frex, w = weight_2))
-
+#'
 #' We can now project the different statistics to choose the best model(s).
-plot_topic_models  <- plot_topicmodels_stat(tuning_results, nb_terms = 100)
+plot_topic_models  <- plot_topicmodels_stat(tuning_results, nb_terms = 20)
 
 plot_topic_models$summary %>%
   ggplotly() %>% 
   htmlwidgets::saveWidget(here(picture_path, "tuning_topicmodels_summary.html"))
 
-ragg::agg_png(paste0(picture_path, "tuning_topicmodels_coherence_vs_exclusivity.png"),
+ragg::agg_png(here(picture_path, "tuning_topicmodels_coherence_vs_exclusivity.png"),
         width = 20, height = 15, units = "cm", res = 300)
 plot_topic_models$exclusivity_coherence
 invisible(dev.off())
@@ -324,17 +355,21 @@ plot_topic_models$exclusivity_coherence_mean %>%
   ggplotly() %>% 
   htmlwidgets::saveWidget(here(picture_path, "tuning_topicmodels_frex_general.html"))
 
+tuning_results %>% select(lower_share, min_word, trigram, preprocessing_id) %>% unique()
+
 #' If we want to look at the stat in an interactive framework, we can do:
 #' 
 #' - `plot_topic_models$summary %>% ggplotly()`;
 #' - `plot_topic_models$exclusivity_coherence_mean %>% ggplotly()`
 
-#' For now, we select the preprocessing 12 and 30 topics.
+#' For `r Sys.date()`, we select the preprocessing 1 (consistent with last tries)
+#' and there is an hesitation between
+#' 50 and 80 topics as 80 is a bit better but it is a lot of topics.
 #' 
 #' ### Working with the chosen topic model: basic description
 
 id <- 1
-nb_topics <- 60 
+nb_topics <- 50 
 
 #' Now we can add the covariates. It seems that it is not changing the topic
 #' model too much. The topics are the same, just the order of the words can
@@ -361,9 +396,9 @@ stm_data$meta$Journal <- metadata$Journal_type
 
 topic_model <- stm(stm_data$documents, 
                    stm_data$vocab, 
-                   prevalence = ~s(Year) + Origin + Journal,
-                   content = ~Journal,
-                   data = stm_data$meta,
+  #                 prevalence = ~s(Year) + Origin + Journal,
+   #                content = ~Journal,
+    #               data = stm_data$meta,
                    K = nb_topics,
                    init.type = "Spectral",
                    seed = 1989)
@@ -380,7 +415,7 @@ top_terms <- extract_top_terms(topic_model,
                                nb_terms = 15,
                                frexweight = 0.3)
 #' We will use this table for exploration
-#' `saveRDS(top_terms, paste0(eer_data, "3_Topic_modelling/topic_model_",id,"-",nb_topics,"_top_terms.rds"))`
+#' `saveRDS(top_terms, paste0(eer_data, "/3_Topic_modelling/topic_model_",id,"-",nb_topics,"_top_terms.rds"))`
 
 
 topics <- name_topics(top_terms, method = "frex", nb_word = 4)
@@ -439,7 +474,8 @@ communities <- topic_corr_network$graph %>%
   activate(nodes) %>% 
   as.data.table %>% 
   select(topic, Com_ID)
-topics <- merge(topics, communities, by = "topic")
+topics <- merge(topics, communities, by = "topic") %>% 
+  arrange(Com_ID)
 
 #' #### naming communities
 #' 
@@ -448,22 +484,21 @@ topics <- merge(topics, communities, by = "topic")
 community_name <- tribble(
   ~Com_ID, ~Com_name,
   "02", "Public Finance, Distribution and Agents Decisions",
-  "03", "Inflation & Business Cycles",
-  "04", "International Macroeconomics",
-  "05", "Fiscal & Monetary policies",
-  "06", "Econometrics",
-  "07", "Growth & Economic Activity",
-  "08", "Investment, Capital & Permanent Income",
-  "09", "Search, Expectations & Information",
-  "10", "Finance, Financial Intermediation & Demand",
-  "11", "Econometrics_bis",
-  "12", "Money Demand",
-  "13", "Econometrics_ter"
+  "03", "Econometrics",
+  "04", "Financial Markets & Macro Issues",
+  "05", "International Macroeconomics",
+  "06", "Theoretical Battles",
+  "07", "Fiscal & Monetary policies",
+  "08", "Inflation & Demand for Money",
+  "09", "Businesss Cyles & Unemployment",
+  "10", "Political Economy of Monetary Policy",
+  "11", "Expectations & Equilibrium",
+  "12", "Growth & Economic Activity"
 )
 
 #' #### Plotting network with communities
 
-community_name$com_color <- c(mypalette[1:9], "gray", "gray", "gray")
+community_name$com_color <- c(mypalette[1:11])
 topics <- merge(topics, community_name, by = "Com_ID")
 network <- topic_corr_network$graph 
 network <- network %>% 
@@ -491,7 +526,7 @@ graph_plot
 invisible(dev.off())
 
 #' We will use this table for exploration
-#' `saveRDS(topics, paste0(data_path, "EER/topic_model_",id,"-",nb_topics,"_topics_summary.rds"))`
+#' `saveRDS(topics, paste0(eer_data, "/3_Topic_modelling/topic_model_", id, "-", nb_topics, "_topics_summary.rds"))`
 #' 
 
 #' We can look at some topics we find close to understand better their differences:
@@ -529,7 +564,7 @@ topic_gamma <- pivot_wider(topic_gamma,
                            names_from = topic_name, 
                            values_from = gamma) %>% 
   mutate(ID_Art = names(stm_data$documents)) %>% 
-  inner_join(Corpus_merged) %>% 
+  inner_join(Corpus) %>% 
   select(document, ID_Art, Nom_ISI, Annee_Bibliographique, Titre, Journal, Journal_type, contains("Topic")) %>% 
   as.data.table()
 
@@ -545,8 +580,8 @@ topic_gamma_attributes <- pivot_longer(topic_gamma_attributes,
   as.data.table()
 
 #' We will use this table for exploration
-#' `saveRDS(topic_gamma_attributes, paste0(data_path, "EER/topic_model_",id,"-",nb_topics,".rds"))`
-#' `topic_gamma_attributes <- readr::write_csv2(topic_gamma_attributes, paste0("summary_topic_model_",id,"-",nb_topics,".csv"))`
+#' `saveRDS(topic_gamma_attributes, paste0(eer_data, "/3_Topic_modelling/topic_model_",id,"-",nb_topics,"_gamma_values.rds"))`
+#' `topic_gamma_attributes <- readr::write_csv2(paste0(eer_data, "/3_Topic_modelling/topic_model_",id,"-",nb_topics,"_gamma_values.rds"))`
 
 #' ### Working with the chosen topic models: differences in terms of journals and affiliations
 #' 
@@ -579,7 +614,7 @@ topic_diff_summary <- pivot_wider(topic_diff_summary,
   as.data.table()
 
 #' We will use this table for exploration
-#' `saveRDS(unique(topic_diff_summary[, c("topic_name", "diff_affiliation", "diff_journal")]), paste0(data_path, "EER/topic_model_",id,"-",nb_topics,"_topics_diff.rds"))`
+#' `saveRDS(topic_diff_summary, paste0(eer_data, "/3_Topic_modelling/topic_model_",id,"-",nb_topics,"_topics_diff.rds"))`
 
 
 
@@ -591,9 +626,9 @@ mean_diff_plot <- ggplot(topic_diff_summary, aes(x = diff_affiliation, y = diff_
   geom_hline(yintercept = 0, size = 1.5, alpha = 0.5) +
   geom_smooth(method = "lm", se = FALSE, linetype = "dashed", color = "gray", alpha = 0.5) +
   geom_label_repel(aes(label = topic_label_2, group = factor(Com_name),
-                       color = com_color, fill = com_color), size = 8, alpha = 0.7, hjust = 0) +
+                       color = com_color, fill = com_color), size = 4, alpha = 0.7, hjust = 0) +
   geom_point(aes(group = factor(Com_name),
-                 color = com_color, fill = com_color), size = 5, alpha = 0.8) +
+                 color = com_color, fill = com_color), size = 4, alpha = 0.8) +
   scale_color_identity() +
   scale_fill_identity() +
   labs(title = "Topic Prevalence over journals (Difference of Means method)",
@@ -601,7 +636,7 @@ mean_diff_plot <- ggplot(topic_diff_summary, aes(x = diff_affiliation, y = diff_
        y = "Top 5 (down) vs. EER (up)") +
   dark_theme_classic()
 
-ragg::agg_png(paste0(picture_path, "mean_diff_plot", id, "-", nb_topics, ".png"), 
+ragg::agg_png(paste0(picture_path, "/mean_diff_plot", id, "-", nb_topics, ".png"), 
               width = 50, 
               height = 40, 
               units = "cm", 
