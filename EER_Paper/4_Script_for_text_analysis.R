@@ -144,16 +144,13 @@ spacy_word <- spacy_parse(text$word, entity = FALSE) %>%
            ! lemma %in% to_keep)) %>% 
   select(doc_id, token, lemma) %>% 
   mutate(doc_id = as.integer(str_remove(doc_id, "text")),
-         lemma = str_trim(str_replace_all(lemma, "[:punct:]|[:digit:]|", " "), "both"),
+         lemma = str_trim(str_replace_all(lemma, "[:punct:]|[:digit:]", " "), "both"),
          lemma = toupper(lemma)) %>% 
   rename(id = doc_id) %>%
   filter(! lemma == " " & 
            ! lemma == "" &
            str_count(lemma) > 1) %>% 
     as.data.table()
-  
-
-spacy_word %>% filter(token == "PRICE")
 
 to_correct <- data.table("to_correct" = c("experiments",
                                           "forecasts",
@@ -196,7 +193,8 @@ relemmatized_spacy_word <- spacy_word %>%
   mutate(former_lemma = lemma,
          lemma = textstem::lemmatize_words(token),
          lemma = toupper(lemma),
-         lemma = str_trim(str_replace_all(lemma, "[:punct:]|[:digit:]|\\^", " "), "both"))
+         lemma = str_trim(str_replace_all(lemma, "[:punct:]|[:digit:]|\\^", " "), "both")) %>% 
+  select(id, token, lemma)
 
 lemme_to_correct <- data.table("to_correct" = c("EQUILIBRIA",
                                                 "CEILING",
@@ -222,7 +220,8 @@ lemme_to_correct <- data.table("to_correct" = c("EQUILIBRIA",
                                                 "MODELLINGS"))
 
 for(i in 1:nrow(lemme_to_correct)) {
-  relemmatized_spacy_word[token == to_correct$to_correct[i]]$lemma <- to_correct$correction[i]
+  relemmatized_spacy_word <- relemmatized_spacy_word %>% 
+    mutate(lemma = ifelse(token == to_correct$to_correct[i], to_correct$correction[i], token))
 }
 
 text <- merge(text[, c("id", "ID_Art", "have_abstract")], 
@@ -292,7 +291,7 @@ saveRDS(term_list, here(eer_data,
 #' 
 hyper_grid <- expand.grid(
   upper_share = c(0.35), # remove a word if it is appearing in more than upper_share% of the docs
-  lower_share = c(0.01, 0.02, 0.04), # remove a word if it is appearing in less than lower_share% of the docs
+  lower_share = c(0.005, 0.01, 0.02), # remove a word if it is appearing in less than lower_share% of the docs
   min_word = c(6, 12), # the min number of words in a doc
   max_word = Inf, # the max number of words in a doc
   prop_word = 1) # keep the top prop_word% of the words (in terms of occurrence)
@@ -302,16 +301,16 @@ hyper_grid <- expand.grid(
 
 data_set_trigram <- create_topicmodels_dataset(hyper_grid, 
                                        term_list, 
-                                       document_name = "ID_Art",
-                                       different_ngram = TRUE)
-data_set_trigram[, trigram := TRUE]
+                                       document_name = "ID_Art") %>% 
+  mutate(trigram = TRUE) 
 
 data_set_bigram <- create_topicmodels_dataset(hyper_grid, 
-                                              filter(term_list, ngram != "trigram"), 
-                                              document_name = "ID_Art",
-                                              different_ngram = TRUE)
-data_set_bigram[, trigram := FALSE]
-data_set <- rbind(data_set_trigram, data_set_bigram)
+                                              term_list[ngram != "trigram"], 
+                                              document_name = "ID_Art") %>% 
+  mutate(trigram = FALSE)
+
+data_set <- rbind(data_set_trigram, data_set_bigram) %>% 
+  relocate(trigram, .after = prop_word)
 
 saveRDS(data_set, here(eer_data, 
                        "3_Topic_modelling",
@@ -325,7 +324,7 @@ saveRDS(data_set, here(eer_data,
 nb_cores <- availableCores()/2
 plan(multisession, workers = nb_cores)
 
-data_set <- create_stm(data_set) 
+data_set <- create_stm(data_set)
 topic_number <- seq(30, 110, 10) 
 many_models <- create_many_models(data_set, topic_number, max.em.its = 800, seed = 1989)
 
@@ -340,7 +339,7 @@ tuning_results <- stm_results(many_models)
 #' `tuning_results <- readRDS(here(eer_data, "3_Topic_modelling", "topic_models.rds"))`.
 #'
 #' We can now project the different statistics to choose the best model(s).
-plot_topic_models  <- plot_topicmodels_stat(tuning_results, nb_terms = 20)
+plot_topic_models  <- plot_topicmodels_stat(tuning_results, nb_terms = 100)
 
 plot_topic_models$summary %>%
   ggplotly() %>% 
@@ -362,14 +361,14 @@ tuning_results %>% select(lower_share, min_word, trigram, preprocessing_id) %>% 
 #' - `plot_topic_models$summary %>% ggplotly()`;
 #' - `plot_topic_models$exclusivity_coherence_mean %>% ggplotly()`
 
-#' For `r Sys.date()`, we select the preprocessing 1 (consistent with last tries)
-#' and there is an hesitation between
-#' 50 and 80 topics as 80 is a bit better but it is a lot of topics.
+#' For `r Sys.date()`, we select the preprocessing 2 (consistent with last tries)
+#' and there is no hesitation between as 70 topics seem the best
+#' compromise.
 #' 
 #' ### Working with the chosen topic model: basic description
 
-id <- 1
-nb_topics <- 50 
+id <- 2
+nb_topics <- 70 
 
 #' Now we can add the covariates. It seems that it is not changing the topic
 #' model too much. The topics are the same, just the order of the words can
@@ -440,7 +439,7 @@ top_terms_graph <- top_terms %>%
   scale_y_reordered() +
   coord_cartesian(xlim=c(0.93,1))
   
-ragg::agg_png(paste0(picture_path, "topic_model_", id, "-", nb_topics, ".png"),
+ragg::agg_png(paste0(picture_path, "/topic_model_", id, "-", nb_topics, ".png"),
                 width = 50, height = 40, units = "cm", res = 300)
 top_terms_graph
 invisible(dev.off())
@@ -451,7 +450,7 @@ invisible(dev.off())
 plot_frequency <- plot_frequency(topics, topic_model) +
   dark_theme_bw()
 
-ragg::agg_png(paste0(picture_path, "topic_model_frequency_", id, "-", nb_topics, ".png"), 
+ragg::agg_png(paste0(picture_path, "/topic_model_frequency_", id, "-", nb_topics, ".png"), 
               width = 40, 
               height = 30, 
               units = "cm", 
@@ -517,7 +516,7 @@ graph_plot <- ggraph(network, layout = "manual", x = x, y = y) +
   geom_node_label(aes(label = topic_name, fill = com_color), size = 2.5, alpha = 0.7) +
   dark_theme_bw()
   
-ragg::agg_png(paste0(picture_path, "topic_correlation", id, "-", nb_topics, ".png"), 
+ragg::agg_png(paste0(picture_path, "/topic_correlation", id, "-", nb_topics, ".png"), 
               width = 40, 
               height = 30, 
               units = "cm", 

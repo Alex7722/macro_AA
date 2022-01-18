@@ -49,7 +49,6 @@ Corpus_top5_microsoft <- readRDS(here(
 )) %>% 
   filter(! is.na(ID_Art)) %>% 
   select(ID_Art, ABSTRACT) %>%
-  mutate(ID_Art = as.character(ID_Art)) %>% 
   unique()
 
 top_5 <- c("AMERICAN ECONOMIC REVIEW",

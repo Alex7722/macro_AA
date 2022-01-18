@@ -34,37 +34,31 @@ filter_terms <- function(data, upper_share = 1,
                          max_word = Inf,
                          prop_word = 1,
                          document_name = "document",
-                         term_name = "term",
-                         different_ngram = FALSE) {
+                         term_name = "term") {
   
   data.table::setDT(data)
   data_dt <- copy(data)
   data.table::setnames(data_dt, 
                        c(document_name, term_name),
                        c("document", "term"))
+  setkey(data_dt, document)
+  nb_doc <- length(unique(data_dt$document))
   
-  if(different_ngram == FALSE) {
+  count_unigram <- data_dt %>% 
+    filter(ngram == "unigram") %>% 
+    group_by(document) %>% 
+    add_count(name = "nb_words") %>% 
+    distinct(document, nb_words) 
+  data_dt <- merge(data_dt, count_unigram, by = "document")
+  
   data_filtered <- data_dt %>% 
     .[, count := .N, by = term] %>%
-    .[, nb_words := .N, by = document] %>% 
     .[, count_per_doc := .N, by = c("term", "document")] %>% 
     unique() %>% 
-    .[, nb_apparition := .N/length(unique(data_dt$document)), by = term] %>% 
+    .[, nb_apparition := .N/nb_doc, by = term] %>% 
     .[between(nb_apparition, lower_share, upper_share) & between(nb_words, min_word, max_word)] %>% 
-    slice_max(order_by = count, prop = prop_word) 
-  } else {
-    count_unigram <- data_dt[ngram == "unigram", nb_words := .N, by = "document"][! is.na(nb_words), c("document","nb_words")] %>% 
-      unique()
-    data_dt <- merge(data_dt[,-"nb_words"], count_unigram, by = "document")
-
-    data_filtered <- data_dt %>% 
-      .[, count := .N, by = term] %>%
-      .[, count_per_doc := .N, by = c("term", "document")] %>% 
-      unique() %>% 
-      .[, nb_apparition := .N/length(unique(data_dt$document)), by = term] %>% 
-      .[between(nb_apparition, lower_share, upper_share) & between(nb_words, min_word, max_word)] %>% 
-      slice_max(order_by = count, prop = prop_word) 
-  }
+    {if(prop_word != 1) slice_max(., order_by = count, prop = prop_word) else . }
+  
   return(data_filtered)
 }
 
@@ -74,7 +68,6 @@ create_topicmodels_dataset <- function(tuning_parameters,
                                        data, 
                                        document_name = "document", 
                                        term_name = "term",
-                                       different_ngram = FALSE,
                                        verbose = TRUE) {
   data_list <- list()
   for(i in 1:nrow(hyper_grid)) {
@@ -85,9 +78,8 @@ create_topicmodels_dataset <- function(tuning_parameters,
                                   max_word = hyper_grid$max_word[i],
                                   prop_word = hyper_grid$prop_word[i],
                                   document_name = document_name,
-                                  term_name = term_name,
-                                  different_ngram = different_ngram)
-    data_filtered <- data_filtered %>% 
+                                  term_name = term_name)
+    data_filtered <- as_tibble(data_filtered) %>% 
       mutate(upper_share = hyper_grid$upper_share[i],
              lower_share = hyper_grid$lower_share[i],
              min_word = hyper_grid$min_word[i],
@@ -118,11 +110,9 @@ create_topicmodels_dataset <- function(tuning_parameters,
 create_stm <- function(data, min_word_number = 200){ 
   data_set <- data %>% 
     mutate(dfm = furrr::future_map(data, 
-                                   ~tidytext::cast_dfm(data = ., document, term, count_per_doc),
-                                   .progress = TRUE)) %>% 
+                                   ~tidytext::cast_dfm(data = ., document, term, count_per_doc))) %>% 
     mutate(stm = furrr::future_map(dfm, 
-                                   ~quanteda::convert(x = ., to = "stm"),
-                                   .progress = TRUE),
+                                   ~quanteda::convert(x = ., to = "stm")),
            preprocessing_id = row_number())
   
   list_document <- list()

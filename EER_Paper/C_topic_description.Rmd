@@ -71,11 +71,11 @@ networks_top5 <- networks_top5 %>%
 # load the topics stats and gamma attributes
 topic_diff <- readRDS(here(eer_data, 
                            "3_Topic_modelling",
-                           "topic_model_1-50_topics_diff.rds"))
+                           "topic_model_2-70_topics_diff.rds"))
 
 topics <- readRDS(here(eer_data, 
                            "3_Topic_modelling",
-                           "topic_model_1-50_gamma_values.rds")) %>%
+                           "topic_model_2-70_gamma_values.rds")) %>%
   filter(gamma > 0.1) %>%
   left_join(topic_diff) %>%
   mutate(
@@ -89,7 +89,7 @@ topics <- readRDS(here(eer_data,
 # load the highest frex value terms for each topics
 top_terms <- readRDS(here(eer_data, 
                           "3_Topic_modelling",
-                          "topic_model_1-50_top_terms.rds")) %>%
+                          "topic_model_2-70_top_terms.rds")) %>%
   rename("topic_n" = topic) %>%
   filter(measure == "frex")
 
@@ -123,7 +123,7 @@ cited_corpus <- merge(cited_corpus, edges_JEL[, c("ItemID_Ref", "nb_cit")], by =
 # General difference in affiliations and journals
 
 ```{r}
-knitr::include_graphics(paste0(here::here(), "/EER_Paper/Pictures/mean_diff_plot1-50.png"))
+knitr::include_graphics(paste0(here::here(), "/EER_Paper/Pictures/mean_diff_plot2-70.png"))
 ```
 
 
