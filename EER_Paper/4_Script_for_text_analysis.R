@@ -57,7 +57,7 @@ to_remove <- c("COPYRIGHT.*",
                "JEL CLASSIFICATION:",
                "KEY WORDS:")
 
-text <- Corpus_topic %>% 
+text <- Corpus %>% 
   mutate(have_abstract = ! is.na(abstract),
          abstract = toupper(abstract)) %>% 
   unite("word", Titre, abstract, sep = " ") %>% 
@@ -325,7 +325,7 @@ nb_cores <- availableCores()/2
 plan(multisession, workers = nb_cores)
 
 data_set <- create_stm(data_set)
-topic_number <- seq(30, 110, 10) 
+topic_number <- seq(40, 100, 5) 
 many_models <- create_many_models(data_set, topic_number, max.em.its = 800, seed = 1989)
 
 #' The third step is to calculate different statistics for each model and produce 
@@ -339,7 +339,7 @@ tuning_results <- stm_results(many_models)
 #' `tuning_results <- readRDS(here(eer_data, "3_Topic_modelling", "topic_models.rds"))`.
 #'
 #' We can now project the different statistics to choose the best model(s).
-plot_topic_models  <- plot_topicmodels_stat(tuning_results, nb_terms = 100)
+plot_topic_models  <- plot_topicmodels_stat(tuning_results, nb_terms = 300)
 
 plot_topic_models$summary %>%
   ggplotly() %>% 
@@ -354,21 +354,23 @@ plot_topic_models$exclusivity_coherence_mean %>%
   ggplotly() %>% 
   htmlwidgets::saveWidget(here(picture_path, "tuning_topicmodels_frex_general.html"))
 
-tuning_results %>% select(lower_share, min_word, trigram, preprocessing_id) %>% unique()
+#' For remembering the different preprocessing steps: 
+#' `tuning_results %>% select(lower_share, min_word, trigram, preprocessing_id) %>% unique`
 
 #' If we want to look at the stat in an interactive framework, we can do:
 #' 
 #' - `plot_topic_models$summary %>% ggplotly()`;
 #' - `plot_topic_models$exclusivity_coherence_mean %>% ggplotly()`
 
-#' For `r Sys.date()`, we select the preprocessing 2 (consistent with last tries)
-#' and there is no hesitation between as 70 topics seem the best
-#' compromise.
+#' For `r Sys.date()`, we select the preprocessing 7 (consistent with last tries but taking
+#' the new lower propertion that we did not try before: 0,5%)
+#' and there is  hesitation between 55, 65 and 85 but the benefits of going over 55 seems
+#' slight.
 #' 
 #' ### Working with the chosen topic model: basic description
 
-id <- 2
-nb_topics <- 70 
+id <- 7
+nb_topics <- 55 
 
 #' Now we can add the covariates. It seems that it is not changing the topic
 #' model too much. The topics are the same, just the order of the words can
@@ -424,7 +426,7 @@ color <- data.table::data.table(
   id = 1:nb_topics,
   color = c(scico(n = nb_topics/2 - 1, begin = 0, end = 0.3, palette = "roma"),
             scico(n = nb_topics/2 + 1, begin = 0.6, palette = "roma")))
-topics <- merge(topics, color, by = "id")
+topics <- merge(topics, color[1:nb_topics], by = "id")
 
 #' We plot the terms with the highest FREX value for each topic:
 
@@ -482,22 +484,23 @@ topics <- merge(topics, communities, by = "topic") %>%
 
 community_name <- tribble(
   ~Com_ID, ~Com_name,
-  "02", "Public Finance, Distribution and Agents Decisions",
-  "03", "Econometrics",
-  "04", "Financial Markets & Macro Issues",
-  "05", "International Macroeconomics",
-  "06", "Theoretical Battles",
+  "02", "Policy analysis and economists role",
+  "03", "International Macroeconomics",
+  "04", "Public Finance, Taxation and Agents Decisions",
+  "05", "Theory: expectations, equilibrium & coordination",
+  "06", "Finance & household behaviour",
   "07", "Fiscal & Monetary policies",
-  "08", "Inflation & Demand for Money",
-  "09", "Businesss Cyles & Unemployment",
-  "10", "Political Economy of Monetary Policy",
-  "11", "Expectations & Equilibrium",
-  "12", "Growth & Economic Activity"
+  "08", "Inflation & Unemployment",
+  "09", "Demand for Money, Exchange Rate & Term Structure",
+  "10", "Business Cycles",
+  "11", "Growth & Economic Activity",
+  "12", "Commodities & Inventory",
+  "13", "Externalities"
 )
 
 #' #### Plotting network with communities
 
-community_name$com_color <- c(mypalette[1:11])
+community_name$com_color <- c(mypalette[1:11], "gray")
 topics <- merge(topics, community_name, by = "Com_ID")
 network <- topic_corr_network$graph 
 network <- network %>% 

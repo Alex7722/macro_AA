@@ -141,7 +141,7 @@ create_stm <- function(data, min_word_number = 200){
 
 #' ## Creating several topic models for different preprocessing criteria and different number of topics
 #' 
-create_many_models <- function(data, nb_topics, max.em.its, seed) {
+create_many_models <- function(data, nb_topics, max.em.its, seed, verbose = TRUE) {
   list_models <- list()
   for(i in 1:nrow(data_set)) {
     topic_model <- tibble(K = nb_topics) %>%
@@ -155,6 +155,11 @@ create_many_models <- function(data, nb_topics, max.em.its, seed) {
                                              .progress = TRUE,
                                              .options = furrr_options(seed = seed)))
     list_models[[i]] <- topic_model 
+    if(verbose == TRUE) {
+      message(paste0("Topic Models for Preprocessing number", 
+                     i, 
+                     " completed."))
+    }
   }
   
   many_models <- data.table(data_set, list_models) %>% 

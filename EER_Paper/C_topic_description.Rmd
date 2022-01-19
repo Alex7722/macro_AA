@@ -61,7 +61,12 @@ community_name <- tribble(
   "c6Nqp2v2", "Demand for Money",
   "EEEzS4Be", "Consumption: intertemporal substitution & permanent income",
   "b5XZ9r9c", "New theoretical approaches of Money: search, random-matching",
-  "DnbEqB4A", "RBC, fluctuations & time series"
+  "DnbEqB4A", "RBC, fluctuations & time series",
+  "poAkzBqE", "Endogenous Growth",
+  "piySoCVv", "Rational Expectations & Business Cycles",
+  "ztGPr6dZ", "Exchange Rate Determination & Cointegration",
+  "FbeuSKRj", "Business Cycles, Unemployment Fluctuations & Equilibrium Unemployment",
+  "oZLXQ5FE", "Ridigities, Contracts & Imperfect Competition"
 )
 
 networks_top5 <- networks_top5 %>% 
@@ -71,11 +76,11 @@ networks_top5 <- networks_top5 %>%
 # load the topics stats and gamma attributes
 topic_diff <- readRDS(here(eer_data, 
                            "3_Topic_modelling",
-                           "topic_model_2-70_topics_diff.rds"))
+                           "topic_model_7-55_topics_diff.rds"))
 
 topics <- readRDS(here(eer_data, 
                            "3_Topic_modelling",
-                           "topic_model_2-70_gamma_values.rds")) %>%
+                           "topic_model_7-55_gamma_values.rds")) %>%
   filter(gamma > 0.1) %>%
   left_join(topic_diff) %>%
   mutate(
@@ -89,7 +94,7 @@ topics <- readRDS(here(eer_data,
 # load the highest frex value terms for each topics
 top_terms <- readRDS(here(eer_data, 
                           "3_Topic_modelling",
-                          "topic_model_2-70_top_terms.rds")) %>%
+                          "topic_model_7-55_top_terms.rds")) %>%
   rename("topic_n" = topic) %>%
   filter(measure == "frex")
 
@@ -123,7 +128,7 @@ cited_corpus <- merge(cited_corpus, edges_JEL[, c("ItemID_Ref", "nb_cit")], by =
 # General difference in affiliations and journals
 
 ```{r}
-knitr::include_graphics(paste0(here::here(), "/EER_Paper/Pictures/mean_diff_plot2-70.png"))
+knitr::include_graphics(paste0(here::here(), "/EER_Paper/Pictures/mean_diff_plot7-55.png"))
 ```
 
 
