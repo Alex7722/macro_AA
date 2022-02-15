@@ -210,6 +210,10 @@ listid_all <-rbind(listid1, listid2, listid3, listid4, listid5, listid6,fill=TRU
 
 saveRDS(listid_all[,.N,ID_Art][,.(ID_Art)],here(data_path, "macro_AA","2_Matched_data","Econlit_matched_ID_Art.RDS"))
 
+# save as csv for OST database
+# Econlit_matched_ID_Art <- readRDS(here(data_path, "macro_AA","2_Matched_data","Econlit_matched_ID_Art.RDS"))
+# write.csv(Econlit_matched_ID_Art, here(data_path, "macro_AA","2_Matched_data","Econlit_matched_ID_Art.csv") )
+
 
 # Comparing with before
 nodes <- readRDS(here(data_path, "macro_AA","Corpus_Econlit_Matched_WoS", "JEL_matched_corpus_nodes.RDS"))
