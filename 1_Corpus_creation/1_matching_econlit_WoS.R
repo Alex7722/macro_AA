@@ -199,16 +199,17 @@ match4 <- c("Nom","Annee_Bibliographique","Volume","Page_Debut")
 match5 <- c("Nom","Titre","Annee_Bibliographique")
 match6 <- c("Titre","Annee_Bibliographique", "Page_Debut")
 
+false_positive <- c("24347350", "49978944", "50736317", "53749630")
+
 listid1 <- match_get_id(variable_list_for_match = match1)
 listid2 <- match_get_id(variable_list_for_match = match2)
-listid3 <- match_get_id(variable_list_for_match = match3)
+listid3 <- match_get_id(df_main=all_art[Code_Discipline==119], variable_list_for_match = match3)
 listid4 <- match_get_id(variable_list_for_match = match4)
 listid5 <- match_get_id(variable_list_for_match = match5)
 listid6 <- match_get_id(variable_list_for_match = match6)
+listid_all <-rbind(listid1, listid2, listid4, listid5, listid6,fill=TRUE)
 
-listid_all <-rbind(listid1, listid2, listid3, listid4, listid5, listid6,fill=TRUE)
-
-saveRDS(listid_all[,.N,ID_Art][,.(ID_Art)],here(data_path, "macro_AA","2_Matched_data","Econlit_matched_ID_Art.RDS"))
+saveRDS(listid_all[,.N,ID_Art][,.(ID_Art)],here(data_path, "macro_AA","2_Matched_data","Econlit_matched_ID_Art_macroAA.RDS"))
 
 # save as csv for OST database
 # Econlit_matched_ID_Art <- readRDS(here(data_path, "macro_AA","2_Matched_data","Econlit_matched_ID_Art.RDS"))
