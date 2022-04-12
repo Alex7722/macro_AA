@@ -194,7 +194,7 @@ match_get_id <- function(df_main=all_art,
 
 match1 <- c("Revue","Volume","Page_Debut")
 match2 <- c("Annee_Bibliographique", "Revue","Page_Debut","Page_Fin")
-match3 <- c("Annee_Bibliographique","Volume","Page_Debut","Page_Fin")
+# match3 <- c("Annee_Bibliographique","Volume","Page_Debut","Page_Fin")
 match4 <- c("Nom","Annee_Bibliographique","Volume","Page_Debut")
 match5 <- c("Nom","Titre","Annee_Bibliographique")
 match6 <- c("Titre","Annee_Bibliographique", "Page_Debut")
@@ -203,7 +203,7 @@ false_positive <- c("24347350", "49978944", "50736317", "53749630")
 
 listid1 <- match_get_id(variable_list_for_match = match1)
 listid2 <- match_get_id(variable_list_for_match = match2)
-listid3 <- match_get_id(df_main=all_art[Code_Discipline==119], variable_list_for_match = match3)
+# listid3 <- match_get_id(df_main=all_art[Code_Discipline==119], variable_list_for_match = match3)
 listid4 <- match_get_id(variable_list_for_match = match4)
 listid5 <- match_get_id(variable_list_for_match = match5)
 listid6 <- match_get_id(variable_list_for_match = match6)
