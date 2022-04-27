@@ -13,15 +13,11 @@ require(arrow)
 
 `%notin%` <- Negate(`%in%`)
 
-if (str_detect(getwd(), "goutsmedt")) {
-  data_path <- "C:/Users/goutsmedt/Mon Drive/data"
-} else {
-  if (str_detect(getwd(), "Dropbox")) {
-    data_path <- "G:/.shortcut-targets-by-id/1EHqA0pp2uozTykWv0_Stf5xyrvo_dkN5/data"
-  } else {
-    data_path <- "/projects/data/macro_AA"
-  }
-}
+source("functions/functions_for_network_analysis.R")
+source("functions/Script_paths_and_basic_objectsV2.R")
+source("functions/functions_dynamics_networks_alex.R")
+source("functions/functions_networks_alex.R")
+
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### 0 Making JEL Corpus (no need to run) ####
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#

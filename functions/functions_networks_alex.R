@@ -708,64 +708,37 @@ layout_fa2 <- function(tbl,
 }
 
 
-layout_fa2_java <- function(graph_list,
-                            niter = 3000,
-                            threads = 2,
-                            gravity = 1)
+layout_fa2_java <- function(tbl=tbl,niter=3000)
 {
   #Layout
-  graph_before <- graph_list %>% 
-    activate(nodes) %>% 
-    mutate(id = as.character(Id))
-  nodes_before <- graph_list %>% 
-    activate(nodes) %>% 
-    as.data.table()
+  graph_before <- tbl %>% activate(nodes) %>% mutate(id=as.character(Id))
+  nodes_before <- tbl %>% activate(nodes) %>% as.data.table()
   
   if("x" %in% colnames(nodes_before)){
-    graph_before <- graph_before %>% 
-      activate(nodes) %>% 
-      mutate(x = ifelse(is.na(x) == TRUE, sample(1:100), x))
-    graph_before <- graph_before %>% 
-      activate(nodes) %>% 
-      mutate(y = ifelse(is.na(y) == TRUE, sample(1:100), y))
-    graph_before <- graph_before %>% 
-      activate(nodes) %>% 
-      select(id, ID_Art, x, y, size)
+    graph_before <- graph_before %>% activate(nodes) %>% mutate(x = ifelse(is.na(x)==TRUE,sample(1:100),x))
+    graph_before <- graph_before %>% activate(nodes) %>% mutate(y = ifelse(is.na(y)==TRUE,sample(1:100),y))
+    graph_before <- graph_before %>% activate(nodes) %>% select(c(id,ID_Art,x,y,size))
   }
   else{
-    graph_before <- graph_before %>% 
-      activate(nodes) %>% 
-      select(id, ID_Art, size)
+    graph_before <- graph_before %>% activate(nodes) %>% select(c(id,ID_Art,size))
   }
   
   write.graph(graph = graph_before, file = 'tidy.graphml', format = 'graphml')
-  system(paste0("java -jar GephiLayouts-1.0.jar forceatlas2 -i ./tidy.graphml -o  ./forceatlas2.graphml -threads ",
-  threads,
-  "-maxiters ",
-  niter,
-  " -barneshut true -adjustsizes true -gravity ",
-  gravity))
-  gml <- read.graph("forceatlas2.graphml", 
-                    format="graphml")
+  system(paste0('java -jar "D://Dropbox/8-Projets Quanti/1-R_Projects/Home/2-External_tools/GephiLayouts-1.0.jar" forceatlas2 -i ./tidy.graphml -o  ./forceatlas2.graphml -threads 16 -maxiters ',niter,' -barneshut true -adjustsizes true -gravity 1'))
+  
+  
+  gml <- read.graph("forceatlas2.graphml", format="graphml")
   graph_after <- as_tbl_graph(gml)
-  graph_after <- graph_after %>% 
-    activate(nodes) %>% 
-    as.data.table() %>% 
-    .[,.(x,y,ID_Art)]
+  graph_after <- graph_after %>% activate(nodes) %>% as.data.table() %>% .[,.(x,y,ID_Art)]
   
   if("x" %in% colnames(nodes_before)){
-    graph_list <- graph_list %>% 
-      activate(nodes) %>% 
-      select(-c(x,y)) %>% 
-      left_join(graph_after)
+    tbl <- tbl %>% activate(nodes) %>% select(-c(x,y)) %>% left_join(graph_after)
   }
   else{
-    graph_list <- graph_list %>% 
-      activate(nodes) %>% 
-      left_join(graph_after)
+    tbl <- tbl %>% activate(nodes) %>% left_join(graph_after)
   }
   
-  return (graph_list)
+  return (tbl)
 }
 
 
@@ -1066,3 +1039,54 @@ sigmajs() %>% # initialise
   sg_button(c("force_stop"), "Stop Layout") %>%
   sg_button(c("noverlap"), "No Overlap")
 }
+
+
+detect_walktrap <- function(tbl)
+{
+  #Leiden
+  leiden <- cluster_walktrap(tbl, weights = E(tbl)$weight, steps = 4)
+  tbl <- tbl %>% activate(nodes) %>% mutate(Leiden_num = leiden$membership) %>% mutate(Leiden1 = leiden$membership) %>% mutate(Leiden1 = sprintf("%02d", Leiden1)) %>% mutate(Leiden1 = as.character(Leiden1))
+  
+  #Share Leiden
+  share_l <- tbl %>% activate(nodes) %>% as.data.table()
+  share_l <- share_l[,share_leiden:= .N/share_l[,.N], Leiden1]
+  tbl <- tbl %>% 
+    activate(nodes) %>% 
+    left_join(share_l)
+  
+  return (tbl)
+}
+
+detect_infomap <- function(tbl)
+{
+  #Leiden
+  leiden <- cluster_infomap(tbl, e.weights = E(tbl)$weight)
+  tbl <- tbl %>% activate(nodes) %>% mutate(Leiden_num = leiden$membership) %>% mutate(Leiden1 = leiden$membership) %>% mutate(Leiden1 = sprintf("%02d", Leiden1)) %>% mutate(Leiden1 = as.character(Leiden1))
+  
+  #Share Leiden
+  share_l <- tbl %>% activate(nodes) %>% as.data.table()
+  share_l <- share_l[,share_leiden:= .N/share_l[,.N], Leiden1]
+  tbl <- tbl %>%
+    activate(nodes) %>%
+    left_join(share_l)
+  
+  return (tbl)
+}
+
+
+detect_leiden_igraph <- function(tbl)
+{
+  #Leiden
+  leiden <- cluster_leiden(tbl, objective_function="modularity", weight = E(tbl)$weight, n_iterations=1000)
+  tbl <- tbl %>% activate(nodes) %>% mutate(Leiden_num = leiden$membership) %>% mutate(Leiden1 = leiden$membership) %>% mutate(Leiden1 = sprintf("%02d", Leiden1)) %>% mutate(Leiden1 = as.character(Leiden1))
+  
+  #Share Leiden
+  share_l <- tbl %>% activate(nodes) %>% as.data.table()
+  share_l <- share_l[,share_leiden:= .N/share_l[,.N], Leiden1]
+  tbl <- tbl %>%
+    activate(nodes) %>%
+    left_join(share_l)
+  print("Done")
+  return (tbl)
+}
+

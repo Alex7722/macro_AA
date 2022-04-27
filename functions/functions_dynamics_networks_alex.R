@@ -154,11 +154,152 @@ dynamics_direct_networks <- function(corpus = Corpus,
     # remove nodes with no edges
     nodes_of_the_year <- nodes_of_the_year[ID_Art_Source %in% edges_of_the_year$from | ID_Art_Source %in% edges_of_the_year$to]
     # make tbl
-    tbl_coup_list[[as.character(Year)]] <- tbl_graph(nodes = nodes_of_the_year, edges = edges_of_the_year, directed = FALSE, node_key = "Id")
+    tbl_coup_list[[as.character(Year)]] <- tbl_graph(nodes = nodes_of_the_year, edges = edges_of_the_year, directed = TRUE, node_key = "Id")
     print(Year)
   }
   
   return (tbl_coup_list)
+}
+
+
+dynamics_backbone_networks <- function(corpus = Corpus, 
+                                       references = refs, 
+                                       source = "ID_Art", 
+                                       target = "ItemID_Ref", 
+                                       time_variable = "Annee_Bibliographique",
+                                       time_window = 5,
+                                       keep_singleton = FALSE,
+                                       backbone_method = "fixedrow",
+                                       significance_level = .01,
+                                       compute_size = TRUE)
+{  
+  #' This function create a list of tbl from a corpus and its references
+  #' 
+  #' @corpus
+  #' The corpus with all nodes and articles
+  #' 
+  #' @references
+  #' The list of all references ( references should be removed )
+  #'
+  #' @source
+  #' The column name of the citing articles.
+  #'
+  #' @target
+  #' The column name of the references that are cited.
+  #' 
+  #' @time_variable
+  #' Variable that identify the year of publication
+  #' 
+  #' @time_window
+  #' How much time should be covered by the network
+  #' 
+  #' @keep_singleton
+  #' Do you want singleton in your network ?
+  #' 
+  #' @backbone_method
+  #' fixedrow or sdsm
+  #' 
+  #' @significance_level
+  #' keep edges that are significantly stronger or weaker than expected in the chosen null model to this level
+  #' 
+  
+  require(data.table)
+  require(backbone)
+  require(magrittr)
+  
+  set.seed(6838)
+  
+  Nodes_coupling <- copy(corpus)
+  Nodes_coupling[,c(source):=as.character(get(source))]
+  if(target %in% colnames(Nodes_coupling))
+  {
+    Nodes_coupling[,c(target):=as.character(get(target))]
+  } else{
+    print("You don't have a target column in your nodes table. Set 'compute_size' to FALSE")
+  }
+  Nodes_coupling[,c(time_variable):=as.character(get(time_variable))]
+  
+  Edges <- copy(references)
+  Edges[,c(source):=as.character(get(source))]
+  Edges[,c(target):=as.character(get(target))]
+  Edges <- Edges[,.SD,.SDcols = c(source,target)]
+  
+  ######################### Dynamics networks **********************
+  Nodes_coupling <- Nodes_coupling[order(get(time_variable))]
+  
+  # Find the time_window
+  first_year <- Nodes_coupling[order(get(time_variable)), head(.SD, 1)][,get(time_variable)]
+  last_year <- (as.numeric(Nodes_coupling[order(-get(time_variable)), head(.SD, 1)][,get(time_variable)]) - time_window +1) # +1 to get the very last year in the window
+  all_years <- first_year:last_year
+  
+  # Bipartite network
+  # ref_bipartite <- unique(Edges[get(source) %in% corpus[,get(source)],.SD,.SDcols = c(source,target)])
+  
+  # Prepare our list
+  tbl_coup_list <- list()
+  
+  for (Year in all_years) {
+    nodes_of_the_year <- Nodes_coupling[get(time_variable)>=Year & get(time_variable)<Year+time_window]
+    
+    ref_bipartite <- Edges[get(source) %in% nodes_of_the_year[,get(source)]]
+    ref_bipartite <- unique(ref_bipartite) %>% as.data.table()
+    ref_bipartite[,Id_key:=as.character(get(source))]
+    ref_bipartite[, c(target) := paste0(get(target),"_refs")]
+    
+    corpus_bipartite <- data.table(Id_key = unlist(ref_bipartite, use.names = FALSE))
+    corpus_bipartite <- unique(corpus_bipartite) %>% as.data.table()
+    corpus_bipartite[, type:=TRUE]
+    corpus_bipartite[Id_key %in% ref_bipartite[,get(source)], type:=FALSE]
+    
+    bipartite_graph <- tbl_graph(nodes = corpus_bipartite, edges = ref_bipartite, directed = TRUE)
+    id_tbl <- bipartite_graph %>% activate(nodes) %>% as.data.table()
+    id_tbl[,name:=rownames(id_tbl)]
+    id_tbl[,Source:=Id_key]
+    id_tbl[,Target:=Id_key]
+    id_tbl[,to:=as.integer(name)]
+    id_tbl[,from:=as.integer(name)]
+    # bipartite_graph <- bipartite_graph %>% activate(nodes) %>% mutate(types=type)
+    matrix <- as.igraph(bipartite_graph)
+    rm(bipartite_graph)
+    rm(ref_bipartite)
+    gc()
+    if(backbone_method=="fixedrow"){
+      hyperg <- fixedrow(matrix, alpha = significance_level, class="igraph")}
+    
+    if(backbone_method=="sdsm"){
+      hyperg <- sdsm(matrix, alpha = significance_level, class="igraph")
+    }
+    
+    # hypergbb <- backbone.extract(hyperg, alpha = significance_level, class="igraph")
+    # rm(hyperg)
+    gc()
+    network <- as_tbl_graph(hyperg, directed=FALSE)
+    edges_backbone <- network %>% activate(edges) %>% as.data.table()
+    edges_backbone <- edges_backbone %>% left_join(id_tbl[,.(from,Source)])
+    edges_backbone <- edges_backbone %>% left_join(id_tbl[,.(to,Target)])
+    edges_backbone[,from:=Source]
+    edges_backbone[,to:=Target]
+    
+    if(compute_size==TRUE){
+      # size of nodes
+      nb_cit <- Edges[get(source) %in% nodes_of_the_year[,get(source)], .N, c(target)]
+      colnames(nb_cit)[colnames(nb_cit) == "N"] <- "size"
+      nodes_of_the_year <- merge(nodes_of_the_year, nb_cit, by = target, all.x = TRUE)
+      nodes_of_the_year[is.na(size),size:=0]
+    }
+    
+    # remove nodes with no edges
+    if(keep_singleton==FALSE){
+      nodes_of_the_year <- nodes_of_the_year[get(source) %in% edges_backbone$Source | get(source) %in% edges_backbone$Target]
+    }
+    
+    # make tbl
+    tbl_coup_list[[as.character(Year)]] <- tbl_graph(nodes = nodes_of_the_year, edges = edges_backbone, directed = FALSE, node_key = source)
+    print(Year)
+  }
+  
+  return (tbl_coup_list)
+  
 }
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -400,25 +541,34 @@ minimize_crossing <- function(alluv_dt = alluv_dt, stratum = new_Id_com, alluviu
   Window <- deparse(substitute(x))
   
   dt<-alluv_dt[order(Id,Window)][,.(new_Id_com, Id, Window)]
+  dt[,new_Id_com:=as.character(new_Id_com)]
   
-  dt[,tot_window_leiden:=.N,.(Window,new_Id_com)]
+  id_nb_cit <- dt[,.N,.(new_Id_com, Window)]
+  id_nb_cit <- id_nb_cit[,mean(N),new_Id_com]
+  # dt[,tot_window_leiden:=.N,.(Window,new_Id_com)]
   
   dt[,Source:=new_Id_com,Id]
   dt[,Target:=shift(new_Id_com),Id]
   
+  # 
+  # dt <- dt %>% rename(tot_window_leiden_Source = tot_window_leiden)
+  # dt[,tot_window_leiden_Target:=shift(tot_window_leiden_Source),Id]
   
-  dt <- dt %>% rename(tot_window_leiden_Source = tot_window_leiden)
-  dt[,tot_window_leiden_Target:=shift(tot_window_leiden_Source),Id]
+  dt <- dt[,head(.SD,1),.(new_Id_com,Id)]
   
+  # dt <- dt[Source > Target, c("tot_window_leiden_Target", "tot_window_leiden_Source") := list(tot_window_leiden_Source, tot_window_leiden_Target)] # exchanging
   dt <- dt[Source > Target, c("Target", "Source") := list(Source, Target)] # exchanging
-  dt <- dt[Source > Target, c("tot_window_leiden_Target", "tot_window_leiden_Source") := list(tot_window_leiden_Source, tot_window_leiden_Target)] # exchanging
 
+  dt <- merge(dt, id_nb_cit, by.x = "Target", by.y = "new_Id_com")
+  setnames(dt, "V1", "tot_window_leiden_Target")
+  dt <- merge(dt, id_nb_cit, by.x = "Source", by.y = "new_Id_com")
+  setnames(dt, "V1", "tot_window_leiden_Source")
   
-  dt[,link_strength:=.N,.(Source,Target,Window)]
+  dt[,link_strength:=.N,.(Source,Target)] # before: dt[,link_strength:=.N,.(Source,Target,Window)]
   
   dt <- dt[is.na(Target)==FALSE & Source!=Target]
   
-  dt[,cosine_strength:=link_strength/sqrt(tot_window_leiden_Target*tot_window_leiden_Source)]
+  dt[,cosine_strength:=link_strength/sqrt(tot_window_leiden_Target*tot_window_leiden_Source)] #before: dt[,cosine_strength:=link_strength/sqrt(tot_window_leiden_Target*tot_window_leiden_Source)]
   dt[,max_cosine_strength:=max(cosine_strength),.(Source,Target)]
   
   dt<-dt[,.N,.(Source,Target,max_cosine_strength)][order(-N)]
@@ -442,7 +592,7 @@ minimize_crossing <- function(alluv_dt = alluv_dt, stratum = new_Id_com, alluviu
     as.data.table()
   
   components[,size_compo:=.N,components_att][order(-N)]
-  components <- components[size_compo==1,components_att:=0]
+  # components <- components[size_compo==1,components_att:=0]
   setnames(components, "components_att", paste0("components_att_","0"))
   components <- components[,.(new_Id_com, "components_att_0"= get("components_att_0"))]
   
@@ -467,7 +617,7 @@ minimize_crossing <- function(alluv_dt = alluv_dt, stratum = new_Id_com, alluviu
       as.data.table()
     
     components2[,size_compo:=.N,components_att][order(-N)]
-    components2 <- components2[size_compo==1,components_att:=0]
+    # components2 <- components2[size_compo==1,components_att:=0]
     name <- paste0("components_att_", links_to_remove)
     setnames(components2, "components_att", name)
     components2 <- components2[,.(new_Id_com, get(name))]
@@ -501,7 +651,7 @@ meta_grouping <- function(alluv_dt = alluv_dt, stratum = new_Id_com, alluvium = 
   #' @alluvium
   #' Alluvium column
   #' @x
-  #' x column
+  #' increasing treshold mean more community
   require(tidyverse)
   require(data.table)
   require(ggalluvial)
@@ -514,25 +664,35 @@ meta_grouping <- function(alluv_dt = alluv_dt, stratum = new_Id_com, alluvium = 
   Window <- deparse(substitute(x))
   
   dt<-alluv_dt[order(Id,Window)][,.(new_Id_com, Id, Window)]
+  dt[,new_Id_com:=as.character(new_Id_com)]
   
-  dt[,tot_window_leiden:=.N,.(Window,new_Id_com)]
+  id_nb_cit <- dt[,.N,.(new_Id_com, Window)]
+  id_nb_cit <- id_nb_cit[,mean(N),new_Id_com]
+  # dt[,tot_window_leiden:=.N,.(Window,new_Id_com)]
   
   dt[,Source:=new_Id_com,Id]
   dt[,Target:=shift(new_Id_com),Id]
   
+  # 
+  # dt <- dt %>% rename(tot_window_leiden_Source = tot_window_leiden)
+  # dt[,tot_window_leiden_Target:=shift(tot_window_leiden_Source),Id]
   
-  dt <- dt %>% rename(tot_window_leiden_Source = tot_window_leiden)
-  dt[,tot_window_leiden_Target:=shift(tot_window_leiden_Source),Id]
+  dt <- dt[,head(.SD,1),.(new_Id_com,Id)]
   
+  # dt <- dt[Source > Target, c("tot_window_leiden_Target", "tot_window_leiden_Source") := list(tot_window_leiden_Source, tot_window_leiden_Target)] # exchanging
   dt <- dt[Source > Target, c("Target", "Source") := list(Source, Target)] # exchanging
-  dt <- dt[Source > Target, c("tot_window_leiden_Target", "tot_window_leiden_Source") := list(tot_window_leiden_Source, tot_window_leiden_Target)] # exchanging
-
   
-  dt[,link_strength:=.N,.(Source,Target,Window)]
+  dt <- merge(dt, id_nb_cit, by.x = "Target", by.y = "new_Id_com")
+  setnames(dt, "V1", "tot_window_leiden_Target")
+  dt <- merge(dt, id_nb_cit, by.x = "Source", by.y = "new_Id_com")
+  setnames(dt, "V1", "tot_window_leiden_Source")
+  
+  dt[,link_strength:=.N,.(Source,Target)] # before: dt[,link_strength:=.N,.(Source,Target,Window)]
   
   dt <- dt[is.na(Target)==FALSE & Source!=Target]
+  # dt <- dt[link_strength>=3]
   
-  dt[,cosine_strength:=link_strength/sqrt(tot_window_leiden_Target*tot_window_leiden_Source)]
+  dt[,cosine_strength:=link_strength/sqrt(tot_window_leiden_Target*tot_window_leiden_Source)] #before: dt[,cosine_strength:=link_strength/sqrt(tot_window_leiden_Target*tot_window_leiden_Source)]
   dt[,max_cosine_strength:=max(cosine_strength),.(Source,Target)]
   
   dt<-dt[,.N,.(Source,Target,max_cosine_strength)][order(-N)]
@@ -556,7 +716,7 @@ meta_grouping <- function(alluv_dt = alluv_dt, stratum = new_Id_com, alluvium = 
     as.data.table()
   
   components[,size_compo:=.N,components_att][order(-N)]
-  components <- components[size_compo==1,components_att:=0]
+  # components <- components[size_compo==1,components_att:=0]
   setnames(components, "components_att", paste0("components_att_","0"))
   components <- components[,.(new_Id_com, "components_att_0"= get("components_att_0"))]
   
@@ -584,7 +744,7 @@ meta_grouping <- function(alluv_dt = alluv_dt, stratum = new_Id_com, alluvium = 
       as.data.table()
     
     components2[,size_compo:=.N,components_att][order(-N)]
-    components2 <- components2[size_compo==1,components_att:=0]
+    # components2 <- components2[size_compo==1,components_att:=0]
     name <- paste0("components_att_", links_to_remove)
     setnames(components2, "components_att", name)
     components2 <- components2[,.(new_Id_com, get(name))]
@@ -604,6 +764,85 @@ meta_grouping <- function(alluv_dt = alluv_dt, stratum = new_Id_com, alluvium = 
   alluv_dt_meta <-merge(alluv_dt,community_order, by="new_Id_com", all.x = TRUE)
   
   return(alluv_dt_meta)
+}
+
+
+alluv_as_network <- function(alluv_dt = alluv_dt, stratum = new_Id_com, alluvium = Id, x = Window){
+  
+  #' This function 
+  #' 
+  #' @alluv_dt
+  #' The dt used for the alluvial
+  #' @stratum
+  #' Stratum column
+  #' @alluvium
+  #' Alluvium column
+  #' @x
+  #' increasing treshold mean more community
+  require(tidyverse)
+  require(data.table)
+  require(ggalluvial)
+  require(tidygraph)
+  require(ggplot2)
+  require(forcats)
+  
+  new_Id_com <- deparse(substitute(stratum))
+  Id <- deparse(substitute(alluvium))
+  Window <- deparse(substitute(x))
+  
+  dt<-alluv_dt[order(Id,Window)][,.(new_Id_com, Id, Window)]
+  dt[,new_Id_com:=as.character(new_Id_com)]
+  
+  id_nb_cit <- dt[,.N,.(new_Id_com, Window)]
+  id_nb_cit <- id_nb_cit[,mean(N),new_Id_com]
+  # dt[,tot_window_leiden:=.N,.(Window,new_Id_com)]
+  
+  dt[,Source:=new_Id_com,Id]
+  dt[,Target:=shift(new_Id_com),Id]
+  
+  # 
+  # dt <- dt %>% rename(tot_window_leiden_Source = tot_window_leiden)
+  # dt[,tot_window_leiden_Target:=shift(tot_window_leiden_Source),Id]
+  
+  dt <- dt[,head(.SD,1),.(new_Id_com,Id)]
+  
+  # dt <- dt[Source > Target, c("tot_window_leiden_Target", "tot_window_leiden_Source") := list(tot_window_leiden_Source, tot_window_leiden_Target)] # exchanging
+  dt <- dt[Source > Target, c("Target", "Source") := list(Source, Target)] # exchanging
+  
+  dt <- merge(dt, id_nb_cit, by.x = "Target", by.y = "new_Id_com")
+  setnames(dt, "V1", "tot_window_leiden_Target")
+  dt <- merge(dt, id_nb_cit, by.x = "Source", by.y = "new_Id_com")
+  setnames(dt, "V1", "tot_window_leiden_Source")
+  
+  dt[,link_strength:=.N,.(Source,Target)] # before: dt[,link_strength:=.N,.(Source,Target,Window)]
+  
+  dt <- dt[is.na(Target)==FALSE & Source!=Target]
+  # dt <- dt[link_strength>=3]
+  
+  dt[,cosine_strength:=link_strength/sqrt(tot_window_leiden_Target*tot_window_leiden_Source)] #before: dt[,cosine_strength:=link_strength/sqrt(tot_window_leiden_Target*tot_window_leiden_Source)]
+  dt[,max_cosine_strength:=max(cosine_strength),.(Source,Target)]
+  
+  dt<-dt[,.N,.(Source,Target,max_cosine_strength)][order(-N)]
+  
+  #Make the dt for naming
+  edges_meta<-dt
+  edges_meta[,Source:=as.character(Source)]
+  edges_meta[,Target:=as.character(Target)]
+  edges_meta[,from:=Source]
+  edges_meta[,to:=Target]
+  edges_meta[,weight:=max_cosine_strength]
+  
+  nodes_meta <-alluv_dt[,.N,new_Id_com]
+  nodes_meta <-nodes_meta[,new_Id_com:=as.character(new_Id_com)]
+  nodes_meta <-nodes_meta[,Id:=new_Id_com]
+  
+  tbl_meta<-tbl_graph(nodes = nodes_meta, edges = edges_meta, directed = FALSE, node_key = "new_Id_com")
+  components <- tbl_meta %>% 
+    activate(nodes) %>% 
+    mutate(components_att = group_components(type = "weak")) %>% 
+    as.data.table()
+
+  return(tbl_meta)
 }
 
 
