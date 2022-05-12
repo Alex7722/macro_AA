@@ -55,47 +55,14 @@ source("functions/functions_networks_alex.R")
 nodes_JEL <- readRDS(here(data_path,"macro_AA","3_Corpus_WoS","JEL_matched_corpus_nodes.RDS"))
 edges_JEL <- readRDS(here(data_path,"macro_AA","3_Corpus_WoS","JEL_matched_corpus_edges.RDS"))
 
-tbl_coup_list1 <- dynamics_backbone_networks(corpus = nodes_JEL[between(Annee_Bibliographique, 1969, 1973)], 
+tbl_coup_list <- dynamics_backbone_networks(corpus = nodes_JEL[between(Annee_Bibliographique, 1969, 2016)], 
                                              references = edges_JEL[New_id2!=0], 
                                              source = "ID_Art",
                                              target = "New_id2", 
                                              time_variable = "Annee_Bibliographique",
-                                             time_window= 5,
-                                             compute_size = FALSE)
-
-tbl_coup_list1 <- dynamics_backbone_networks(corpus = nodes_JEL[between(Annee_Bibliographique, 1969, 1980)], 
-                                         references = edges_JEL[New_id2!=0], 
-                                         source = "ID_Art",
-                                         target = "New_id2", 
-                                         time_variable = "Annee_Bibliographique",
-                                         time_window= 5)
-saveRDS(tbl_coup_list,here(data_path,"macro_AA","4_Networks","tbl_coup_list1.RDS"))
-
-tbl_coup_list2 <- dynamics_backbone_networks(corpus = nodes_JEL[between(Annee_Bibliographique, 1977, 2000)], 
-                                            references = edges_JEL[ItemID_Ref!=0], 
-                                            source = "ID_Art",
-                                            target = "ItemID_Ref", 
-                                            time_variable = "Annee_Bibliographique",
-                                            time_window= 5)
-saveRDS(tbl_coup_list2,here(data_path,"macro_AA","4_Networks","tbl_coup_list2.RDS"))
-
-tbl_coup_list3 <- dynamics_backbone_networks(corpus = nodes_JEL[between(Annee_Bibliographique, 1997, 2005)], 
-                                             references = edges_JEL[ItemID_Ref!=0], 
-                                             source = "ID_Art",
-                                             target = "ItemID_Ref", 
-                                             time_variable = "Annee_Bibliographique",
                                              time_window= 5)
-saveRDS(tbl_coup_list3,here(data_path,"macro_AA","4_Networks","tbl_coup_list3.RDS"))
 
-tbl_coup_list4 <- dynamics_backbone_networks(corpus = nodes_JEL[between(Annee_Bibliographique, 2002, 2010)], 
-                                             references = edges_JEL[ItemID_Ref!=0], 
-                                             source = "ID_Art",
-                                             target = "ItemID_Ref", 
-                                             time_variable = "Annee_Bibliographique",
-                                             time_window= 5)
-# cleaning now useless objects
-gc()
-rm(list = c("edges_JEL", "nodes_JEL","tbl_coup_list_bis"))
+saveRDS(tbl_coup_list,here(data_path,"macro_AA","4_Networks","tbl_coup_list.RDS"))
 
 #' ## Finding Communities
 

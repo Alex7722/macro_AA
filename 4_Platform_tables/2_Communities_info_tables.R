@@ -16,7 +16,7 @@ if (str_detect(getwd(), "goutsmedt")) {
   }
 }
 
-nodes <- fread(here(data_path, "macro_AA","platform_data","nodes_lf.csv"))
+nodes <- fread(here(data_path, "macro_AA","platform_data","Old","nodes_lf.csv"))
 authors <- readRDS(here(data_path, "macro_AA","OST_generic_data", "all_aut.RDS")) %>% .[ID_Art %in% nodes$ID_Art]
 refs <- arrow::read_parquet(here(data_path, "macro_AA","OST_generic_data", "all_ref.parquet"),as.data.frame=FALSE) %>% .[ID_Art %in% nodes$ID_Art]
 
