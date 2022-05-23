@@ -21,7 +21,6 @@
 #' 
 
 
-
 #+ r setup, include = FALSE
 knitr::opts_chunk$set(eval = FALSE)
 
@@ -34,10 +33,12 @@ knitr::opts_chunk$set(eval = FALSE)
 #' and color palettes.
 
 #+ r source
-# source("functions/functions_dynamics_networks_alex.R")
+source("functions/functions_dynamics_networks_alex.R")
 # source("functions/functions_networks_alex.R")
 source("functions/functions_for_network_analysis.R")
 source("functions/Script_paths_and_basic_objectsV2.R")
+
+set.seed(3155210)
 
 intertemporal_naming_function <- function(tbl_list = tbl_list, 
                                           community_column = Leiden1,

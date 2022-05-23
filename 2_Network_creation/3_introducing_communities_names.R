@@ -21,15 +21,78 @@
 
 #+ r setup, include = FALSE
 knitr::opts_chunk$set(eval = FALSE)
-library(viridis)
 #' # Loading packages paths and data
 
+set.seed(3155210)
+source("functions/functions_dynamics_networks_alex.R")
+# source("functions/functions_networks_alex.R")
+source("functions/functions_for_network_analysis.R")
+source("functions/Script_paths_and_basic_objectsV2.R")
+tbl_coup_list <- readRDS(here(data_path,"macro_AA","4_Networks","list_graph_position_intertemporal_naming_1969-2011.RDS"))
 
-source("~/macro_AA/functions/functions_for_network_analysis.R")
-source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
+Year <- 2010
+list_graph_position[[paste0(Year)]] <- layout_fa2_java(tbl_coup_list[[paste0(Year)]],
+                                                       niter = 6000,
+                                                       threads = 16)
 
 
+ragg::agg_png(here(picture_path, "coupling_normal
+                   png"),
+        width = 60, height = 40, units = "cm", res = 300)
+list_graph_position[[paste0(Year)]] %>% 
+  ggraph("manual", x = x, y = y) + 
+  geom_edge_arc0(aes(color = "grey", width = weight), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
+  scale_edge_width_continuous(range = c(0.1,2)) +
+  geom_node_point(aes(x=x, y=y, size = nb_cit, fill = new_Id_com), pch = 21, alpha = 0.9, show.legend = FALSE) +
+  scale_size_continuous(range = c(0.01,6)) +
+  #  new_scale("size") +
+  #  geom_text_repel(data=top_nodes, aes(x=x, y=y, label = Label), size = 3, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
+  #  geom_label_repel(data=community_labels, aes(x=x, y=y, label = Community_name, fill = color, size = Size_com), fontface="bold", alpha = 0.8, point.padding=NA, show.legend = FALSE) +
+  #  scale_size_continuous(range = c(1,5)) +
+  theme_void()
+invisible(dev.off())
 
+tbl_backbone <- backbone::disparity(list_graph_position[[paste0(Year)]], alpha = 0.05, narrative = TRUE, class = "igraph")
+
+tbl_filtered <- tbl_coup_list[[paste0(Year)]] %>% activate(edges) %>% filter(weight>0.01)
+tbl_filtered <- tbl_filtered %>% activate(nodes) %>% mutate(components_att = group_components(type = "weak")) %>% filter(components_att==1)
+
+
+tbl_filtered <- layout_fa2_java(tbl_filtered,
+                                                       niter = 1200,
+                                                       threads = 16)
+
+
+ragg::agg_png(here(picture_path, "coupling_filtered..png"),
+              width = 60, height = 40, units = "cm", res = 300)
+tbl_filtered %>% 
+  ggraph("manual", x = x, y = y) + 
+  geom_edge_arc0(aes(color = "grey", width = weight), alpha = 0.4, strength = 0.2, show.legend = FALSE) +
+  scale_edge_width_continuous(range = c(0.1,2)) +
+  geom_node_point(aes(x=x, y=y, size = nb_cit, fill = new_Id_com), pch = 21, alpha = 0.9, show.legend = FALSE) +
+  scale_size_continuous(range = c(0.01,6)) +
+  #  new_scale("size") +
+  #  geom_text_repel(data=top_nodes, aes(x=x, y=y, label = Label), size = 3, fontface="bold", alpha = 1, point.padding=NA, show.legend = FALSE) +
+  #  geom_label_repel(data=community_labels, aes(x=x, y=y, label = Community_name, fill = color, size = Size_com), fontface="bold", alpha = 0.8, point.padding=NA, show.legend = FALSE) +
+  #  scale_size_continuous(range = c(1,5)) +
+  theme_void()
+invisible(dev.off())
+
+ggraph(tbl_filtered, "manual", x = x, y = y) +
+  geom_edge_arc(aes(color = "grey", width = weight), alpha = 0.5, strength =0.2) +
+  geom_node_point(aes(fill = new_Id_com, size = size), pch=21) +
+  scale_edge_width_continuous(range = c(0.5, 1)) +
+  theme_void() +
+  # geom_label_repel(data = label_com, aes(x = mean_coord_x, y = mean_coord_y, label = as.character(Label_com), fill = color)) +
+  theme(legend.position = "none") 
+  # scale_fill_identity() +
+  # scale_edge_colour_identity() +
+  # labs(title = paste0(as.character(Year),"-",as.character(Year+time_window-1)))
+ggsave(here(picture_path, "coupling_filtered.png"), width=50, height=40, units = "cm")
+
+tbl_filtered <- layout_fa2_java(tbl_filtered,
+                                                       niter = 6000,
+                                                       threads = 16)
 
 
 # 
