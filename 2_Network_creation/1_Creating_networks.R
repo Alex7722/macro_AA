@@ -365,8 +365,8 @@ saveRDS(alluv_dt, here(graph_data_path, paste0("alluv_dt_", first_year, "-", las
 
 saveRDS(tf_idf_results, here(graph_data_path, paste0("tf_idf_alluvial", first_year, "-", last_year, ".rds")))
 
-saveRDS(tbl_coup_list, here(graph_data_path, paste0("list_graph_", names(tbl_coup_list[1]), "-",
-                                                    as.integer(names(tbl_coup_list[length(tbl_coup_list)])), ".rds")))
+# saveRDS(tbl_coup_list, here(graph_data_path, paste0("list_graph_", names(tbl_coup_list[1]), "-",
+#                                                     as.integer(names(tbl_coup_list[length(tbl_coup_list)])), ".rds")))
 
 saveRDS(intertemporal_naming, here(graph_data_path, paste0("list_graph_position_intertemporal_naming_", names(tbl_coup_list[1]), "-", 
                                                     as.integer(names(tbl_coup_list[length(tbl_coup_list)])), ".rds")))

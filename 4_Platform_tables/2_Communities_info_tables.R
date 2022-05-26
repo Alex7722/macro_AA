@@ -129,23 +129,13 @@ tf_idf_table_final <- lapply(tf_idf_table_final, function(dt) dt[,new_Id_com:=Co
 tf_idf_table_final <- lapply(tf_idf_table_final, function(dt) dt[,.(new_Id_com,word,tf_idf,count)])
 tf_idf_table_final <- rbindlist(tf_idf_table_final, idcol = "window")
 tf_idf_table_final <- tf_idf_table_final[order(window, new_Id_com, -tf_idf), window := paste0(window, "-", as.integer(window) + time_window-1)]
-
+tf_idf_table_final <- tf_idf_table_final[,table_name:="tf_idf"]
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### All Tables ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
-master_table_info_com <- rbind(authors_table,most_cited_refs, tf_idf_table_final, fill=TRUE)
+master_table_info_com <- rbind(authors_table,most_cited_refs_info, tf_idf_table_final, fill=TRUE)
 master_table_info_com[is.na(master_table_info_com)] <- ""
 
 write.csv(master_table_info_com, here(data_path,"macro_AA","5_platform_data","master_table_info_com.csv"))
-
-## Nodes tables to export
-nodes_aut <- copy(authors)
-nodes_aut[,Ordre := paste0("aut_",Ordre)]
-nodes_aut <- dcast(nodes_aut, ID_Art ~ Ordre, value.var = "Nom")
-nodes_aut[is.na(nodes_aut)] <- ""
-column_to_paste <- c(paste0(str_subset(ls(nodes_aut),"[:digit:]")))
-nodes_aut[,c("Authors") := do.call(paste, c(.SD, sep = " ")), .SDcols = column_to_paste] # apply paste on all .SD cols
-nodes_aut <- nodes_aut[,.SD,.SDcols = c("ID_Art","Authors")]
-nodes_aut <- nodes_aut[, c("Authors") := str_squish(get("Authors"))][, c("Authors") := str_replace_all(get("Authors")," ","; ")]
 
