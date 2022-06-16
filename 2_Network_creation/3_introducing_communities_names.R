@@ -73,6 +73,19 @@ com_list[,new_Id_com:=Com_ID]
 com_list[,Com_ID:=NULL]
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Remove weird sizes of ID_Art that have ItemID_Ref==0 ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+tbl_coup_list <- lapply(tbl_coup_list, function(tbl)
+  (
+    tbl <- tbl %>% 
+      activate(nodes) %>% 
+      mutate(nb_cit = ifelse(ItemID_Ref == 0, 0, nb_cit)) %>% 
+      mutate(size = ifelse(ItemID_Ref == 0, 0, size)) 
+  )
+)
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### Giving Names and Colors to Networks ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 # sample
@@ -266,7 +279,7 @@ for (Year in all_years) {
 saveRDS(list_graph_position, here(graph_data_path, paste0("list_graph_position", first_year, "-", last_year + time_window - 1, ".rds")))
 list_graph_position <- readRDS(here(graph_data_path, paste0("list_graph_position", first_year, "-", last_year + time_window - 1, ".rds")))
 
-graph_90 <- list_graph_position[["1990"]]
+graph_90 <- list_graph_position[["1992"]] %>% activate(edges) %>% filter(weight>0.05)
 plot_90 <- ggraph(graph_90, "manual", x = x, y = y) +
   geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
   geom_node_point(aes(fill = color_nodes, size = size), pch=21) +
@@ -290,7 +303,7 @@ plot_00 <- ggraph(graph_00, "manual", x = x, y = y) +
   scale_edge_colour_identity()
 ggsave(here(picture_path, "FA2_00.png"), plot_00, device = ragg::agg_png, width = 60, height = 50, units = "cm") 
 
-graph_10 <- list_graph_position[["2010"]] %>% activate(edges) %>% filter(weight>0.05)
+graph_10 <- list_graph_position[["2009"]] %>% activate(edges) %>% filter(weight>0.05)
 plot_10 <- ggraph(graph_10, "manual", x = x, y = y) +
   geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
   geom_node_point(aes(fill = color_nodes, size = size), pch=21) +
