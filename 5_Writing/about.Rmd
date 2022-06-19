@@ -1,0 +1,14 @@
+---
+title: "What is the Mapping Macroeconomics project?"
+author: "Aurélien Goutsmedt and Alexandre Truc"
+output: html_document
+---
+
+The Mapping Macroeconomics project is an online interactive platform displaying bibliometric data on a large set of macroeconomic articles. It aims at offering a better understanding of the history of macroeconomics through the navigation between the different bibliometric networks. 
+
+The point of departure of the project is the observation of an exponential increase in the number of articles published in academic journals in economics since the 1970s. This phenomenon makes it harder for historians of economics to properly assess the trends in the transformation of economics, the main topics researched, the most influential authors and ideas, etc. We consider that developing collective quantitative tools could help historians to confront this challenge. The opportunities that a quantitative history brings are particularly useful to the recent history of macroeconomics. Practicing macroeconomists are eager to tell narratives of the evolution of their field that serve the purpose of intervening on current debates, by giving credit to particular authors and weight to specific ideas. Historians who go into this area find plenty of accounts by macroeconomists and have to handle the vast increase in the macroeconomic literature since the last quarter of the past century. The Mapping Macroeconomics platform aims at helping historians to empirically check macroeconomists' narratives on the discipline, to explore interesting patterns on the evolution of macroeconomics, and eventually to write new histories of macroeconomics.
+
+# Team and acknowledgements
+
+This project was made possible by the generous support of the [History of Economics Society New Initiatives Fund](https://historyofeconomics.org/about-the-society/new-initiatives/). [Aurélien Goutsmedt](https://aurelien-goutsmedt.com) and [Alexandre Truc](https://sites.google.com/view/alexandre-truc/home-and-contact) have done all the quantitative analyses. Philippe Boissonneault (Université de Sherbrooke) with the support of the [Plateforme en humanités numériques](https://www.usherbrooke.ca/flsh/recherche/centres-groupes-et-equipes-de-recherche/phun) has programmed the web application.
+
