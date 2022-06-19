@@ -31,24 +31,45 @@ knitr::opts_chunk$set(eval = FALSE)
 #' and color palettes.
 
 #+ r source
-source("~/macro_AA/functions/functions_for_network_analysis.R")
-source("~/macro_AA/dynamic_networks/Script_paths_and_basic_objects.R")
+library(tidyverse)
+library(here)
+library(data.table)
+library(tidygraph)
+library(tidytext)
+library(textstem)
+
+if (str_detect(getwd(), "goutsmedt")) {
+  data_path <- "C:/Users/goutsmedt/Mon Drive/data/macro_AA"
+} else {
+  if (str_detect(getwd(), "Dropbox")) {
+    data_path <- "G:/.shortcut-targets-by-id/1EHqA0pp2uozTykWv0_Stf5xyrvo_dkN5/data"
+  } else {
+    data_path <- "/projects/data/macro_AA"
+  }
+}
+
+## Nodes Table
+list_graph_position <- readRDS(here(data_path,"macro_AA","4_Networks","list_graph_position_intertemporal_naming_1969-2011.RDS"))
+nodes_lf <- lapply(list_graph_position, function(tbl) (tbl %>% activate(nodes) %>% as.data.table())) %>% 
+  lapply(function(dt) (dt[, .(ID_Art, Titre)])) %>% 
+  rbindlist(idcol = "window")
+nodes <- nodes_lf[, window := paste0(window, "-", as.integer(window) + time_window-1)][order(ID_Art, window)]
 
 #' # Extracting words
 #' 
 #' We first extract the words and add a column for lemmas
 
-word_JEL <- nodes_JEL %>% 
+word_JEL <- nodes %>% 
   unnest_tokens(word, Titre) %>% 
   anti_join(stop_words) %>% 
   select(ID_Art, word) %>% 
-  mutate(lemme = textstem::lemmatize_words(word))
+  mutate(lemme = lemmatize_words(word))
 
 #' We then do the same thing but for bigrams, which
 #' implies a bit more of work.
 #' 
 
-bigram_JEL <- nodes_JEL %>% 
+bigram_JEL <- nodes %>% 
   unnest_tokens(word, Titre, token = "ngrams", n = 2) %>% 
   separate(word, c("word1","word2"), sep = " ") %>% 
   mutate(word1 = str_remove_all(word1, "[:digit:]|'s"),
@@ -72,4 +93,4 @@ bigram_JEL <- nodes_JEL %>%
 #' 
 word_JEL <- rbind(word_JEL, bigram_JEL)
 
-write_csv(word_JEL, paste0(platform_data, "word.csv"))
+write_csv(word_JEL, here(data_path, "5_platform_data", "word.csv"))
