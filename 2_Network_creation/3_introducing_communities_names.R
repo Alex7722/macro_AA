@@ -116,12 +116,16 @@ list_meta_name[!is.na(`meta-name`) & `meta-name`!="Public Finance",
 list_meta_name[is.na(`meta-name`),primary_color:="#B2B2B2"]
 list_meta_name[`meta-name`=="Public Finance",primary_color:="#B9BBB6"]
 list_meta_name[`meta-name`=="Keynesian Economics",primary_color:="#E41A1C"]
-list_meta_name[`meta-name`=="Monetary & Financial Economics",primary_color:="#F781BF"]
+list_meta_name[`meta-name`=="Monetary & Financial Economics",primary_color:="#A65628"]
 list_meta_name[`meta-name`=="Growth",primary_color:="#FF7F00"]
 list_meta_name[`meta-name`=="International Macroeconomics",primary_color:="#FF9287"]
+list_meta_name[`meta-name`=="Marxian Economics",primary_color:="#FF7F00"]
+list_meta_name[`meta-name`=="Growth",primary_color:="#984EA3"]
+list_meta_name[`meta-name`=="Macro Policy",primary_color:="#F781BF"]
 
+#
 # Secondary colors are viridis pallets, restarting each group
-sec_color <- viridis(list_sub_name[,.N,`meta-name`][order(-N)][head(1)]$N)
+sec_color <- viridis(list_sub_name[,.N,`meta-name`][order(-N)][head(1)]$N,option="G")
 # sec_color <- as.data.table(sec_color) %>% .[sample(nrow(.))] %>% .[[1]]
 list_sub_name[,secondary_color:=rep(sec_color, length.out = .N),`meta-name`]
 
@@ -191,25 +195,7 @@ plot_alluvial <- ggplot(alluv_dt_graph, aes(x = Window, y=share, stratum = new_I
   ggrepel::geom_label_repel(stat = "stratum", size = 5, aes(label = Label)) 
 ggsave(here(picture_path, "alluvial_colored_named.png"), plot = plot_alluvial, width = 60, height = 50, units = "cm")
 
-# label <- copy(alluv_dt_graph)
-# label <- label[,Window:=round(mean(as.numeric(Window))),`meta-name`][, head(.SD, 1), .(`new_Id_com`)]
-# label[,Label:=`meta-name`]
-# alluv_dt_graph[,Label:=NULL]
-# alluv_dt_graph<-merge(alluv_dt_graph,label[,.(new_Id_com,Window,Label)], by = c("new_Id_com","Window"), all.x = TRUE) 
-# alluv_dt_graph$new_Id_com <- fct_reorder(alluv_dt_graph$new_Id_com, alluv_dt_graph$order,min, .desc = TRUE)
-# 
-# 
-# plot_alluvial <- ggplot(alluv_dt_graph, aes(x = Window, y=share, stratum = new_Id_com, alluvium = ID_Art, fill = color_nodes)) +
-#   geom_stratum(alpha =1, size=1/10) +
-#   geom_flow() +
-#   theme(legend.position = "none") +
-#   theme_minimal() +
-#   scale_fill_identity() +
-#   ggtitle("") +
-#   ggrepel::geom_label_repel(stat = "stratum", size = 5, aes(label = Label)) 
-# ggsave(here(picture_path, "alluvial_colored_named_meta.png"), plot = plot_alluvial, width = 60, height = 50, units = "cm")
-# 
-# 
+saveRDS(alluv_dt_graph, here(graph_data_path, "alluv_dt_named_colored.rds"))
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### Sample ####
@@ -279,47 +265,18 @@ for (Year in all_years) {
 saveRDS(list_graph_position, here(graph_data_path, paste0("list_graph_position", first_year, "-", last_year + time_window - 1, ".rds")))
 list_graph_position <- readRDS(here(graph_data_path, paste0("list_graph_position", first_year, "-", last_year + time_window - 1, ".rds")))
 
-graph_90 <- list_graph_position[["1992"]] %>% activate(edges) %>% filter(weight>0.05)
-plot_90 <- ggraph(graph_90, "manual", x = x, y = y) +
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
-  geom_node_point(aes(fill = color_nodes, size = size), pch=21) +
-  scale_edge_width_continuous(range = c(0.5, 1)) +
-  theme_void() +
-  # ggrepel::geom_label_repel(data = label_com, aes(x = mean_coord_x, y = mean_coord_y, label = as.character(`sub-name`), fill = color)) +
-  theme(legend.position = "none") +
-  scale_fill_identity() +
-  scale_edge_colour_identity()
-ggsave(here(picture_path, "FA2_90.png"), plot_90, device = ragg::agg_png, width = 60, height = 50, units = "cm") 
-
-graph_00 <- list_graph_position[["2000"]] %>% activate(edges) %>% filter(weight>0.05)
-plot_00 <- ggraph(graph_00, "manual", x = x, y = y) +
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
-  geom_node_point(aes(fill = color_nodes, size = size), pch=21) +
-  scale_edge_width_continuous(range = c(0.5, 1)) +
-  theme_void() +
-  # ggrepel::geom_label_repel(data = label_com, aes(x = mean_coord_x, y = mean_coord_y, label = as.character(`sub-name`), fill = color)) +
-  theme(legend.position = "none") +
-  scale_fill_identity() +
-  scale_edge_colour_identity()
-ggsave(here(picture_path, "FA2_00.png"), plot_00, device = ragg::agg_png, width = 60, height = 50, units = "cm") 
-
-graph_10 <- list_graph_position[["2009"]] %>% activate(edges) %>% filter(weight>0.05)
-plot_10 <- ggraph(graph_10, "manual", x = x, y = y) +
-  geom_edge_arc(aes(color = color_edges, width = weight), alpha = 0.5, strength =0.2) +
-  geom_node_point(aes(fill = color_nodes, size = size), pch=21) +
-  scale_edge_width_continuous(range = c(0.5, 1)) +
-  theme_void() +
-  # ggrepel::geom_label_repel(data = label_com, aes(x = mean_coord_x, y = mean_coord_y, label = as.character(`sub-name`), fill = color)) +
-  theme(legend.position = "none") +
-  scale_fill_identity() +
-  scale_edge_colour_identity()
-ggsave(here(picture_path, "FA2_10.png"), plot_10, device = ragg::agg_png, width = 60, height = 50, units = "cm") 
-
+# # Recover position manually
+list_graph_position_manual <- list()
+for (Year in all_years) {
+  xy_position <- list_graph_position[[paste0(Year)]] %>% activate(nodes) %>% as.data.table() %>% .[,.(ID_Art,x,y)]
+  list_graph_position_manual[[paste0(Year)]] <- networks_final[[paste0(Year)]] %>% left_join(xy_position)
+}
+list_graph_position <- list_graph_position_manual
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### SAVING ####
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-list_graph_position <- readRDS(here(graph_data_path, paste0("list_graph_position", first_year, "-", last_year + time_window - 1, ".rds")))
+# list_graph_position <- readRDS(here(graph_data_path, paste0("list_graph_position", first_year, "-", last_year + time_window - 1, ".rds")))
 # Rescaling coordinates and size
 list_graph_position <- lapply(list_graph_position, 
                               function(tbl){tbl %>% 

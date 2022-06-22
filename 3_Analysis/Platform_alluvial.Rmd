@@ -1,5 +1,5 @@
 ---
-title: "List of communities and their main features"
+title: "Alluvial"
 output: 
   html_document:
     theme: readable
@@ -43,9 +43,35 @@ script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"
   });
 ```
 
-```{r loading files}
-source(here("functions","functions_for_network_analysis.R"))
-source(here("functions","Script_paths_and_basic_objectsV2.R"))
+```{r loading files, set.seed(3155210)}
+#' ---
+#' title: "Alluvial html for the plaform"
+#' author: "Aurélien Goutsmedt and Alexandre Truc"
+#' date: "/ Last compiled on `r format(Sys.Date())`"
+#' output: 
+#'   github_document:
+#'     toc: true
+#'     number_sections: true
+#' ---
+#' 
+
+
+#+ r setup, include = FALSE
+knitr::opts_chunk$set(eval = FALSE)
+
+#' # Loading packages, paths and data
+
+#' We first load all the functions created in the functions script. 
+#' We also have a separated script with all the packages needed for the scripts
+#' in the `dynamic_networks` directory, as well as all the paths (for saving
+#' pictures for instance). This separated script also loads our data 
+#' and color palettes.
+
+#+ r source
+source(here::here("functions","functions_dynamics_networks_alex.R"))
+# source("functions/functions_networks_alex.R")
+source(here::here("functions","functions_for_network_analysis.R"))
+source(here::here("functions","Script_paths_and_basic_objectsV2.R"))
 
 authors_JEL <- readRDS(here(data_path,"macro_AA","3_Corpus_WoS","JEL_matched_corpus_authors.rds"))
 ref_info_JEL <- readRDS(here(data_path,"macro_AA","3_Corpus_WoS","JEL_matched_corpus_references_info.rds"))
@@ -75,12 +101,35 @@ edges_JEL <- merge(edges_JEL, unique(nodes_JEL[, c("ID_Art", "Annee_Bibliographi
 rm(list = c("ref_info_JEL","ref_info_old_JEL","authors_old_JEL"))
 
 
-# loading alluvial data
-tf_idf_alluvial <- readRDS(here(graph_data_path, paste0("tf_idf_alluvial", first_year, "-", last_year, ".rds")))
+alluv_dt <- readRDS(here(graph_data_path, "alluv_dt_1969-2011.rds"))
 
-alluv_dt <- readRDS(here(graph_data_path, paste0("alluv_dt_", first_year, "-", last_year, ".rds")))
-alluv_dt <- alluv_dt[color != "grey"]
+alluv_dt <- readRDS(here(graph_data_path, "alluv_dt_named_colored.rds"))
+alluv_dt <- alluv_dt[, Com_ID := new_Id_com]
+alluv_dt <- alluv_dt[, share_max := max(share_leiden), by = "Com_ID"]
+alluv_dt <- alluv_dt[, color :=color_nodes]
+
+# plot_alluvial <- ggplot(alluv_dt, aes(x = Window, y=share, stratum = new_Id_com, alluvium = ID_Art, fill = color_nodes)) +
+#   geom_stratum(alpha =1, size=1/10) +
+#   geom_flow() +
+#   theme(legend.position = "none") +
+#   theme_minimal() +
+#   scale_fill_identity() +
+#   ggtitle("") +
+#   ggrepel::geom_label_repel(stat = "stratum", size = 5, aes(label = Label)) 
+
+tf_idf_alluvial <- tf_idf(nodes = alluv_dt[color != "#B2B2B2"],
+                         com_name_column = "new_Id_com",
+                         number_of_words = 20, 
+                         threshold_com = 0.03,
+                         com_size_column = "share_max",
+                         size_title_wrap = 10)
+
+alluv_dt <- alluv_dt[color != "#B2B2B2"]
 alluv_dt <- merge(alluv_dt, nodes_JEL[,c("ID_Art","ItemID_Ref")], by = "ID_Art")
+
+
+
+
 ```
 
 # Explanation of the process for naming communities
@@ -95,7 +144,9 @@ We have communities that just stay for five years, and some that persist for dec
 
 ```{r alluvial_plot, eval=TRUE}
 
-include_graphics(here(picture_path,"alluvial.png"))
+
+include_graphics(here(picture_path,"alluvial_colored_named.png"))
+
 
 ```
 
@@ -125,25 +176,6 @@ The name of a community should be unique and is composed of two parts:
 I have already created a list of meta-names. The meta-names are more or less inspired by the JEL categories for macroeconomics. You are more than welcome to disagree with this list of meta-names and to think it does not properly allow to give names to the communities, and thus to suggest deletion, addition or replacement (see below how to express your disagreement). I also have a list of sub-names that I used in a former categorization. It could inspire you but you are not tied to use them. 
 
 Using the information gathered below on each community, you will be able to give names for each community. You will do this separately from the others, not to be influenced. At the end, I will compare the results and choose the more suitable categorization.
-
-> **How to fill the google.sheets table?**
->
->
-> You will find two sheets in the table:
->
->
->   - a first sheet with a first list of meta-names and sub-names that I have created. If you think the meta-names should be changed, please comments the problematic meta-names or add new ones (justifying your choice in the `comments` column). In `Aurelien's comments` you can find some justification for having chosen such or such meta-names. 
->   - a second sheet with the list of the communities with its first ID, called `Com_ID` (the same as in the graph above) and a `ID_bis` used to identify them below. Please give a `meta-name` and a `sub-name` to each community. If you are hesitating, you can give a `meta-name-2` and a `sub-name-2`. Don't hesitate to add `comments` if you are not sure at all, if you have suggestions, if you want to justify your choice, _etc._.
-> 
-> You can find here your respective google sheet to name communities (don't look at others'):
->
->   - [Béatrice](https://docs.google.com/spreadsheets/d/1gPwlEjHdEkg2Sy2ael1cVd2J47apmilYn4QlXQDva1w/edit?usp=sharing)
->   - [Francesco](https://docs.google.com/spreadsheets/d/1Qogq9ShJpdnhBXOTHnuMNWoEXkx5xXIHXpElY5zQrRY/edit?usp=sharing)
->   - [Matthieu](https://docs.google.com/spreadsheets/d/1XdFCCEbHmyJQbUKDQvxXmw3x_qG67SBOhJB_frSPHfU/edit?usp=sharing)
->   - [Pedro](https://docs.google.com/spreadsheets/d/1JR6bCeNdIRUdv6AnOb3fzK6PF5ajXuL_i3XcYARzNPc/edit?usp=sharing)
->   - [Romain](https://docs.google.com/spreadsheets/d/1ZcB5dqtCsR1lW0XCtJ71LPM4dNnibUXWCY3sRs4VCH0/edit?usp=sharing)
->
-> I have filled a small part of your table to give you some examples of how it functions. You can keep the names I gave or overwrite them.
 
 
 In what follows, you will find information for each community about:
@@ -225,28 +257,28 @@ main_journals <- main_journals %>%
   slice(1:5)
 
 ################ Beginning of the template ######################
-  cat(sprintf("  \n## Community %s (`%s`) \n\n", unique(alluv_com[Com_ID == com]$ID_bis),com))
+  cat(sprintf("  \n## Community %s \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
   cat(paste0("  \nThe community exists from ", window[1]," to ", window[2],". \n"))
   cat(paste0("  \nThe community gathers ",length(unique(alluv_com$ID_Art))," articles. It represents ", round(unique(alluv_com$share_leiden_total)*100,2), "% of the whole corpus. In the five-year window when its share in the network is the bigggest, it represents ", round(unique(alluv_com$share_max)*100,2), "% of the corresponding five-year network. \n"))
   cat(paste0("  \nThe five most prolific authors in this community are ",paste0(main_author$Nom," (",main_author$nb_art,")", collapse = ", "),". \n"))
   cat(paste0("  \nThe five journals with the highest number of articles in this community are ",paste0(main_journals$Revue," (",main_journals$nb_art,")", collapse = ", "),". \n"))
 
   
-  cat(sprintf("  \n### Most cited articles of the community %s \n\n", unique(alluv_com[Com_ID == com]$ID_bis)))
+  cat(sprintf("  \n### Most cited articles of the community %s \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
   cat(paste0("In the next table, you have the ten articles of the community with the highest normalised deviation measure, which compares the number of citations within the community, with the number of citations in the whole corpus between ", window[1]," and ", window[2],". \n\n"))
   
   print(kbl(most_cited_nodes,
             col.names = c("First Author","Year","Title","Citations Deviation")) %>% 
   kable_styling(bootstrap_options = c("striped","condensed")))
   
-  cat(sprintf("  \n### Most cited references by the community %s \n\n", unique(alluv_com[Com_ID == com]$ID_bis)))
+  cat(sprintf("  \n### Most cited references by the community %s \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
   cat(paste0("In the next table, you have the fifteen most cited references by the articles of the community. \n\n"))
   
   print(kbl(most_cited_ref[,c("Nom","Annee","Revue_Abbrege","Titre","nb_cit_com")],
             col.names = c("First Author","Year","Book title or journal (abbrv.)","Title","Citations")) %>% 
         kable_styling(bootstrap_options = c("striped","condensed")))
   
-  cat(sprintf("  \n### Terms with the highest TF-IDF value in community %s \n\n", unique(alluv_com[Com_ID == com]$ID_bis)))
+  cat(sprintf("  \n### Terms with the highest TF-IDF value in community %s \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
   cat(paste0("  \nWe have extracted all the terms (unigrams and bigrams, that is one word and two words) in the title of all the community articles. We display here the 20 terms which indentifies the most this particular community, in comparison to the other communities."))
 plot(ggplot(tf_idf_alluvial$list_words[Com_ID == com], aes(reorder_within(word, tf_idf, color), tf_idf, fill = color)) +
     geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +

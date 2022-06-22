@@ -43,7 +43,7 @@ set.seed(3155210)
 intertemporal_naming_function <- function(tbl_list = tbl_list, 
                                           community_column = Leiden1,
                                           individual_ids = Id,
-                                          threshold_similarity = 0.51){
+                                          threshold_similarity = 0.55){
   #' This function 
   #' 
   #' @tbl_list
@@ -220,8 +220,6 @@ make_into_alluv_dt <- function(intertemporal_networks,
 
 #+ r list
 
-# nodes_JEL <- readRDS(here(data_path,"macro_AA","3_Corpus_WoS","JEL_matched_corpus_nodes.RDS"))
-# edges_JEL <- readRDS(here(data_path,"macro_AA","3_Corpus_WoS","JEL_matched_corpus_edges.RDS"))
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### Tbl list ####
@@ -264,7 +262,6 @@ tbl_coup_list <- lapply(tbl_coup_list, leiden_workflow)
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
 #' ## Intertemporal Naming + size
-# tbl_coup_list <- readRDS(here(graph_data_path, paste0("list_graph_", first_year, "-", last_year, ".rds")))
 tbl_coup_list <- lapply(tbl_coup_list, 
                         function(tbl){tbl %>% 
                             activate(nodes) %>% 
@@ -275,7 +272,7 @@ list_graph <- tbl_coup_list
 intertemporal_naming <- intertemporal_naming_function(list_graph, 
                                                       community_column = "Com_ID", 
                                                       individual_ids = "ID_Art", 
-                                                      threshold_similarity = 0.51)
+                                                      threshold_similarity = 0.55)
 
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -326,7 +323,7 @@ plot_alluvial <- ggplot(alluv_dt, aes(x = Window, y=share, stratum = new_Id_com,
   geom_label(stat = "stratum", size = 5, aes(label = Label)) +
   ggtitle("")
 
-ggsave(here(picture_path, "alluvial.png"), plot = plot_alluvial, width = 40, height = 30, units = "cm")
+# ggsave(here(picture_path,"Benchmark", "alluvial_55_raw.png"), plot = plot_alluvial, width = 40, height = 30, units = "cm")
 
 alluv_dt <- alluv_dt[, Com_ID := new_Id_com]
 alluv_dt <- alluv_dt[, share_max := max(share_leiden), by = "Com_ID"]
@@ -351,24 +348,9 @@ tf_idf_results <- tf_idf(nodes = alluv_dt[color != "grey"],
                          com_size_column = "share_max",
                          size_title_wrap = 10)
 
-ggsave(here(picture_path, "tf-idf.png"), plot = tf_idf_results$plot, width = 55, height = 55, units = "cm")
-
-
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### Saving it all####
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
 # saving the entire dt and just the community identifiers in csv
-write_csv2(unique(alluv_dt[color != "grey",c("ID_bis","Com_ID")]), here(graph_data_path, "community_list_1969-2015.csv"))
-
-saveRDS(alluv_dt, here(graph_data_path, paste0("alluv_dt_", first_year, "-", last_year, ".rds")))
-
-saveRDS(tf_idf_results, here(graph_data_path, paste0("tf_idf_alluvial", first_year, "-", last_year, ".rds")))
-
-# saveRDS(tbl_coup_list, here(graph_data_path, paste0("list_graph_", names(tbl_coup_list[1]), "-",
-#                                                     as.integer(names(tbl_coup_list[length(tbl_coup_list)])), ".rds")))
-
-saveRDS(intertemporal_naming, here(graph_data_path, paste0("list_graph_position_intertemporal_naming_", names(tbl_coup_list[1]), "-", 
-                                                    as.integer(names(tbl_coup_list[length(tbl_coup_list)])), ".rds")))
-
-
+write_csv2(unique(alluv_dt[color != "grey",c("ID_bis","Com_ID")]), here(graph_data_path,"Alt_Networks", "community_list_55_no_name.csv"))

@@ -130,11 +130,116 @@ tf_idf_table_final <- lapply(tf_idf_table_final, function(dt) dt[,.(new_Id_com,w
 tf_idf_table_final <- rbindlist(tf_idf_table_final, idcol = "window")
 tf_idf_table_final <- tf_idf_table_final[order(window, new_Id_com, -tf_idf), window := paste0(window, "-", as.integer(window) + time_window-1)]
 tf_idf_table_final <- tf_idf_table_final[,table_name:="tf_idf"]
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+####  Origin Table ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+alluv_dt <- readRDS(here(graph_data_path, "alluv_dt_named_colored.rds"))
+origin <- split(alluv_dt[order(Window)], by="Window")
+
+list_years_origin <- list()
+for (Year in all_years[-1]) {
+  present <- origin[[paste0(Year)]]
+  present_ls <- split(present[order(new_Id_com)], by="new_Id_com") # split communities as list
+  past <- origin[[paste0(Year-1)]] # get nodes from past
+  
+  com_list <- as.character(present[,.N,new_Id_com][,new_Id_com])
+  list_com_origin <- list()
+  for (new_Id_com in com_list) {
+    present_nodes <- present_ls[[paste0(new_Id_com)]][,ID_Art]
+    nodes_from_the_past <- past[ID_Art %in% present_nodes] # for each com find out the nodes that are in common with the past
+    com_origin <- nodes_from_the_past[,.N,new_Id_com] # compute share
+    com_origin[,`Share of Origin`:=round(N/length(present_nodes)*100,1)]
+    com_origin[,`Community of Origin`:=new_Id_com]
+    
+    #compute new nodes
+    share_new <- com_origin[,100-sum(`Share of Origin`)]
+    com_origin <- rbind(com_origin, data.table(new_Id_com=new_Id_com, `Community of Origin`="New Articles", `Share of Origin`=share_new),fill=TRUE)
+    
+    list_com_origin[[paste0(new_Id_com)]] <- com_origin[,.(`Community of Origin`, `Share of Origin`)]
+  }
+  list_years_origin[[paste0(Year)]] <- rbindlist(list_com_origin, idcol = "new_Id_com")
+}
+com_origin <- rbindlist(list_years_origin, idcol = "window")
+com_origin <- com_origin[, window := paste0(window, "-", as.integer(window) + time_window-1)]
+com_origin <- com_origin[order(-`Share of Origin`,window,new_Id_com), head(.SD, 10), .(window,new_Id_com)][,.(window,new_Id_com,`Community of Origin`,`Share of Origin`)]
+
+com_origin <- merge(com_origin,
+                    alluv_dt[,.(new_Id_com,`sub-name`,`meta-name`)][,head(.SD,1),new_Id_com], # retrieve the name of communities evolution/origin
+                    by.x="Community of Origin", by.y="new_Id_com", all.x=TRUE)
+com_origin[`Community of Origin`=="New Articles",`meta-name`:="New Articles"]
+com_origin[,`Community of Origin`:=paste0(`meta-name`," - ",`sub-name`)]
+com_origin[`Community of Origin`=="NA - NA",`Community of Origin`:="Unamed Community"]
+com_origin[`Community of Origin`=="New Articles - NA",`Community of Origin`:="New Articles"]
+
+com_origin[,table_name:="Origin_communities"]
+
+com_origin <- com_origin[,.(new_Id_com, window, `Community of Origin`, `Share of Origin`,table_name)]
+com_origin <- com_origin[new_Id_com %in% alluv_dt[!is.na(`meta-name`)]$new_Id_com]
+
+com_origin <- com_origin[order(window,new_Id_com,-`Share of Origin`,)]
+com_origin <- com_origin[,`Share of Origin`:=paste0(`Share of Origin`," %")]
+
+good_example_origin <- com_origin[window=="1983-1987" & new_Id_com=="o2GS150I"]
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+####  Evolution Table ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+alluv_dt <- readRDS(here(graph_data_path, "alluv_dt_named_colored.rds"))
+origin <- split(alluv_dt[order(Window)], by="Window")
+
+list_years_origin <- list()
+for (Year in all_years[-length(all_years)]) {
+  present <- origin[[paste0(Year)]]
+  present_ls <- split(present[order(new_Id_com)], by="new_Id_com") # split communities as list
+  future <- origin[[paste0(Year+1)]] # get nodes from past
+  
+  com_list <- as.character(present[,.N,new_Id_com][,new_Id_com])
+  list_com_origin <- list()
+  for (new_Id_com in com_list) {
+    present_nodes <- present_ls[[paste0(new_Id_com)]][,ID_Art]
+    nodes_from_the_future <- future[ID_Art %in% present_nodes] # for each com find out the nodes that are in common with the past
+    com_future <- nodes_from_the_future[,.N,new_Id_com] # compute share
+    com_future[,`Share of Destiny`:=round(N/length(present_nodes)*100,1)] # compute % as share of present nodes (for share of comon nodes replace lenght() by sum(N))
+    com_future[,`Communities of Destiny`:=new_Id_com]
+    
+    #compute new nodes
+    share_new <- com_future[,100-sum(`Share of Destiny`)]
+    com_future <- rbind(com_future, data.table(new_Id_com=new_Id_com, `Communities of Destiny`="Dropped Articles", `Share of Destiny`=share_new),fill=TRUE)
+    
+    list_com_origin[[paste0(new_Id_com)]] <- com_future[,.(`Communities of Destiny`, `Share of Destiny`)]
+  }
+  list_years_origin[[paste0(Year)]] <- rbindlist(list_com_origin, idcol = "new_Id_com")
+}
+com_future <- rbindlist(list_years_origin, idcol = "window")
+com_future <- com_future[, window := paste0(window, "-", as.integer(window) + time_window-1)]
+com_future <- com_future[order(-`Share of Destiny`,window,new_Id_com), head(.SD, 10), .(window,new_Id_com)][,.(window,new_Id_com,`Communities of Destiny`,`Share of Destiny`)]
+
+com_future <- merge(com_future, 
+                    alluv_dt[,.(new_Id_com,`sub-name`,`meta-name`)][,head(.SD,1),new_Id_com], # retrieve the name of communities evolution/origin
+                    by.x="Communities of Destiny", by.y="new_Id_com", all.x=TRUE)
+com_future[`Communities of Destiny`=="Dropped Articles",`meta-name`:="Dropped Articles"]
+com_future[,`Communities of Destiny`:=paste0(`meta-name`," - ",`sub-name`)]
+com_future[`Communities of Destiny`=="NA - NA",`Communities of Destiny`:="Unamed Community"]
+com_future[`Communities of Destiny`=="Dropped Articles - NA",`Communities of Destiny`:="Dropped Articles"]
+
+com_future[,table_name:="Evolution_communities"]
+
+com_future <- com_future[,.(new_Id_com, window, `Communities of Destiny`, `Share of Destiny`,table_name)]
+com_future <- com_future[new_Id_com %in% alluv_dt[!is.na(`meta-name`)]$new_Id_com]
+
+com_future <- com_future[order(window,new_Id_com,-`Share of Destiny`,)]
+com_future <- com_future[,`Share of Destiny`:=paste0(`Share of Destiny`," %")]
+
+good_example_future <- com_future[window=="1983-1987" & new_Id_com=="o2GS150I"]
+
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### All Tables ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
-master_table_info_com <- rbind(authors_table,most_cited_refs_info, tf_idf_table_final, fill=TRUE)
+master_table_info_com <- rbind(authors_table,most_cited_refs_info, tf_idf_table_final, com_origin, com_future, fill=TRUE)
 master_table_info_com[is.na(master_table_info_com)] <- ""
 
 write.csv(master_table_info_com, here(data_path,"macro_AA","5_platform_data","master_table_info_com.csv"))
