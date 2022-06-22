@@ -1,0 +1,172 @@
+---
+title: "DHM: a Digital History of Macroeconomics interactive platform"
+short: "Digital History of Macroeconomics"
+journal: "JEL" # AER, AEJ, PP, JEL
+month: "`r format(Sys.Date(), '%m')`"
+year: "`r format(Sys.Date(), '%Y')`"
+vol: 1
+issue: 1
+jel:
+  - A10
+  - A11
+keywords:
+  - first keyword
+  - second keyword
+author:
+  - name: Aurélien Goutsmedt
+    firstname: Aurélien
+    surname: Goutsmedt
+    email: Goutsmedt@example.com
+    affiliation: ULC
+  - name: Alexandre Truc
+    firstname: Alexandre
+    surname: Truc
+    email: Alexandre.Truc@unice.fr
+    affiliation: UCA (Université Côte d'Azur), CNRS (Centre national de la recherche scientifique), GREDEG (Groupe de Recherche en Droit, Economie, Gestion), 250 Rue Albert Einstein, 06560 Valbonne. France.
+acknowledgements: |
+  We thank Till Duppe for his wisdom
+abstract: |
+  Abstract goes here
+output: rticles::aea_article
+---
+
+The Mapping Macroeconomics project is an online interactive platform displaying bibliometric data on a large set of macroeconomic articles. It aims at offering a better understanding of the history of macroeconomics through the navigation between the different bibliometric networks.
+
+The point of departure of the project is the observation of an exponential increase in the number of articles published in academic journals in economics since the 1970s. This phenomenon makes it harder for historians of economics to properly assess the trends in the transformation of economics, the main topics researched, the most influential authors and ideas, etc. We consider that developing collective quantitative tools could help historians to confront this challenge. The opportunities that a quantitative history brings are particularly useful to the recent history of macroeconomics. Practicing macroeconomists are eager to tell narratives of the evolution of their field that serve the purpose of intervening on current debates, by giving credit to particular authors and weight to specific ideas. Historians who go into this area find plenty of accounts by macroeconomists and have to handle the vast increase in the macroeconomic literature since the last quarter of the past century. The Mapping Macroeconomics platform aims at helping historians to empirically check macroeconomists’ narratives on the discipline, to explore interesting patterns on the evolution of macroeconomics, and eventually to write new histories of macroeconomics.
+
+\section{Methodology}
+
+\subsection{Construction of the Corpus}
+
+Our corpus is composed of macroeconomic articles published in economics. 
+We identified all articles published in macroeconomics using JEL codes related to macroeconomics (Econlit database). JEL codes are used in economics to classify articles into specialties, like “Microeconomics”, “Macroeconomics & Monetary Economics”, “Industrial Organization”, etc. An article can have multiple JEL codes and so can be identified as part of multiple specialties. The JEL nomenclature was radically altered in 1991, and while these results in some discontinuity between the two nomenclatures, there are some correspondence (see Cherrier for a history…). The contemporary list of JEL codes can be found on the AEA website^[https://www.aeaweb.org/econlit/jelCodes.php] and the old JEL codes with old/new correspondence table can be found in the Journal of Economic Literature, volume 29(1) (JEL, 1991).
+
+For our corpus, we consider that an article is a macroeconomics article if it has one of the following codes:
+
+- For old JEL codes (pre-1991): 023, 131, 132, 133, 134, 223, 311, 313, 321, 431, 813, 824.
+
+- For new JEL codes (1991 onward): all E, F3 and F4.2.
+
+Two additional comments on the JEL classification are necessary:
+
+- First, we had to use some pre-1991 JEL codes that are not considered in the new classification as totally belonging to macroeconomics. Consequently, many articles in our pre-1991 corpus are public finance/public economics articles. Nonetheless, this group is clearly identifiable in our networks and thus do not disturb the interpretation of our results.
+
+- Second, in the recent classification, the letter E designates macroeconomics JEL code, while F designates International Economics. In this last sub-discipline, we decided that it would be important to have articles dealing with international macroeconomics and thus we integrated articles with F3 and F4.2 JEL codes.
+
+Using these JEL codes, we match the articles extracted from Econlit with Web of Science articles using the following set of matching variables:
+
+- Journal, Volume, First Page
+
+- Year, Journal, First Page, Last Page
+
+- First Author, Year, Volume, First Page
+
+- First Author, Title, Year
+
+- Title, Year, First Page
+
+We expect that these matching procedure results in some false positive. However, two elements prevent false positive from having any importance on the platform. First, we applied a general threshold on edges by keeping links between articles that had at least two references in common, and our projected networks are only made of the main component of our corpus (i.e,the biggest connected network). In other words, false positive have a very high chance of being completely disconnected from our main component and therefore filtered out from our analysis. Second, even if false positive "articles" are present in some networks, these articles, when irrelevant, would be relegated at the margins of our networks and thus do not have any significant impact on our results.
+
+\subsection{Network construction}
+
+Our networks are based on bibliographic coupling. In a bibliographic coupling network, a link is created between two articles when they have one or more references in common. The more references two articles have in common, the stronger the link. The idea is that articles sharing many references to gather are likely to share cognitive content (ideas, theories, methods, objects of study, etc.).
+
+To normalize and weight the link between two articles, we used the refined bibliographic coupling strength of Shen et al. (2019). This method normalized and weight the strength between articles by considering two important elements:
+
+The size of the bibliography of the two linked articles. It means that common references between two articles with long bibliography are weighted as less significant since the likeliness of potential common references is higher. Conversely, common references between two articles with a short bibliography is weighted as more significant.
+
+The number of occurrences of each reference in the overall corpus. When a reference is shared between two articles, it is weighted as less significant if it is a very common reference across the entire corpus and very significant if it is scarcely cited. The assumption is that a very rare common reference points to a higher content similarity between two articles than a highly cited reference.
+
+For all macroeconomics articles published in the EER and in the Top 5, we build successive networks on 5-year overlapping windows (1969-1973; 1970-1974; …; 2010-2014; 2011-2015). This results in 43 networks.
+
+For each network:
+
+We apply a general threshold on edges by keeping links between articles that had at least two references in common before weighting. We consider that it is more likely that the link between two articles is significant if they share at least two references.
+
+We only kept the main component of the network (thus ignoring singleton and secondary components). Nonetheless, we take care to check that any secondary component did not represented more than 2% of the whole network.
+
+We place nodes in a 2-dimensional space using the Force Atlas 2 algorithm (Jacomy et al., 2014). Force Atlas relied on an attractive force—bringing closer articles which are linked—and a repulsive force—moving away the articles with no link, while minimizing the crossing between edges.
+
+The size of the nodes depends of the number of citations—coming from other macroeconomics papers—the article received during the time window.
+
+We identify relevant groups of articles using a cluster detection algorithm and colored nodes according to the cluster they belong to (see below for details).
+
+
+\section{Features}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Sample figure:
+
+\begin{figure}
+Figure here.
+
+\caption{Caption for figure below.}
+\begin{figurenotes}
+Figure notes without optional leadin.
+\end{figurenotes}
+\begin{figurenotes}[Source]
+Figure notes with optional leadin (Source, in this case).
+\end{figurenotes}
+\end{figure}
+
+Sample table:
+
+\begin{table}
+\caption{Caption for table above.}
+
+\begin{tabular}{lll}
+& Heading 1 & Heading 2 \\
+Row 1 & 1 & 2 \\
+Row 2 & 3 & 4%
+\end{tabular}
+\begin{tablenotes}
+Table notes environment without optional leadin.
+\end{tablenotes}
+\begin{tablenotes}[Source]
+Table notes environment with optional leadin (Source, in this case).
+\end{tablenotes}
+\end{table}
+
+References here (manual or bibTeX). If you are using bibTeX, add your bib file
+name in place of BibFile in the bibliography command.
+% Remove or comment out the next two lines if you are not using bibtex.
+\bibliographystyle{aea}
+\bibliography{references}
+
+% The appendix command is issued once, prior to all appendices, if any.
+\appendix
+
+\section{Mathematical Appendix}
