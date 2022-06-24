@@ -29,6 +29,35 @@
   \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 
 
+% Pandoc citation processing
+\newlength{\cslhangindent}
+\setlength{\cslhangindent}{1.5em}
+\newlength{\csllabelwidth}
+\setlength{\csllabelwidth}{3em}
+\newlength{\cslentryspacingunit} % times entry-spacing
+\setlength{\cslentryspacingunit}{\parskip}
+% for Pandoc 2.8 to 2.10.1
+\newenvironment{cslreferences}%
+  {}%
+  {\par}
+% For Pandoc 2.11+
+\newenvironment{CSLReferences}[2] % #1 hanging-ident, #2 entry spacing
+ {% don't indent paragraphs
+  \setlength{\parindent}{0pt}
+  % turn on hanging indent if param 1 is 1
+  \ifodd #1
+  \let\oldpar\par
+  \def\par{\hangindent=\cslhangindent\oldpar}
+  \fi
+  % set entry spacing
+  \setlength{\parskip}{#2\cslentryspacingunit}
+ }%
+ {}
+\usepackage{calc}
+\newcommand{\CSLBlock}[1]{#1\hfill\break}
+\newcommand{\CSLLeftMargin}[1]{\parbox[t]{\csllabelwidth}{#1}}
+\newcommand{\CSLRightInline}[1]{\parbox[t]{\linewidth - \csllabelwidth}{#1}\break}
+\newcommand{\CSLIndent}[1]{\hspace{\cslhangindent}#1}
 
 
 \usepackage{hyperref}
@@ -108,10 +137,11 @@ economics to classify articles into specialties, like
 and so can be identified as part of multiple specialties. The JEL
 nomenclature was radically altered in 1991, and while these results in
 some discontinuity between the two nomenclatures, there are some
-correspondence (see Cherrier for a history\ldots). The contemporary list
-of JEL codes can be found on the AEA website\footnote{https://www.aeaweb.org/econlit/jelCodes.php}
-and the old JEL codes with old/new correspondence table can be found in
-the Journal of Economic Literature, volume 29(1) (JEL, 1991).
+correspondence (see Cherrier (2017) for a history of the JEL codes). The
+contemporary list of JEL codes can be found on the AEA
+website\footnote{\url{https://www.aeaweb.org/econlit/jelCodes.php}} and
+the old JEL codes with old/new correspondence table can be found in the
+Journal of Economic Literature, volume 29(1) (JEL, 1991).
 
 For our corpus, we consider that an article is a macroeconomics article
 if it has one of the following codes:
@@ -180,7 +210,7 @@ references to gather are likely to share cognitive content (ideas,
 theories, methods, objects of study, etc.).
 
 To normalize and weight the link between two articles, we used the
-refined bibliographic coupling strength of Shen et al.~(2019). This
+refined bibliographic coupling strength of Shen et al. (2019). This
 method normalized and weight the strength between articles by
 considering two important elements:
 
@@ -214,10 +244,11 @@ secondary component did not represented more than 2\% of the whole
 network.
 
 We place nodes in a 2-dimensional space using the Force Atlas 2
-algorithm (Jacomy et al., 2014). Force Atlas relied on an attractive
-force---bringing closer articles which are linked---and a repulsive
-force---moving away the articles with no link, while minimizing the
-crossing between edges.
+algorithm Jacomy et al. (2014)
+
+(Jacrelied on an attracive force---bringing closer articles which are
+linked---and a repulsive force---moving away the articles with no link,
+while minimizing the crossing between edges. (Vedeld 1994)
 
 The size of the nodes depends of the number of citations---coming from
 other macroeconomics papers---the article received during the time
@@ -261,17 +292,38 @@ Table notes environment with optional leadin (Source, in this case).
 \end{tablenotes}
 \end{table}
 
-References here (manual or bibTeX). If you are using bibTeX, add your
-bib file name in place of BibFile in the bibliography command. \% Remove
-or comment out the next two lines if you are not using bibtex.
-
-\bibliographystyle{aea}
-\bibliography{references}
-
 \% The appendix command is issued once, prior to all appendices, if any.
 \appendix
 
 \section{Mathematical Appendix}
+
+\hypertarget{refs}{}
+\begin{CSLReferences}{1}{0}
+\leavevmode\vadjust pre{\hypertarget{ref-cherrierClassifyingEconomicsHistory2017}{}}%
+Cherrier, Beatrice. 2017. {``Classifying {Economics}: {A History} of the
+{JEL Codes}.''} \emph{Journal of Economic Literature} 55 (2): 545--79.
+\url{https://econpapers.repec.org/article/aeajeclit/v_3a55_3ay_3a2017_3ai_3a2_3ap_3a545-79.htm}.
+
+\leavevmode\vadjust pre{\hypertarget{ref-jacomy_ForceAtlas2ContinuousGraph_2014}{}}%
+Jacomy, Mathieu, Tommaso Venturini, Sebastien Heymann, and Mathieu
+Bastian. 2014. {``{ForceAtlas2}, a {Continuous Graph Layout Algorithm}
+for {Handy Network Visualization Designed} for the {Gephi Software}.''}
+Edited by Mark R. Muldoon. \emph{PLoS ONE} 9 (6): e98679.
+\url{https://doi.org/10.1371/journal.pone.0098679}.
+
+\leavevmode\vadjust pre{\hypertarget{ref-shenRefinedMethodComputing2019}{}}%
+Shen, Si, Danhao Zhu, Ronald Rousseau, Xinning Su, and Dongbo Wang.
+2019. {``A Refined Method for Computing Bibliographic Coupling
+Strengths.''} \emph{Journal of Informetrics} 13 (2): 605--15.
+\url{https://doi.org/10.1016/j.joi.2019.01.012}.
+
+\leavevmode\vadjust pre{\hypertarget{ref-vedeld_environment_1994}{}}%
+Vedeld, Paul O. 1994. {``The Environment and Interdisciplinarity
+Ecological and Neoclassical Economical Approaches to the Use of Natural
+Resources.''} \emph{Ecological Economics} 10 (1): 1--13.
+\url{https://doi.org/10.1016/0921-8009(94)90031-0}.
+
+\end{CSLReferences}
 
 
 \end{document}
