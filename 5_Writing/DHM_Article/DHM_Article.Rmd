@@ -27,7 +27,9 @@ acknowledgements: |
   We thank Till Duppe for his wisdom
 abstract: |
   Abstract goes here
-output: rticles::aea_article
+output:
+  bookdown::pdf_document2:
+    extra_dependencies: "subfig"
 bibliography: references.bib
 ---
 
@@ -35,15 +37,13 @@ The Mapping Macroeconomics project is an online interactive platform displaying 
 
 The point of departure of the project is the observation of an exponential increase in the number of articles published in academic journals in economics since the 1970s. This phenomenon makes it harder for historians of economics to properly assess the trends in the transformation of economics, the main topics researched, the most influential authors and ideas, etc. We consider that developing collective quantitative tools could help historians to confront this challenge. The opportunities that a quantitative history brings are particularly useful to the recent history of macroeconomics. Practicing macroeconomists are eager to tell narratives of the evolution of their field that serve the purpose of intervening on current debates, by giving credit to particular authors and weight to specific ideas. Historians who go into this area find plenty of accounts by macroeconomists and have to handle the vast increase in the macroeconomic literature since the last quarter of the past century. The Mapping Macroeconomics platform aims at helping historians to empirically check macroeconomists' narratives on the discipline, to explore interesting patterns on the evolution of macroeconomics, and eventually to write new histories of macroeconomics.
 
-\section{Methodology}
+# Methodology {#Methodology}
 
-\subsection{Construction of the Corpus}
+## Construction of the Corpus
 
-Our corpus is composed of macroeconomic articles published in economics. We identified all articles published in macroeconomics using JEL codes related to macroeconomics (Econlit database). JEL codes are used in economics to classify articles into specialties, like "Microeconomics", "Macroeconomics & Monetary Economics", "Industrial Organization", etc. An article can have multiple JEL codes and so can be identified as part of multiple specialties. The JEL nomenclature was radically altered in 1991, and while these results in some discontinuity between the two nomenclatures, there are some correspondence (see @cherrierClassifyingEconomicsHistory2017 for a history of the JEL codes). The contemporary list of JEL codes can be found on the AEA website[^1] and the old JEL codes with old/new correspondence table can be found in the Journal of Economic Literature, volume 29(1) (JEL, 1991).[^2]
+Our corpus is composed of macroeconomic articles published in economics. We identified all articles published in macroeconomics using JEL codes related to macroeconomics (Econlit database). JEL codes are used in economics to classify articles into specialties, like "Microeconomics", "Macroeconomics & Monetary Economics", "Industrial Organization", etc. An article can have multiple JEL codes and so can be identified as part of multiple specialties. The JEL nomenclature was radically altered in 1991, and while these results in some discontinuity between the two nomenclatures, there are some correspondence (see @cherrierClassifyingEconomicsHistory2017 for a history of the JEL codes). The contemporary list of JEL codes can be found on the AEA website[^1] and the old JEL codes with old/new correspondence table can be found in the Journal of Economic Literature, volume 29(1) (JEL, 1991).
 
 [^1]: <https://www.aeaweb.org/econlit/jelCodes.php>
-
-[^2]: <https://www.aeaweb.org/econlit/jelCodes.php>
 
 For our corpus, we consider that an article is a macroeconomics article if it has one of the following codes:
 
@@ -71,7 +71,7 @@ Using these JEL codes, we match the articles extracted from Econlit with Web of 
 
 We expect that these matching procedure results in some false positive. However, two elements prevent false positive from having any importance on the platform. First, we applied a general threshold on edges by keeping links between articles that had at least two references in common, and our projected networks are only made of the main component of our corpus (i.e,the biggest connected network). In other words, false positive have a very high chance of being completely disconnected from our main component and therefore filtered out from our analysis. Second, even if false positive "articles" are present in some networks, these articles, when irrelevant, would be relegated at the margins of our networks and thus do not have any significant impact on our results.
 
-\subsection{Network construction}
+## Network construction
 
 Our networks are based on bibliographic coupling. In a bibliographic coupling network, a link is created between two articles when they have one or more references in common. The more references two articles have in common, the stronger the link. The idea is that articles sharing many references to gather are likely to share cognitive content (ideas, theories, methods, objects of study, etc.).
 
@@ -85,7 +85,7 @@ For all macroeconomics articles published in the EER and in the Top 5, we build 
 
 For each network, we apply a variety of treatments:
 
--   We apply a general threshold on edges by removing links between articles that had only two references in common before weighting. We consider that it is more likely that the link between two articles is significant if they share at least two references. This is a great way to filter very common references such as econometrics hand book that might link two articles that have little in common. This is also a way to filter potential false positive from our matching method and exclude article that have little in common with the overall network beside one reference.[^3]
+-   We apply a general threshold on edges by removing links between articles that had only two references in common before weighting. We consider that it is more likely that the link between two articles is significant if they share at least two references. This is a great way to filter very common references such as econometrics hand book that might link two articles that have little in common. This is also a way to filter potential false positive from our matching method and exclude article that have little in common with the overall network beside one reference.[^2]
 
 -   We only kept the main component of the network (thus ignoring singleton and secondary components). Nonetheless, we made sure that no other components represented more than 2% of the whole network.
 
@@ -95,9 +95,9 @@ For each network, we apply a variety of treatments:
 
 -   We identify relevant groups of articles using a cluster detection algorithm and colored nodes according to the cluster they belong to (see below for details).
 
-[^3]: There exists other recently developed methods to filter non-significant edges such as the Stochastic Degree Sequence Model from backbone approaches [@domagalskiBackbone2021]. In addition to being costly computationally and unpractical in our case, backbone approaches are better suited for tightly knit networks for which there is not obvious weighting methods. This is not the case for your corpus. With a low threshold and the weighting method used, clear and stable clusters are easily identified.
+[^2]: There exists other recently developed methods to filter non-significant edges such as the Stochastic Degree Sequence Model from backbone approaches [@domagalskiBackbone2021]. In addition to being costly computationally and unpractical in our case, backbone approaches are better suited for tightly knit networks for which there is not obvious weighting methods. This is not the case for your corpus. With a low threshold and the weighting method used, clear and stable clusters are easily identified.
 
-\subsection{Cluster detection}
+## Cluster detection {#clustermetho}
 
 We use the Leiden detection algorithm [@traag_LouvainLeidenGuaranteeing_2019] that optimize the modularity on each network to identify groups of articles that are similar to each other and dissimilar to the rest of the network. We use a resolution of 1 with 1000 iterations. This results in X clusters across all networks.
 
@@ -109,66 +109,64 @@ Finally, we collect a certain number of information for each cluster (most cited
 
 -   Sub-names are unique to clusters. They capture what makes the cluster specific to other clusters in the network, and other clusters with the same meta-name (e.g., International Macroeconomics: Exchange Rate Dynamics).
 
-\section{Features}
+To make sure that the name chosen were not too biased by our individual subjective judgement, we submitted the list of clusters to **EXPLAIN HERE IN MORE DETAILED WHO DID WHAT**.
 
-\subsection{Graph exploration and manual search}
+# Features
+
+## Graph exploration and manual search
 
 The platform and its results rely on data taken from Web of Science. Besides the underlying data used, we can distinguish two analytical layers to the platform. The first layer is made of the network nodes and edges and capture the way we project bibliographic information on the a two-dimensional space.
 
 The main methodological elements that characterize this layers is the method of projection of the bipartite graph used (bibliographic coupling), the length of the time-window, the edge threshold, the filtering of nodes unconnected to the main component, the way we weighted the edges, and finally the algorithm used to placed nodes in a two-dimensional space.
 
-User of the platform can explore this first analytical layer freely using the main view of the platform. Using the timeline at the bottom of the platform, a particular time window can be chosen to display all macroeconomics articles published during that time frame.
+Users of the platform can explore this first analytical layer freely using the main view of the platform. Using the timeline at the bottom of the platform, a particular time window can be chosen to display all macroeconomics articles published during that time frame.
 
-A first obvious way to explore this graphical representation of the literature is to use the mouse to move (sustained click), zoom (mouse scroll), and interact with the network (left click). Different level of zoom capture different information. Being completely zoomed out, user can get an overview of the network, spot some groups of nodes visually, and get the title of the most cited articles in the network of the time window.
+A first obvious way to explore this graphical representation of the literature is to use the mouse to move (sustained click), zoom (mouse scroll), and interact with the network (left click). Different level of zoom capture different levels of information.
 
-Example 1969-1973: very obvious cluster such as public finance, less obvious cluster such as a detached group of article about the Cambridge controversy.
+User can get an overview of the network while being completely zoomed out. A first obvious heuristics that catches the eye is to focus on big nodes. Big nodes in your bibliographic coupling networks are nodes that are very cited within the selected time window. In other words, it does not give a lot of information about long-term impact, but it captures what are the "hot" articles published during the selected time frame. For example, in the 1990-1994 network, a very big node at the bottom of the network catches the eye. @johansenMAXIMUM1990 was published in 1990, and in the first year of its publications, it is already the most cited article in the network. It is not surprising to find that according to RePEc IDEAS ranking, this article rank 34th among the most cited economics articles.[^3] Our network confirms the importance of this particular article in macroeconomics, but also as an article that within its first year was impactful.
 
-Biggest node example: find during a particular time frame, which articles recently published generated a lot of attention =\> follow the attention over long term
+[^3]: Source: <https://ideas.repec.org/top/top.item.nbcites.html>, consulted the 01/07/2022
 
-By zooming in, it is can focus on particular subset of the network. As the network is zoomed in, you can
-
-Neighborhood. Click on a node.
-
-Example of Marxist article
-
-This exploratory tool can be pushed further using algorithmic detected clusters.
-
-\subsection{Clusters analysis}
-
-Sample figure:
-
-```{=tex}
-\begin{figure}
-Figure here.
-
-\caption{Caption for figure below.}
-\begin{figurenotes}
-Figure notes without optional leadin.
-\end{figurenotes}
-\begin{figurenotes}[Source]
-Figure notes with optional leadin (Source, in this case).
-\end{figurenotes}
-\end{figure}
+```{r bignode, out.width="100%",echo = FALSE, fig.cap = "caption"}
+knitr::include_graphics(here::here("5_Writing","DHM_Article","Pictures","big_nodes.PNG"))
 ```
-Sample table:
 
-```{=tex}
-\begin{table}
-\caption{Caption for table above.}
+A second important heuristics is to find close-knit groups of articles and blank spaces in the networks. For example, in the 1969-1973 a large group of article in the right part of the network is very detached from the rest (Figure \@ref(fig:zoom)a). Generally, when a close-knit group of articles is detached from most of the networks it means that its articles are bibliographically different from the rest of the network. User can zoom on relevant part of the network and investigate more closely the composition of such groups (Figure \@ref(fig:zoom)b).
 
-\begin{tabular}{lll}
-& Heading 1 & Heading 2 \\
-Row 1 & 1 & 2 \\
-Row 2 & 3 & 4%
-\end{tabular}
-\begin{tablenotes}
-Table notes environment without optional leadin.
-\end{tablenotes}
-\begin{tablenotes}[Source]
-Table notes environment with optional leadin (Source, in this case).
-\end{tablenotes}
-\end{table}
+```{r zoom, out.width="50%", fig.ncol = 2, echo = FALSE, fig.cap = "caption", fig.show = "hold", fig.subcap = c("Overview", "Zoomed")}
+knitr::include_graphics(c(here::here("5_Writing","DHM_Article","Pictures","detached_group.PNG"), here::here("5_Writing","DHM_Article","Pictures","zoomed_group.PNG")))
 ```
+
+From the zoomed in view, users can get a quick glance of the titles of the nodes. A better way to investigate the nature of the group is to click on individual nodes to bring forth the Node information panel. This panel will give you information about the authors names, the year of publication of the article, journal in which it is published, and the number of citations in the selected time window. By clicking on a node, you can also get information about its relationship to other nodes. For example, by clicking on one of the big node of the previously highlighted groups of articles (Figure \@ref(fig:bridge)a), we can see that the clicked node [@mcguireEfficiency1969] has only bibliographic relationship with other nodes from the group confirming the idea that it is part of a specialized literature dedicated to public finance and public good. Besides this big nodes at the center of the group, users can also investigate articles that bridges these different literatures. For example, while heavily bibliographically related to the public good groups, @mieszkowskiTax1969 on the effect of taxes bridge the public finance group with others groups such as exchange rate (on tariff and tax rates), investment behavior (corporate taxes), and Keynesian economics (Figure \@ref(fig:bridge)b). Articles bridging different parts of the literature means that they cite similar references as these different groups. It is not surprising to find that @mieszkowskiTax1969 was published in the *Journal of Economic Literature* as literature review tend to bring together sub-fields of economics that rarely cite the same references otherwise.
+
+```{r bridge, out.width="50%", fig.ncol = 2, echo = FALSE, fig.cap = "caption", fig.show = "hold", fig.subcap = c("Clicked node in group", "Bridging node")}
+knitr::include_graphics(c(here::here("5_Writing","DHM_Article","Pictures","clicked_node.PNG"), here::here("5_Writing","DHM_Article","Pictures","bridge_node.PNG")))
+```
+
+Finally, a third important heuristic tool is the search bar which allows users to search articles with particular authors, published in specific journals or whose titles contain defined keywords. After a search query, nodes matching the query will be highlighted with a red circle. For example, by search for occurrences of the keywords "Cambridge Journal" in the Journals of publications, we find that most articles published in the *Cambridge Journal of Economics* between 1989-1993 are situated in a very specific part of the network that we identified through clustering techniques as Keynesian economics (Figure \@ref(fig:query)a). This results contrasts with a query looking for articles published in the *American Economic Review* which highlight many different parts of the network (Figure \@ref(fig:query)b).
+
+```{r query, out.width="50%", fig.ncol = 2, echo = FALSE, fig.cap = "caption", fig.show = "hold", fig.subcap = c("Cambridge Journal query", "American Economic Review query")}
+knitr::include_graphics(c(here::here("5_Writing","DHM_Article","Pictures","cambridge_query.PNG"), here::here("5_Writing","DHM_Article","Pictures","AER_query.PNG")))
+```
+
+Taken together, these three heuristics tools allow users to freely explore the structure of macroeconomics without concerns for methodological considerations regarding clustering techniques. The different time windows allows user to follow dynamically how groups of nodes, individual articles or particular keywords queries change over time. One can follow two close-knit group of articles to investigate the articles bridging them, or follow the number of citations of one particular articles by other macroeconomics articles within the first five years of its publications. In the case of keywords search, query remain active as time windows are selected, allowing user to easily track particular trends. For example, one can search for publications in the *Cambridge Journal of Economics* and change time windows. As soon as the network is loaded, relevant articles will be highlighted thus making changes in structure easily noticeable.
+
+While these features highlight important ways to use the platform, its full power come when using these heuristics tools in combination with the cluster analysis made available on the platform.
+
+## Clusters analysis
+
+When exploring particular networks, nodes are colored according to particular algorithmically-identified clusters. These clusters groups particular articles into discrete aggregates. As an overview of the network, users can use two important tools. First, the "Meta-name" and "Sub-name" buttons allows user to display directly on the network the name of the clusters (see section \@ref(clustermetho) for the difference between meta- and sub- names). Second, by clicking on the "Size of communities" users can obtain the list of all clusters and their relative importance in the network. Doing so will open a window with the share of nodes in the networks identified as part of the different clusters. This allows users to easily track how different clusters evolved over time in term of number of publications.
+
+By clicking on any nodes in the networking belonging to a particular cluster, the "Node information" window opens and gives access to a new button called "Community information". By clicking on this new button, users can explore specific information that relate to the cluster whose name is the sub-name in the "Node information" window.
+
+From this new windows, user can access a variety of table that summarize the nature of the cluster during this particular time window. It is possible to find out which are the biggest nodes of the community in the network and use the "Show" button to zoom and select a chosen node. It is also possible to have a summary of the venue of publications of articles in the cluster, or which authors have authored the most articles in the clusters.
+
+In addition to these information which can be found by exploring the network, user can also find a very new information such as with the "Most cited references" table which rank the most cited references by articles in the clusters. As we said previously, the size of the nodes is a great way to investigate short-time influence. However, for long term impact, the "Most cited references" table is more useful as you can track how the importance of particular references increases or decreases across multiple decades for particular communities in macroeconomics.
+
+The TFIDF table will give you information about the most distinct words (bigrams and unigrams) that appear in the title of the articles in the clusters. Finally, the "Evolution communities" and "Origin communities" tables allows you to investigate how the clustered chosen relates to clusters in the following and previous time windows respectively. This table is a way to quantitatively assess how clusters evolve in relationship to others clusters beyond heuristics impressions such as visually identifiable close-knit groups of articles.
+
+While we gave name to particular cluster as a heuristics tools, it is important to explore communities of interest using these tables so that one can better understand the nature of the clusters. The way we named clusters capture important features of the clusters, but is might also play down potential heterogeneity in the clusters or smaller clusters within the clusters that capture relevant specialties of economics.
+
 \% The appendix command is issued once, prior to all appendices, if any. \appendix
 
 \section{Mathematical Appendix}
