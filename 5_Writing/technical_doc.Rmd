@@ -1,21 +1,33 @@
 ---
 title: "Mapping Macroeconomics - Technical Documentation"
 author: "Aurélien Goutsmedt and Alexandre Truc"
-date: "30/05/2022"
 output: 
   html_document:
-    keep_html: true
+    theme: readable
+    toc: true
+    number_sections: false
+    toc_float: true
+    toc_depth: 2
+    code_folding: hide
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
+
+source(here::here("functions","Script_paths_and_basic_objectsV2.R"))
+alluv_dt <- readRDS(here(graph_data_path, "alluv_dt_1969-2011.rds"))
+
+nb_total_com <- alluv_dt %>% distinct(new_Id_com, Window) %>% nrow()
+nb_temporal_com <- alluv_dt$new_Id_com %>% unique %>% length
+nb_temporal_com_filtered <- alluv_dt[color != "grey"]$new_Id_com %>% unique %>% length
+
 ```
 
 ## Corpus
 
 Our corpus is composed of macroeconomic articles published in economics. 
 
-We identified all articles published in macroeconomics using **JEL codes** related to macroeconomics (Econlit database). JEL codes are used in economics to classify articles into specialties, like “Microeconomics”, “Macroeconomics & Monetary Economics”, “Industrial Organization”, etc. An article can have multiple JEL codes and so can be identified as part of multiple specialties. The JEL nomenclature was radically altered in 1991, and while these results in some discontinuity between the two nomenclatures, there are some correspondence (see Cherrier for a history…). The contemporary list of JEL codes can be found [here](https://www.aeaweb.org/econlit/jelCodes.php?view=jel) and the old JEL codes with old/new correspondence table can be found in the *Journal of Economic Literature*, volume 29(1) (JEL, 1991).
+We identified articles published in macroeconomics using **JEL codes** related to macroeconomics (Econlit database). JEL codes are used in economics to classify articles into specialties, like “Microeconomics”, “Macroeconomics & Monetary Economics”, “Industrial Organization”, etc. An article can have multiple JEL codes and so can be identified as part of multiple specialties. The JEL nomenclature was radically altered in 1991, and while these results in some discontinuity between the two nomenclatures, there are some correspondence (see Cherrier, 2017, for a history of JEL codes). The contemporary list of JEL codes can be found [here](https://www.aeaweb.org/econlit/jelCodes.php?view=jel) and the old JEL codes with old/new correspondence table can be found in the *Journal of Economic Literature*, volume 29(1) (JEL, 1991).
 
 For our corpus, we consider that **an article is a macroeconomics article if it has one of the following codes**: 
 
@@ -41,15 +53,15 @@ Using these JEL codes, we **match the articles extracted from Econlit with Web o
 
 - Title, Year, First Page
 
-We expect that these matching produced some false positive. Nonetheless, these “false positive” articles are relegated at the margins of our networks and thus do not have any significant impact on our results.
+We expect that this matching produces some false positive. Nonetheless, these “false positive” articles are relegated at the margins of our networks and thus do not have any significant impact on our results.
 
 ## Network construction
 
-Our networks are based on **bibliographic coupling**. In a bibliographic coupling network, a link is created between two articles when they have one or more references in common. The more references two articles have in common, the stronger the link. The idea is that articles sharing many references to gather are likely to share cognitive content (ideas, theories, methods, objects of study, etc.).
+Our networks are based on **bibliographic coupling**. In a bibliographic coupling network, a link is created between two articles when they have one or more references in common. The more references two articles have in common, the stronger the link. The idea is that articles sharing many references together are likely to share cognitive content (ideas, theories, methods, objects of study, etc.).
 
 **To normalize and weight** the link between two articles, we used the refined bibliographic coupling strength of Shen et al. (2019). This method normalized and weight the strength between articles by considering two important elements: 
 
-1.	**The size of the bibliography** of the two linked articles. It means that common references between two articles with long bibliography are weighted as less significant since the likeliness of potential common references is higher. Conversely, common references between two articles with a short bibliography is weighted as more significant. 
+1.	**The size of the bibliography** of the two linked articles. It means that common references between two articles with long bibliography are weighted as less significant since the likeliness of potential common references is higher. Conversely, common references between two articles with a short bibliography are weighted as more significant. 
 
 2.	**The number of occurrences of each reference** in the overall corpus. When a reference is shared between two articles, it is weighted as less significant if it is a very common reference across the entire corpus and very significant if it is scarcely cited. The assumption is that a very rare common reference points to a higher content similarity between two articles than a highly cited reference.
 
@@ -69,11 +81,11 @@ For each network:
 
 ## Cluster detection
 
-We use the* Leiden detection algorithm* (Traag et al., 2019) that optimize the modularity on each network to identify groups of articles that are similar to each other and dissimilar to the rest of the network. We use a resolution of 1 with 1000 iterations. This results in X clusters across all networks. 
+We use the *Leiden detection algorithm* (Traag et al., 2019) that optimize the modularity on each network to identify groups of articles that are similar to each other and dissimilar to the rest of the network. We use a resolution of 1 with 1000 iterations. This results in `r nb_total_com` clusters across all networks. 
 
-Because networks have a lot of overlaps (three years are common to successive networks), many clusters between two successive periods are composed of the same articles. To identify these clusters that are very similar between two successive time-windows, we consider that two clusters can be merged if *(i)* at least 55% of the articles in a cluster of the first time-window were in the same cluster in the second time window and *(ii)* the cluster was also composed by at least 55% of articles of the first time-window. Simply put, **between two successive time-windows, if two clusters share a high number of articles, and are both mostly composed by these shared articles, they are considered the same cluster**.
+Because networks have a lot of overlaps (three years are common to successive networks), many clusters between two successive periods are composed of the same articles. To identify these clusters that are very similar between two successive time-windows, we consider that two clusters can be merged if *(i)* at least 55% of the articles in a cluster of the first time-window were in the same cluster in the second time window and *(ii)* the cluster was also composed by at least 55% of articles of the first time-window. Simply put, **between two successive time-windows, if two clusters share a high number of articles, and are both mostly composed by these shared articles, they are considered the same cluster**. From the `r nb_total_com` initial clusters, we thus reduce the number of clusters to `r nb_temporal_com`.
 
-Finally, we collect a certain number of information for each cluster (most cited nodes, most cited references, recurrent authors and journals, most “identifying” words in title) to name the clusters. We use two-level names:
+Finally, for clusters representing more than 3% of a network for at least one time-window (that is, `r nb_temporal_com_filtered` clusters), we collect a certain number of information for each (most cited nodes, most cited references, recurrent authors and journals, most “identifying” words in title) to name the clusters. We use two-level names:
 
 - **Meta-names** are names shared across different clusters. They capture a broader characterization of the clusters: Business Cycles; Consumption, Investment & Production; Econometrics; Growth; International Macroeconomics; Keynesian Economics, Macro Policy; Monetary & Financial Economics; Public Finance.
 
@@ -81,8 +93,10 @@ Finally, we collect a certain number of information for each cluster (most cited
 
 ## Bibliography
 
-Jacomy, M., Venturini, T., Heymann, S., & Bastian, M. (2014). ForceAtlas2, a continuous graph layout algorithm for handy network visualization designed for the Gephi software. _PloS one_, 9(6), e98679.
+Cherrier, B. (2017). Classifying economics: A history of the JEL codes. _Journal of economic literature_, _55_(2): 545‑79.
 
-JEL. (1991). Classification System: Old and New Categories. _Journal of Economic Literature_, 29(1), xviii–xxviii.
+Jacomy, M., Venturini, T., Heymann, S., & Bastian, M. (2014). ForceAtlas2, a continuous graph layout algorithm for handy network visualization designed for the Gephi software. _PloS one_, _9_(6), e98679.
 
-Shen, S., Zhu, D., Rousseau, R., Su, X., Wang, D., 2019. A refined method for computing bibliographic coupling strengths. _Journal of Infometrics_ 13, 605–615.
+JEL. (1991). Classification System: Old and New Categories. _Journal of Economic Literature_, _29_(1), xviii–xxviii.
+
+Shen, S., Zhu, D., Rousseau, R., Su, X., Wang, D., 2019. A refined method for computing bibliographic coupling strengths. _Journal of Infometrics_, _13_, 605–615.
