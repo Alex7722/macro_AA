@@ -2,7 +2,7 @@
 title: "Alluvial"
 output: 
   html_document:
-    theme: readable
+    theme: united
     toc: true
     number_sections: true
     toc_float: true
@@ -43,7 +43,7 @@ script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"
   });
 ```
 
-```{r loading files, set.seed(3155210)}
+```{r loading files, set.seed(3155210), echo=FALSE}
 #' ---
 #' title: "Alluvial html for the plaform"
 #' author: "Aurélien Goutsmedt and Alexandre Truc"
@@ -107,15 +107,29 @@ alluv_dt <- readRDS(here(graph_data_path, "alluv_dt_named_colored.rds"))
 alluv_dt <- alluv_dt[, Com_ID := new_Id_com]
 alluv_dt <- alluv_dt[, share_max := max(share_leiden), by = "Com_ID"]
 alluv_dt <- alluv_dt[, color :=color_nodes]
+alluv_dt[,Window_plot:=paste0(Window, "-\n", as.numeric(Window)+time_window-1)]
 
-# plot_alluvial <- ggplot(alluv_dt, aes(x = Window, y=share, stratum = new_Id_com, alluvium = ID_Art, fill = color_nodes)) +
-#   geom_stratum(alpha =1, size=1/10) +
-#   geom_flow() +
-#   theme(legend.position = "none") +
-#   theme_minimal() +
-#   scale_fill_identity() +
-#   ggtitle("") +
-#   ggrepel::geom_label_repel(stat = "stratum", size = 5, aes(label = Label)) 
+plot_alluvial <- ggplot(alluv_dt, aes(x = Window_plot, y=share, stratum = new_Id_com, alluvium = ID_Art, fill = color_nodes)) +
+  geom_stratum(alpha =1, size=1/10) +
+  geom_flow() +
+  theme(legend.position = "none") +
+  theme_minimal() +
+  theme(plot.background = element_rect(fill = 'white', colour = NA)) +
+  scale_fill_identity() +
+  ggtitle("") +
+  ggrepel::geom_label_repel(stat = "stratum", size = 5, aes(label = Label), max.overlaps = 5)
+ggsave(here(picture_path, "alluvial_platform_graph.png"), plot = plot_alluvial, width = 60, height = 50, units = "cm")
+
+plot_alluvial_noname <- ggplot(alluv_dt, aes(x = Window_plot, y=share, stratum = new_Id_com, alluvium = ID_Art, fill = color_nodes)) +
+  geom_stratum(alpha =1, size=1/10) +
+  geom_flow() +
+  theme(legend.position = "none") +
+  theme_minimal() +
+  theme(plot.background = element_rect(fill = 'white', colour = NA)) +
+  scale_fill_identity() +
+  ggtitle("") 
+  # ggrepel::geom_label_repel(stat = "stratum", size = 5, aes(label = Label), max.overlaps = 5)
+ggsave(here(picture_path, "alluvial_platform_graph_noname.png"), plot = plot_alluvial_noname, width = 60, height = 50, units = "cm")
 
 tf_idf_alluvial <- tf_idf(nodes = alluv_dt[color != "#B2B2B2"],
                          com_name_column = "new_Id_com",
@@ -132,64 +146,47 @@ alluv_dt <- merge(alluv_dt, nodes_JEL[,c("ID_Art","ItemID_Ref")], by = "ID_Art")
 
 ```
 
-# Explanation of the process for naming communities
+In this section, you will find graphic representations of all networks and communities as alluvial diagrams. You can click on images to zoom and explore the diagrams with more precision.
 
-The following document gathers different data we have produced to help you labeling the different communities identified.
+-   The X axis delimits the different time windows of the platform. For one time window, you find all the communities in the network represented as rectangles (the stratum of the alluvial)
 
-What is our method? We have extracted all the articles with a macro JEL code.^[Before 1991, we have used the [correspondence grid](https://www.jstor.org/stable/2727351?seq=1) between old and new categories built by the _Journal of Economic Literature_.] The first JEL are in 1969, and we stop our analysis in 2015, mainly because reaching post-2015 articles involves going through another database and it is a supplementary work we don't want to go through for now. We have built bibliometric coupling networks (how many references two articles share in common) for five-year movingwindows: 1969-1973, 1970-1974,1971-1975, _etc..._, until 2011-2015. For each five-year network, we use the [Leiden algorithm](https://www.nature.com/articles/s41598-019-41695-z) to detect communities/clusters within the network. The algorithm groups together nodes that have many links in common, and few links with nodes outside of the community. 
+-   Each rectangle is one cluster in a given network detected by the Leiden algorithm. Rectangles are given a color according to the intertemporal naming procedure explained in the technical documentation. Colors in the alluvial directly match colors in the graph representation on the platform.
 
-In a second step, we have compared communities between networks. For instance, for the 1969-1973 and 1970-1974, we take all the articles published between 1970 and 1973 (i.e. those which are in both networks) and we look at which communities they belong. If one community (A) of 1969-1973 have a high share of its nodes in a community (B) of 1970-1974, and if a large share of the nodes of this community B comes from the same community A of 1969-1973, we consider that A and B are the same community. We have run this identification on the whole period.
+-   The "flow" between rectangles (the alluvium) is the share of nodes going from one cluster to the other. On the upper part of each rectangles, the absence of flow on the right is the share of nodes that are not found in the previous time window network (articles published on the last year of the time window), while the absence of flow on the left is the share of nodes that disappear in the following time window network (articles published in the first year of the time window).
 
-We have communities that just stay for five years, and some that persist for decades. Here is a visualization of the different communities (those which represent more than 5% of the nodes at least in one network) over time with their automatically generated labels. 
+-   The Y axis is the share of nodes in a given community for rectangles and the share of nodes circulating between clusters for the alluvium.
 
-```{r alluvial_plot, eval=TRUE}
+# Alluvial Diagrams
 
+```{r alluvial_plot, eval=TRUE, echo=FALSE}
 
-include_graphics(here(picture_path,"alluvial_colored_named.png"))
-
+include_graphics(here(picture_path,"alluvial_platform_graph.png"))
+include_graphics(here(picture_path,"alluvial_platform_graph_noname.png"))
 
 ```
 
-We think it is important to give names to community to analyse better our results and have more interesting visualizations, but we don't want to name these communities automatically (for instance by taking the most identifying word of the community). We want a "qualitative" assessment of what each community represents. That is what the following information should help to do.
+# List of the main macroeconomics clusters in the alluvial
 
-# List of the main macroeconomics communities on the 1969-2015 period
+In this section, you will find a number of synthetic information and tables about [**intertemporal clusters**]{.underline} (i.e. all articles in all time windows in individual clusters as identified by sub-names).
 
-You will find below basic information on each community to help you to name them. 
+-   The first year of the first five-year window the community appears for the first time and the last year of the last window before it disappears;
 
-The name of a community should be unique and is composed of two parts:
+-   The number of nodes in the community, what it represents in the whole corpus, and what the community represents in the five-year window it is the largest in proportion;
 
-- A "meta-name", which could be the same for different communities and which represent a meta-category to which the community belongs. After a first investigation of our results, I have already established a list of these meta-names that could be transformed (see below):
+-   The five authors that have published the highest number of articles in the community;
 
-  - Business Cycles
-  - Consumption, Production & Investment
-  - Econometrics
-  - General Equilibrium Theory
-  - Growth
-  - International Macroeconomics
-  - Keynesian Economics
-  - Macro Policy
-  - Monetary Economics
-  - Public Finance
-  
-- A  sub-name for the community (that will be complemented by the "meta-name"), which is unique under the meta-name. For instance, you could use "Varia", "Theory", or "forecasting issues", and you could have "Econometrics - Varia" and "Monetary Economics - Varia", but not two "Monetary Economics - Varia". Examples of such meta-names are: Phillips Curve and Rational Expectations (with the meta-name, it would give: "Business Cycles - Phillips Curve and Rational Expectations"), Exchange Rate Forecasting, Disequilibrium Theory, OLG Models... Again, the name of the community, that is "meta-name - sub-name" has to be unique. 
+-   The five journals that have published the highest number of articles in the community;
 
-I have already created a list of meta-names. The meta-names are more or less inspired by the JEL categories for macroeconomics. You are more than welcome to disagree with this list of meta-names and to think it does not properly allow to give names to the communities, and thus to suggest deletion, addition or replacement (see below how to express your disagreement). I also have a list of sub-names that I used in a former categorization. It could inspire you but you are not tied to use them. 
+-   The articles of the community that "identifies" the most the community. We use a normalized deviation measure, which takes into account the number of times an article is cited in the corpus in general during the period---if the community existed from 1979 to 1991, we calculate the number of citations of these articles between 1979 and 1991--- and the number of times it is cited by other articles of the community. The formula looks like this: $\theta = \sqrt{N}\frac{f - f_0}{\sqrt{f_0(1 - f_0)}}$ with $N$ the total number of articles in the corpus in the period, $f$ the weighted frequency in the community and $f0$ the weighted frequency in the whole corpus. The articles with the highest values are the articles which are highly cited by other articles of the community, without being highly cited by the other articles of the period.
 
-Using the information gathered below on each community, you will be able to give names for each community. You will do this separately from the others, not to be influenced. At the end, I will compare the results and choose the more suitable categorization.
+-   The most cited references (articles, books, book chapters...).
+
+-   The terms (in the articles titles) that "identify" the most the communities. We use the [Term-Frequency/Inverse-Document-Frequency](https://en.wikipedia.org/wiki/Tf%E2%80%93idf) measure. The Term-Frequency part simply looks at the number of time a term is used (above the total number of words used by the community), whereas the Inverse-Document-Frequency calculates in how many communities a term appear. The higher the number of communities it appears is, the lower the IDF will be. In other words, a term has a high TF-IDF value if it is used a lot in a community, but not used in many other communities.
 
 
-In what follows, you will find information for each community about:
+[**IMPORTANT DISCLAIMER**]{.underline}: because the number of articles (nodes) increase rapidly over time, communities that exists over many time windows are mostly characterized in the following tables by the latter time windows. In turn, the following tables can hide heterogeneity and great transformations within a particular cluster simply because the weight of the latter time window is simply to important. [The best exploratory tool remain to look at individual cluster on the platform for different time window]{.underline}.
 
-- The first year of the first five-year window the community appears for the first time and the last year of the last window before it disappears;
-- The number of nodes in the community, what it represents in the whole corpus, and what the community represents in the five-year window it is the largest in proportion;
-- The five authors that have published the highest number of articles in the community;
-- The five journals that have published the highest number of articles in the community;
-- The articles of the community that "identifies" the most the community. We use a normalized deviation measure, which takes into account the number of times an article is cited in the corpus in general during the period---if the community existed from 1979 to 1991, we calculate the number of citations of these articles between 1979 and 1991--- and the number of times it is cited by other articles of the community. The formula looks like this: $\theta = \sqrt{N}\frac{f - f_0}{\sqrt{f_0(1 - f_0)}}$ with $N$ the total number of articles in the corpus in the period, $f$ the weighted frequency in the community and $f0$ the weighted frequency in the whole corpus. The articles with the highest values are the articles which are highly cited by other articles of the community, without being highly cited by the other articles of the period. It is a measure similar to the TF-IDF measure (see below).^[Why doing that rather than just measuring the most cited articles of the community? Because some articles could be highly cited in general, and thus highly cited by other communities too. So they are not representative of the community, even if they are in the community. Indeed, the presence of an article within the community is linked to the references it shares with other articles. It does not say anything on which articles are citing it. Besides, articles could belong more or less "deeply" to some communities. Sometimes, articles are at the frontier of different communities. When the five-year window move to the next year, some articles could arrive in another community.] 
-- The references (articles, books, book chapters...) that are the most cited by the articles of the community.
-- The terms (in the articles titles) that "identify" the most the communities. We use the [Term-Frequency/Inverse-Document-Frequency](https://en.wikipedia.org/wiki/Tf%E2%80%93idf) measure. The Term-Frequency part simply looks at the number of time a term is used (above the total number of words used by the community), whereas the Inverse-Document-Frequency calculates in how many communities a term appear. The higher the number of communities it appears is, the lower the IDF will be. In other words, a term has a high TF-IDF value if it is used a lot in a community, but not used in many other communities.
-
-
-```{r,results = "asis", eval=TRUE}
+```{r,results = "asis", eval=TRUE, echo=FALSE}
 for (com in unique(alluv_dt[order(ID_bis)]$Com_ID)) {
   ####################### Preparing the data to put in the template
   
@@ -294,4 +291,3 @@ plot(ggplot(tf_idf_alluvial$list_words[Com_ID == com], aes(reorder_within(word, 
   cat("  \n")
 }
 ```
-
