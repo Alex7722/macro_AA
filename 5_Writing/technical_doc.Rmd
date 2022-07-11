@@ -1,6 +1,5 @@
 ---
 title: "Mapping Macroeconomics - Technical Documentation"
-author: "Aurélien Goutsmedt and Alexandre Truc"
 output: 
   html_document:
     theme: readable

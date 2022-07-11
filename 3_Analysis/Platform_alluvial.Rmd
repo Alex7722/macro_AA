@@ -1,5 +1,5 @@
 ---
-title: "Alluvial"
+title: "Overview of All Networks and Clusters"
 output: 
   html_document:
     theme: united
@@ -146,45 +146,47 @@ alluv_dt <- merge(alluv_dt, nodes_JEL[,c("ID_Art","ItemID_Ref")], by = "ID_Art")
 
 ```
 
-In this section, you will find graphic representations of all networks and communities as alluvial diagrams. You can click on images to zoom and explore the diagrams with more precision.
+In this section, you will find a graphic representation of all networks and communities in an alluvial diagram, as well as detailed information on the different inter-temporal clusters. You can click on images to zoom and explore the figures with more precision.
 
--   The X axis delimits the different time windows of the platform. For one time window, you find all the communities in the network represented as rectangles (the stratum of the alluvial)
 
--   Each rectangle is one cluster in a given network detected by the Leiden algorithm. Rectangles are given a color according to the intertemporal naming procedure explained in the technical documentation. Colors in the alluvial directly match colors in the graph representation on the platform.
+# Alluvial Diagram
 
--   The "flow" between rectangles (the alluvium) is the share of nodes going from one cluster to the other. On the upper part of each rectangles, the absence of flow on the right is the share of nodes that are not found in the previous time window network (articles published on the last year of the time window), while the absence of flow on the left is the share of nodes that disappear in the following time window network (articles published in the first year of the time window).
+The alluvial diagram offer a synthetic representation of our networks and the different communities identified. 
+
+-   The X axis delimits the different time windows of the platform. For one time window, you find all the communities in the network represented as rectangles (the stratum of the alluvial);
+
+-   Each rectangle is one cluster in a given network detected by the Leiden algorithm. Rectangles are given a color according to the qualitative inter-temporal naming procedure explained in the [technical documentation](./documentation). Colors in the alluvial directly match colors in the graph representation on the platform.
+
+-   The "flow" between rectangles (the alluvium) is the share of nodes going from one cluster to the other. On the upper part of each rectangle, the absence of flow on the right is the share of nodes that disappear in the following time window network (articles published in the last year of the current time window), while the absence of flow on the left is the share of nodes not found in the previous time window network (articles published in the first year of the current time window).
 
 -   The Y axis is the share of nodes in a given community for rectangles and the share of nodes circulating between clusters for the alluvium.
-
-# Alluvial Diagrams
 
 ```{r alluvial_plot, eval=TRUE, echo=FALSE}
 
 include_graphics(here(picture_path,"alluvial_platform_graph.png"))
-include_graphics(here(picture_path,"alluvial_platform_graph_noname.png"))
 
 ```
 
-# List of the main macroeconomics clusters in the alluvial
+# List of the main macroeconomics communities in the alluvial
 
-In this section, you will find a number of synthetic information and tables about [**intertemporal clusters**]{.underline} (i.e. all articles in all time windows in individual clusters as identified by sub-names).
+In this section, you will find a number of synthetic information and tables about [**intertemporal communities**]{.underline}. On the [Graph](./) page, by clicking on the *Communitie information* button, you have access on information about the community for the displayed time-window. In what follows, you have acces on information about the community as the whole, that is for all the time windows in which it exists. For each intertemporal community, you can find:
 
 -   The first year of the first five-year window the community appears for the first time and the last year of the last window before it disappears;
 
--   The number of nodes in the community, what it represents in the whole corpus, and what the community represents in the five-year window it is the largest in proportion;
+-   The number of nodes in the community, what it represents in the whole corpus, and what the community represents in the five-year window when it is the largest in proportion;
 
 -   The five authors that have published the highest number of articles in the community;
 
 -   The five journals that have published the highest number of articles in the community;
 
--   The articles of the community that "identifies" the most the community. We use a normalized deviation measure, which takes into account the number of times an article is cited in the corpus in general during the period---if the community existed from 1979 to 1991, we calculate the number of citations of these articles between 1979 and 1991--- and the number of times it is cited by other articles of the community. The formula looks like this: $\theta = \sqrt{N}\frac{f - f_0}{\sqrt{f_0(1 - f_0)}}$ with $N$ the total number of articles in the corpus in the period, $f$ the weighted frequency in the community and $f0$ the weighted frequency in the whole corpus. The articles with the highest values are the articles which are highly cited by other articles of the community, without being highly cited by the other articles of the period.
+-   The articles of the community that "identifies" the most the community. We use a normalized deviation measure, which takes into account the number of times an article is cited in the corpus in general during the period---if the community existed from 1979 to 1991, we calculate the number of citations of these articles between 1979 and 1991---and the number of times it is cited by other articles of the community. The formula looks like this: $\theta = \sqrt{N}\frac{f - f_0}{\sqrt{f_0(1 - f_0)}}$ with $N$ the total number of articles in the corpus in the period, $f$ the weighted frequency in the community and $f0$ the weighted frequency in the whole corpus. The articles with the highest values are the articles which are highly cited by other articles of the community, without being highly cited by the rest of the articles of the period.
 
 -   The most cited references (articles, books, book chapters...).
 
 -   The terms (in the articles titles) that "identify" the most the communities. We use the [Term-Frequency/Inverse-Document-Frequency](https://en.wikipedia.org/wiki/Tf%E2%80%93idf) measure. The Term-Frequency part simply looks at the number of time a term is used (above the total number of words used by the community), whereas the Inverse-Document-Frequency calculates in how many communities a term appear. The higher the number of communities it appears is, the lower the IDF will be. In other words, a term has a high TF-IDF value if it is used a lot in a community, but not used in many other communities.
 
 
-[**IMPORTANT DISCLAIMER**]{.underline}: because the number of articles (nodes) increase rapidly over time, communities that exists over many time windows are mostly characterized in the following tables by the latter time windows. In turn, the following tables can hide heterogeneity and great transformations within a particular cluster simply because the weight of the latter time window is simply to important. [The best exploratory tool remain to look at individual cluster on the platform for different time window]{.underline}.
+[**IMPORTANT DISCLAIMER**]{.underline}: because the number of articles (nodes) increase rapidly over time, communities that exists over many time windows are mostly characterized in the following tables by the more recent time windows. In turn, the following tables can hide heterogeneity and great transformations within a particular community simply because the weight of the more recent time windows is simply too important. [The best exploratory tool remain to look at each community on the platform for different time window]{.underline}.
 
 ```{r,results = "asis", eval=TRUE, echo=FALSE}
 for (com in unique(alluv_dt[order(ID_bis)]$Com_ID)) {
@@ -254,21 +256,21 @@ main_journals <- main_journals %>%
   slice(1:5)
 
 ################ Beginning of the template ######################
-  cat(sprintf("  \n## Community %s \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
+  cat(sprintf("  \n## Community _%s_ \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
   cat(paste0("  \nThe community exists from ", window[1]," to ", window[2],". \n"))
-  cat(paste0("  \nThe community gathers ",length(unique(alluv_com$ID_Art))," articles. It represents ", round(unique(alluv_com$share_leiden_total)*100,2), "% of the whole corpus. In the five-year window when its share in the network is the bigggest, it represents ", round(unique(alluv_com$share_max)*100,2), "% of the corresponding five-year network. \n"))
+  cat(paste0("  \nThe community gathers ",length(unique(alluv_com$ID_Art))," articles. It represents ", round(unique(alluv_com$share_leiden_total)*100,2), "% of the whole corpus. In the five-year window when its share in the network is the biggest, it represents ", round(unique(alluv_com$share_max)*100,2), "% of the corresponding five-year network. \n"))
   cat(paste0("  \nThe five most prolific authors in this community are ",paste0(main_author$Nom," (",main_author$nb_art,")", collapse = ", "),". \n"))
   cat(paste0("  \nThe five journals with the highest number of articles in this community are ",paste0(main_journals$Revue," (",main_journals$nb_art,")", collapse = ", "),". \n"))
 
   
-  cat(sprintf("  \n### Most cited articles of the community %s \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
+  cat(sprintf("  \n### Most cited articles of the community _%s_ \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
   cat(paste0("In the next table, you have the ten articles of the community with the highest normalised deviation measure, which compares the number of citations within the community, with the number of citations in the whole corpus between ", window[1]," and ", window[2],". \n\n"))
   
   print(kbl(most_cited_nodes,
             col.names = c("First Author","Year","Title","Citations Deviation")) %>% 
   kable_styling(bootstrap_options = c("striped","condensed")))
   
-  cat(sprintf("  \n### Most cited references by the community %s \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
+  cat(sprintf("  \n### Most cited references by the community _%s_ \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
   cat(paste0("In the next table, you have the fifteen most cited references by the articles of the community. \n\n"))
   
   print(kbl(most_cited_ref[,c("Nom","Annee","Revue_Abbrege","Titre","nb_cit_com")],
@@ -276,7 +278,7 @@ main_journals <- main_journals %>%
         kable_styling(bootstrap_options = c("striped","condensed")))
   
   cat(sprintf("  \n### Terms with the highest TF-IDF value in community %s \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
-  cat(paste0("  \nWe have extracted all the terms (unigrams and bigrams, that is one word and two words) in the title of all the community articles. We display here the 20 terms which indentifies the most this particular community, in comparison to the other communities."))
+  cat(paste0("  \nWe have extracted all the terms (unigrams and bigrams, that is one word and two words) in the title of all the community articles. We display here the 20 terms which indentify the most this particular community, in comparison to the other communities."))
 plot(ggplot(tf_idf_alluvial$list_words[Com_ID == com], aes(reorder_within(word, tf_idf, color), tf_idf, fill = color)) +
     geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
     labs(
