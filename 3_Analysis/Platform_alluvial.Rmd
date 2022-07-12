@@ -8,6 +8,7 @@ output:
     toc_float: true
     toc_depth: 2
     code_folding: hide
+    self_contained: false
 ---
 
 ```{r setup, include=FALSE}
@@ -21,6 +22,17 @@ library(knitr)
   }
 library(kableExtra)
 library(here)
+```
+
+```{css, echo=FALSE}
+body .main-container {
+max-width: 100% !important;
+width: 100% !important;
+margin: auto;
+}
+body {
+max-width: 100% !important;
+}
 ```
 
 ```{css zoom-lib-src, echo = FALSE}
