@@ -256,18 +256,27 @@ most_cited_com <- merge(most_cited_com, com_size, by = c("window","ref_com"), al
 most_cited_com[,tot_size:=sum(com_size),.(window, new_Id_com)]
 most_cited_com[,share_size:=com_size/tot_size]
 
-most_cited_com[,`Weighted Share of Citations to`:=share_citation_by_com*com_size]
-most_cited_com[,`Weighted Share of Citations to`:= round(`Weighted Share of Citations to`,2)]
+most_cited_com[,weighted_share := share_citation_by_com/share_size]
 
-most_cited_com[,`Share of Citations to`:=paste0(round(share_citation_by_com*100,2)," %")]
+most_cited_com[,`Weighted Share of Citations to`:= weighted_share/sum(weighted_share),.(window, new_Id_com)]
+most_cited_com[,`Weighted Share of Citations to`:= paste0(round(`Weighted Share of Citations to`*100,2)," %")]
+
+most_cited_com[,`Share of Citations to`:= paste0(round(share_citation_by_com*100,2)," %")]
 
 most_cited_com[window=="2009-2013" & new_Id_com=="oVarxM1p"][order(-n_cite)]
 
 most_cited_com_table <- copy(most_cited_com)
 setnames(most_cited_com_table, "ref_com", "Citations to")
-most_cited_com_table <- most_cited_com_table[,.(window, new_Id_com, `Citations to`, `Share of Citations to`, `Weighted Share of Citations to`)]
+
+most_cited_com_table <- merge(most_cited_com_table, 
+                    alluv_dt[,.(new_Id_com,`sub-name`,`meta-name`)][,head(.SD,1),new_Id_com], # retrieve the name of communities evolution/origin
+                    by.x="Citations to", by.y="new_Id_com", all.x=TRUE)
+most_cited_com_table[,`Citations to`:= paste0(`sub-name`, " - ",`meta-name`)]
+most_cited_com_table[`Citations to`=="NA - NA",`Citations to`:="Unamed Community"]
 
 most_cited_com_table[,table_name:="Cluster_Cited"]
+
+most_cited_com_table <- most_cited_com_table[,.(window, new_Id_com, `Citations to`, `Share of Citations to`, `Weighted Share of Citations to`, table_name)]
 
 most_cited_com_table[window=="2009-2013" & new_Id_com=="oVarxM1p"][order(-`Share of Citations to`)]
 
@@ -278,36 +287,45 @@ most_cited_com_table[window=="2009-2013" & new_Id_com=="oVarxM1p"][order(-`Share
 com_size <- copy(nodes[,.N,.(window,new_Id_com)])
 setnames(com_size, "N", "com_size")
 
-most_cited_to_com <- merge(most_cited_refs, most_cited_communities_nodes, by = c("window","ItemID_Ref"), all.x = TRUE) # we merge the most cited ref with the table of nodes on windows and ItemID_Ref (so ref of nodes in the same network)
-most_cited_to_com <- most_cited_to_com[!is.na(ref_com),.N,.(window,new_Id_com,ref_com)][order(-N)]
-setnames(most_cited_to_com, "N", "n_cited")
-most_cited_to_com[,tot_cit:=sum(n_cited),.(window, ref_com)]
-most_cited_to_com[,share_citation_to_com:=n_cited/tot_cit]
-most_cited_to_com <- merge(most_cited_to_com, com_size, by = c("window","new_Id_com"), all.x = TRUE) # we merge the most cited ref with the table of nodes on windows and ItemID_Ref (so ref of nodes in the same network)
-most_cited_to_com[,tot_size:=sum(com_size),.(window, ref_com)]
-most_cited_to_com[,share_size:=com_size/tot_size]
+most_cited_from_com <- merge(most_cited_refs, most_cited_communities_nodes, by = c("window","ItemID_Ref"), all.x = TRUE) # we merge the most cited ref with the table of nodes on windows and ItemID_Ref (so ref of nodes in the same network)
+most_cited_from_com <- most_cited_from_com[!is.na(ref_com),.N,.(window,new_Id_com,ref_com)][order(-N)]
+setnames(most_cited_from_com, "N", "n_cited")
+most_cited_from_com[,tot_cit:=sum(n_cited),.(window, ref_com)]
+most_cited_from_com[,share_citation_from_com:=n_cited/tot_cit]
+most_cited_from_com <- merge(most_cited_from_com, com_size, by = c("window","new_Id_com"), all.x = TRUE) # we merge the most cited ref with the table of nodes on windows and ItemID_Ref (so ref of nodes in the same network)
+most_cited_from_com[,tot_size:=sum(com_size),.(window, ref_com)]
+most_cited_from_com[,share_size:=com_size/tot_size]
 
-most_cited_to_com[,`Weighted Share of Citations from`:= share_citation_to_com*com_size]
-most_cited_to_com[,`Weighted Share of Citations from`:= round(`Weighted Share of Citations from`,2)]
+most_cited_from_com[,weighted_share_from := share_citation_from_com/share_size]
 
-most_cited_to_com[,`Share of Citations from`:=paste0(round(share_citation_to_com*100,2)," %")]
+most_cited_from_com[,`Weighted Share of Citations from`:= weighted_share_from/sum(weighted_share_from),.(window, new_Id_com)]
+most_cited_from_com[,`Weighted Share of Citations from`:= paste0(round(`Weighted Share of Citations from`*100,2)," %")]
 
-most_cited_to_com[window=="2009-2013" & ref_com=="oVarxM1p"][order(-n_cited)]
+most_cited_from_com[,`Share of Citations from`:=paste0(round(share_citation_from_com*100,2)," %")]
 
-most_cited_to_com_table <- copy(most_cited_to_com)
-setnames(most_cited_to_com_table, "new_Id_com", "Citations from")
-setnames(most_cited_to_com_table, "ref_com", "new_Id_com")
-most_cited_to_com_table <- most_cited_to_com_table[,.(window, new_Id_com, `Citations from`, `Share of Citations from`, `Weighted Share of Citations from`)]
+most_cited_from_com[window=="2009-2013" & ref_com=="oVarxM1p"][order(-n_cited)]
 
-most_cited_to_com_table[,table_name:="Cluster_Citing"]
+most_cited_from_com_table <- copy(most_cited_from_com)
+setnames(most_cited_from_com_table, "new_Id_com", "Citations from")
+setnames(most_cited_from_com_table, "ref_com", "new_Id_com")
 
-most_cited_to_com_table[window=="2009-2013" & new_Id_com=="oVarxM1p"][order(-`Share of Citations from`)]
+most_cited_from_com_table <- merge(most_cited_from_com_table, 
+                              alluv_dt[,.(new_Id_com,`sub-name`,`meta-name`)][,head(.SD,1),new_Id_com], # retrieve the name of communities evolution/origin
+                              by.x="Citations from", by.y="new_Id_com", all.x=TRUE)
+most_cited_from_com_table[,`Citations from`:= paste0(`sub-name`, " - ",`meta-name`)]
+most_cited_from_com_table[`Citations from`=="NA - NA",`Citations from`:="Unamed Community"]
+
+most_cited_from_com_table[,table_name:="Cluster_Citing"]
+
+most_cited_from_com_table <- most_cited_from_com_table[,.(window, new_Id_com, `Citations from`, `Share of Citations from`, `Weighted Share of Citations from`, table_name)]
+
+most_cited_from_com_table[window=="2009-2013" & new_Id_com=="oVarxM1p"][order(-`Share of Citations from`)]
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### All Tables ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
-master_table_info_com <- rbind(authors_table,most_cited_refs_info, tf_idf_table_final, com_origin, com_future, most_cited_com_table, most_cited_to_com_table, fill=TRUE)
+master_table_info_com <- rbind(authors_table,most_cited_refs_info, tf_idf_table_final, com_origin, com_future, most_cited_com_table, most_cited_from_com_table, fill=TRUE)
 master_table_info_com[is.na(master_table_info_com)] <- ""
 
 write.csv(master_table_info_com, here(data_path,"macro_AA","5_platform_data","master_table_info_com.csv"))
