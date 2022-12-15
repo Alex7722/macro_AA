@@ -270,7 +270,7 @@ main_journals <- main_journals %>%
 ################ Beginning of the template ######################
   cat(sprintf("  \n## Community _%s_ \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
   cat(paste0("  \nThe community exists from ", window[1]," to ", window[2],". \n"))
-  cat(paste0("  \nThe community gathers ",length(unique(alluv_com$ID_Art))," articles. It represents ", round(unique(alluv_com$share_leiden_total)*100,2), "% of the whole corpus. In the five-year window when its share in the network is the biggest, it represents ", round(unique(alluv_com$share_max)*100,2), "% of the corresponding five-year network. \n"))
+  cat(paste0("  \nThe community gathers ",length(unique(alluv_com$ID_Art))," unique articles from our corpus (",round(length(unique(alluv_com$ID_Art))/length(unique(alluv_dt$ID_Art))*100,2),"% of the corpus). The nodes of the community represents ", round(unique(alluv_com$share_leiden_total)*100,2), "% of the all nodes across all networks. In the five-year window when its share in the network is the biggest, it represents ", round(unique(alluv_com$share_max)*100,2), "% of the corresponding five-year network. \n"))
   cat(paste0("  \nThe five most prolific authors in this community are ",paste0(main_author$Nom," (",main_author$nb_art,")", collapse = ", "),". \n"))
   cat(paste0("  \nThe five journals with the highest number of articles in this community are ",paste0(main_journals$Revue," (",main_journals$nb_art,")", collapse = ", "),". \n"))
 
