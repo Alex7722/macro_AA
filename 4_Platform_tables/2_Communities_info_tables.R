@@ -45,6 +45,10 @@ authors$name_short <- toupper(authors$name_short)
 authors <- authors[, Nom := name_short]
 authors[, c("name_short") := NULL]
 
+## Institutions Table
+institutions <- readRDS(here(data_path,"macro_AA","3_Corpus_WoS","MACRO_AA_INSTITUTIONS.rds"))
+institutions[,ID_Art:=as.character(ID_Art)]
+
 ## Refs Table
 refs <- arrow::read_parquet(here(data_path, "macro_AA","OST_generic_data", "all_ref.parquet"),as.data.frame=FALSE) %>% 
   .[ID_Art %in% nodes$ID_Art]
@@ -69,11 +73,51 @@ authors_table[,share_of_paper_authored:=n_authors/n_nodes_window_com*100]
 
 ## final table
 authors_table <- authors_table[order(window,new_Id_com,-share_of_paper_authored,Nom),.(window,new_Id_com,Nom,share_of_paper_authored)] %>% unique()
-authors_table <- authors_table[,table_name:="Most_occurring_authors"] %>% rename("Share of Paper Authored" = share_of_paper_authored)
+authors_table <- authors_table[,table_name:="Most_occurring_authors"] %>% 
+  rename("Share of Paper Authored" = share_of_paper_authored)
 authors_table[,`Share of Paper Authored`:=paste0(round(`Share of Paper Authored`,2)," %")]
 
 authors_table <- authors_table[, head(.SD, 20), .(window,new_Id_com)]
 
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Most Occurring Countries Table ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+countries_table <- merge(nodes[,.(ID_Art,window,new_Id_com)],institutions[,.SD[1], .(Pays, ID_Art)][,.(ID_Art, Pays)],by="ID_Art",allow.cartesian=TRUE)
+
+## Compute
+countries_table[,n_countries:=.N,.(window,new_Id_com, Pays)]
+countries_table[,tot_occurences:=.N,.(window,new_Id_com)]
+countries_table[,share_of_country_occurence:=n_countries/tot_occurences*100]
+
+## final table
+countries_table <- countries_table[order(window,new_Id_com,-share_of_country_occurence),.(window,new_Id_com,Pays,share_of_country_occurence)] %>% unique()
+countries_table <- countries_table[,table_name:="Most_occurring_countries"] %>% 
+  rename("Share of Articles" = share_of_country_occurence,
+         "Country" = Pays)
+countries_table[,`Share of Articles`:=paste0(format(round(`Share of Articles`,2), 2)," %")]
+
+countries_table <- countries_table[, head(.SD, 20), .(window,new_Id_com)]
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+#### Most Occurring Institutions Table ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
+
+institutions_table <- merge(nodes[,.(ID_Art,window,new_Id_com)],institutions[,.SD[1], .(Institution, ID_Art)][,.(ID_Art, Institution)],by="ID_Art",allow.cartesian=TRUE)
+
+## Compute
+institutions_table[,n_institutions:=.N,.(window,new_Id_com, Institution)]
+institutions_table[,tot_occurences:=.N,.(window,new_Id_com)]
+institutions_table[,share_of_institutions_occurence:=n_institutions/tot_occurences*100]
+
+## final table
+institutions_table <- institutions_table[order(window,new_Id_com,-share_of_institutions_occurence),.(window,new_Id_com,Institution,share_of_institutions_occurence)] %>% unique()
+institutions_table <- institutions_table[,table_name:="Most_occurring_institutions"] %>% 
+  rename("Share of Articles" = share_of_institutions_occurence)
+institutions_table[,`Share of Articles`:=paste0(format(round(`Share of Articles`,2), 2)," %")]
+
+institutions_table <- institutions_table[, head(.SD, 20), .(window,new_Id_com)]
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #### Most Cited Refs Table ####
@@ -357,7 +401,7 @@ most_cited_from_com_table <- most_cited_from_com_table %>%
 #### All Tables ####
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 
-master_table_info_com <- rbind(authors_table,most_cited_refs_info, tf_idf_table_final, com_origin, com_future, most_cited_from_com_table, most_cited_to_com_table, fill=TRUE)
+master_table_info_com <- rbind(authors_table, countries_table, institutions_table, most_cited_refs_info, tf_idf_table_final, com_origin, com_future, most_cited_from_com_table, most_cited_to_com_table, fill=TRUE)
 master_table_info_com[is.na(master_table_info_com)] <- ""
 
 write.csv(master_table_info_com, here(data_path,"macro_AA","5_platform_data","master_table_info_com.csv"))
