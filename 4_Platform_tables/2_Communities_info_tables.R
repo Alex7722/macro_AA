@@ -171,7 +171,7 @@ com_origin <- merge(com_origin,
                     by.x="Community of Origin", by.y="new_Id_com", all.x=TRUE)
 com_origin[`Community of Origin`=="New Articles",`meta-name`:="New Articles"]
 com_origin[,`Community of Origin`:=paste0(`meta-name`," - ",`sub-name`)]
-com_origin[`Community of Origin`=="NA - NA",`Community of Origin`:="Unamed Community"]
+com_origin[`Community of Origin`=="NA - NA",`Community of Origin`:="Unnamed Community"]
 com_origin[`Community of Origin`=="New Articles - NA",`Community of Origin`:="New Articles"]
 
 com_origin[,table_name:="Origin_communities"]
@@ -223,7 +223,7 @@ com_future <- merge(com_future,
                     by.x="Communities of Destiny", by.y="new_Id_com", all.x=TRUE)
 com_future[`Communities of Destiny`=="Dropped Articles",`meta-name`:="Dropped Articles"]
 com_future[,`Communities of Destiny`:=paste0(`meta-name`," - ",`sub-name`)]
-com_future[`Communities of Destiny`=="NA - NA",`Communities of Destiny`:="Unamed Community"]
+com_future[`Communities of Destiny`=="NA - NA",`Communities of Destiny`:="Unnamed Community"]
 com_future[`Communities of Destiny`=="Dropped Articles - NA",`Communities of Destiny`:="Dropped Articles"]
 
 com_future[,table_name:="Evolution_communities"]
@@ -273,7 +273,7 @@ most_cited_refs <- merge(nodes[,.(ID_Art,window,new_Id_com)],refs[ItemID_Ref!=0,
  #                   alluv_dt[,.(new_Id_com,`sub-name`,`meta-name`)][,head(.SD,1),new_Id_com], # retrieve the name of communities evolution/origin
   #                  by.x="Citations to", by.y="new_Id_com", all.x=TRUE)
 #most_cited_com_table[,`Citations to`:= paste0(`sub-name`, " - ",`meta-name`)]
-#most_cited_com_table[`Citations to`=="NA - NA",`Citations to`:="Unamed Community"]
+#most_cited_com_table[`Citations to`=="NA - NA",`Citations to`:="Unnamed Community"]
 
 #most_cited_com_table[,table_name:="Cluster_Cited"]
 
@@ -335,7 +335,7 @@ most_cited_from_com_table <- merge(com_links,
                               alluv_dt[,.(new_Id_com,`sub-name`,`meta-name`)][,head(.SD,1),new_Id_com], # retrieve the name of communities evolution/origin
                               by = "new_Id_com", all.x=TRUE) 
 most_cited_from_com_table[,`Citations from`:= paste0(`sub-name`, " - ",`meta-name`)]
-most_cited_from_com_table[`Citations from`=="NA - NA",`Citations from`:="Unamed Community"]
+most_cited_from_com_table[`Citations from`=="NA - NA",`Citations from`:="Unnamed Community"]
 most_cited_from_com_table <- most_cited_from_com_table %>% 
   select(window, new_Id_com = ref_com, `Citations from`, `citations` = n_cited, `Share of citations from`, `Weighted share of citations from`) %>% 
   mutate(table_name = "Cluster_citing_origins")
@@ -348,7 +348,7 @@ most_cited_from_com_table <- most_cited_from_com_table %>%
                                      alluv_dt[,.(new_Id_com,`sub-name`,`meta-name`)][,head(.SD,1),new_Id_com], # retrieve the name of communities evolution/origin
                                      by.x = "ref_com", by.y = "new_Id_com", all.x=TRUE) 
   most_cited_to_com_table[,`Citations to`:= paste0(`sub-name`, " - ",`meta-name`)]
-  most_cited_to_com_table[`Citations to`=="NA - NA",`Citations to`:="Unamed Community"]
+  most_cited_to_com_table[`Citations to`=="NA - NA",`Citations to`:="Unnamed Community"]
   most_cited_to_com_table <- most_cited_to_com_table %>% 
     select(window, new_Id_com, `Citations to`, `citations` = n_cited, `Share of citations going to`, `Weighted share of citations going to`) %>% 
   mutate(table_name = "Cluster_citing_destination")

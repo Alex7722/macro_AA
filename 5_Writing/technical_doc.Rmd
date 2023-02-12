@@ -1,5 +1,6 @@
 ---
 title: "Mapping Macroeconomics - Technical Documentation"
+author: "Aurélien Goutsmedt and Alexandre Truc"
 output: 
   html_document:
     theme: readable
@@ -26,7 +27,7 @@ nb_temporal_com_filtered <- alluv_dt[color != "grey"]$new_Id_com %>% unique %>% 
 
 Our corpus is composed of macroeconomic articles published in economics. 
 
-We identified articles published in macroeconomics using **JEL codes** related to macroeconomics (Econlit database). JEL codes are used in economics to classify articles into specialties, like “Microeconomics”, “Macroeconomics & Monetary Economics”, “Industrial Organization”, etc. An article can have multiple JEL codes and so can be identified as part of multiple specialties. The JEL nomenclature was radically altered in 1991, and while these results in some discontinuity between the two nomenclatures, there are some correspondence (see Cherrier, 2017, for a history of JEL codes). The contemporary list of JEL codes can be found [here](https://www.aeaweb.org/econlit/jelCodes.php?view=jel) and the old JEL codes with old/new correspondence table can be found in the *Journal of Economic Literature*, volume 29(1) (JEL, 1991).
+We identified articles published in macroeconomics using **JEL codes** related to macroeconomics (Econlit database). JEL codes are used in economics to classify articles into specialties, like “Microeconomics”, “Macroeconomics & Monetary Economics”, “Industrial Organization”, etc. An article may have multiple JEL codes and so can be identified as part of multiple specialties. The JEL nomenclature was radically altered in 1991, and while these results in some discontinuity between the two nomenclatures, there are some correspondence (see Cherrier, 2017, for a history of JEL codes). The contemporary list of JEL codes can be found [here](https://www.aeaweb.org/econlit/jelCodes.php?view=jel) and the old JEL codes with old/new correspondence table can be found in the *Journal of Economic Literature*, volume 29(1) (JEL, 1991).
 
 For our corpus, we consider that **an article is a macroeconomics article if it has one of the following codes**: 
 
@@ -36,11 +37,11 @@ For our corpus, we consider that **an article is a macroeconomics article if it 
 
 Two additional comments on the JEL classification are necessary:
 
--	First, we had to use some pre-1991 JEL codes that are not considered in the new classification as totally belonging to macroeconomics. Consequently, many articles in our pre-1991 corpus are public finance/public economics articles. Nonetheless, this group is clearly identifiable in our networks and thus do not disturb the interpretation of our results.
+-	First, we had to use some pre-1991 JEL codes that are not considered in the new classification as belonging fully to macroeconomics. Consequently, many articles in our pre-1991 corpus are public finance/public economics articles. Nonetheless, this group is clearly identifiable in our networks and thus do not disturb the interpretation of our results.
 
 -	Second, in the recent classification, the letter E designates macroeconomics JEL code, while F designates International Economics. In this last sub-discipline, we decided that it would be important to have articles dealing with international macroeconomics and thus we integrated articles with F3 and F4.2 JEL codes.
 
-Using these JEL codes, we **match the articles extracted from Econlit with Web of Science articles** using the following matching variables:
+Using these JEL codes, we **match the articles extracted from Econlit with Web of Science (WoS) articles** using the following matching variables:
 
 - Journal, Volume, First Page
 
@@ -62,9 +63,9 @@ Our networks are based on **bibliographic coupling**. In a bibliographic couplin
 
 1.	**The size of the bibliography** of the two linked articles. It means that common references between two articles with long bibliography are weighted as less significant since the likeliness of potential common references is higher. Conversely, common references between two articles with a short bibliography are weighted as more significant. 
 
-2.	**The number of occurrences of each reference** in the overall corpus. When a reference is shared between two articles, it is weighted as less significant if it is a very common reference across the entire corpus and very significant if it is scarcely cited. The assumption is that a very rare common reference points to a higher content similarity between two articles than a highly cited reference.
+2.	**The number of citations of each reference** in our corpus in the corresponding period. When a reference is shared between two articles, it is weighted as less significant if it is a very common reference in the corpus of the corresponding period and very significant if it is scarcely cited. The assumption is that a very rare reference in common points to a higher content similarity between two articles than a highly cited reference.
 
-For all macroeconomics articles published in the EER and in the Top 5, we build successive networks **on 5-year overlapping windows** (1969-1973; 1970-1974; …; 2010-2014; 2011-2015). This results in 43 networks.
+For all the macroeconomics articles gathered, we build successive networks **on 5-year overlapping windows** (1969-1973; 1970-1974; …; 2010-2014; 2011-2015). This results in 43 networks.
 
 For each network:
 
@@ -82,13 +83,34 @@ For each network:
 
 We use the *Leiden detection algorithm* (Traag et al., 2019) that optimize the modularity on each network to identify groups of articles that are similar to each other and dissimilar to the rest of the network. We use a resolution of 1 with 1000 iterations. This results in `r nb_total_com` clusters across all networks. 
 
-Because networks have a lot of overlaps (three years are common to successive networks), many clusters between two successive periods are composed of the same articles. To identify these clusters that are very similar between two successive time-windows, we consider that two clusters can be merged if *(i)* at least 55% of the articles in a cluster of the first time-window were in the same cluster in the second time window and *(ii)* the cluster was also composed by at least 55% of articles of the first time-window. Simply put, **between two successive time-windows, if two clusters share a high number of articles, and are both mostly composed by these shared articles, they are considered the same cluster**. From the `r nb_total_com` initial clusters, we thus reduce the number of clusters to `r nb_temporal_com`.
+Because networks have a lot of overlaps (four years are common to successive networks), many clusters between two successive periods are composed of the same articles. To identify these clusters that are very similar between two successive time-windows, we consider that two clusters can be merged if *(i)* at least 55% of the articles in a cluster of the first time-window were in the same cluster in the second time window and *(ii)* the cluster of the second time window was also composed by at least 55% of articles of the first time-window. Simply put, **between two successive time-windows, if two clusters share a high number of articles, and are both mostly composed by these shared articles, they are considered the same cluster**. From the `r nb_total_com` initial clusters, we thus reduce the number of clusters to `r nb_temporal_com`.
 
 Finally, for clusters representing more than 3% of a network for at least one time-window (that is, `r nb_temporal_com_filtered` clusters), we collect a certain number of information for each (most cited nodes, most cited references, recurrent authors and journals, most “identifying” words in title) to name the clusters. We use two-level names:
 
 - **Meta-names** are names shared across different clusters. They capture a broader characterization of the clusters: Business Cycles; Consumption, Investment & Production; Econometrics; Growth; International Macroeconomics; Keynesian Economics, Macro Policy; Monetary & Financial Economics; Public Finance.
 
 - **Sub-names** are unique to clusters. They capture what makes the cluster specific to other clusters in the network, and other clusters with the same meta-name (e.g., International Macroeconomics: Exchange Rate Dynamics).
+
+## Additional informations
+
+### Informations about institutions and countries
+
+In WoS, articles' authors and affiliations are separated information. It means that it is not possible to associate an author with an affiliation. In the networks displayed on the platform, you have information about who are the authors of an article/node, as well as what are the country and institution associated to the article. However, when there is more than one author, you cannot infer the affiliations of the different authors. 
+
+### Precisions on "Community information" in "Graphs" 
+
+In the networks, when you click on a node, you can then access information about the community of the node (see the "Community information" button) during the time window displayed. Indeed contrary to the "[Overview of all networks and communities](/overview/)" page which gives detail on every inter-temporal clusters, the "Community information" button leads you to information only about the displayed time window.
+
+Outside of intuitive information like the most cited references by a specific cluster during a time window or the most prolific author within the cluster during the period, you will also find more elaborated information:
+
+- We measure the [Term Frequency - Inverse Document Frequency](https://en.wikipedia.org/wiki/Tf%E2%80%93idf) of unigrams and bigrams in articles titles. TF-IDF is a measure intended to reflect the importance of a word for a document in a corpus. TF-IDF takes into account how many times a word is used by a document, while also counting in how many documents the word is used: the lower the number of documents in which it is used, the higher its significance for the documents in which it is used. Here, we took only words and bigrams that appear at least 20 times in all the titles of our corpus. A document corresponds to all the titles of a cluster during the displayed time window. TF-IDF is thus calculated on comparing all the clusters in each time window: in other words, if a cluster survives during three time windows, it will count as three different "documents" (one for each time window). It is thus possible to explore how the vocabulary used in a cluster is changing across time windows.
+- Our intertemporal clusters are built by comparing the composition of clusters in two successive networks. But it may be relevant for each cluster to understand from where the nodes in this cluster are coming (in the previous time window) and where they are going (in the next time window). This allows you to track the evolution of a specific cluster and also to understand the links between different clusters. You can look at this information in "Evolution communities" and "Origin communities". 
+  - The first one informs you about how the nodes of the cluster in the current time window are shared in the next time window between the different clusters. The nodes that are disappearing because they are not part of the next time window are indicated as "Dropped Articles". When they are going in communities that are smaller than 3% of all the nodes of the next time windows, they are aggregated under the label "Unnamed Community". 
+  - The second one informs you about how the nodes of the cluster in the current time window were shared in the previous time window. If some nodes are not in the previous time window, they are indicated as "New Articles".
+- To understand the interaction between clusters, we can also look at how they cite between each other. 
+  - In "Cluster_citing_origins", we look at which community cite the community in question during the displayed time window. We also provide an alternative measure that takes into account the size of each community, through their total number of citations. The idea is to decrease the significance of a citation from a big community in comparison to a smaller one.
+  - In "Cluster_citing_destination", we look at which communities are cited by the community in question during the displayed time window.
+
 
 ## Bibliography
 
