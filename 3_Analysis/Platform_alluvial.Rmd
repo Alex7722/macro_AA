@@ -87,6 +87,7 @@ source(here::here("functions","Script_paths_and_basic_objectsV2.R"))
 
 authors_JEL <- readRDS(here(data_path,"macro_AA","3_Corpus_WoS","JEL_matched_corpus_authors.rds"))
 ref_info_JEL <- readRDS(here(data_path,"macro_AA","3_Corpus_WoS","JEL_matched_corpus_references_info.rds"))
+institutions <- readRDS(here(data_path,"macro_AA","3_Corpus_WoS","MACRO_AA_INSTITUTIONS.rds"))
 
 
 # keepint only refs with a title and a ESpecialite, then removing doublons
@@ -160,6 +161,25 @@ alluv_dt <- merge(alluv_dt, nodes_JEL[,c("ID_Art","ItemID_Ref")], by = "ID_Art")
 
 In this section, you will find a graphic representation of all networks and communities in an alluvial diagram, as well as detailed information on the different inter-temporal clusters. You can click on images to zoom and explore the figures with more precision.
 
+# Corpus Distribution
+
+```{r histogram_plot, eval=TRUE, echo=FALSE}
+
+
+plot_hist <- ggplot(nodes_JEL[,.N,Annee_Bibliographique], aes(x=Annee_Bibliographique, y=N)) +
+  geom_bar(stat="identity")+
+  # geom_text(aes(label=N), vjust=-0.3, size=3.5)+
+  theme_minimal(base_size = 22) +
+  theme(plot.background = element_rect(fill = 'white', colour = NA)) +
+  labs(y = "Number of Observations", x = "Year") +
+  ggtitle("") 
+ggsave(here(picture_path, "corpus_histogram.png"), plot = plot_hist, width = 60, height = 50, units = "cm")
+
+
+include_graphics(here(picture_path,"corpus_histogram.png"))
+
+
+```
 
 # Alluvial Diagram
 
@@ -248,7 +268,8 @@ most_cited_ref <-  refs_alluv %>%
   select(-New_id2) %>% 
   unique() %>% 
   arrange(desc(nb_cit_com)) %>%
-  slice(1:15) 
+  slice(1:15) %>% as.data.table()
+most_cited_ref[, share_of_paper_citing:=paste0(format(round(nb_cit_com/alluv_com[,.N,ID_Art][,.N]*100,2), 2 ),"%")]
 
 # keeping the n authors the most present in coupling communities
 authors_alluv <- authors_alluv[, nb_art := .N, by = "Nom"]
@@ -266,6 +287,12 @@ main_journals <- main_journals %>%
   unique() %>% 
   arrange(desc(nb_art)) %>%
   slice(1:5)
+
+# occurrence of countries
+main_countries <- institutions[ID_Art %in% alluv_com$ID_Art][,.SD[1], .(Pays, ID_Art)][,.N,Pays][,share:=N/sum(N)][order(-share)][,share_format:=paste0(format(round(share*100,2), 2),"%")]
+
+# occurrence of institutions
+main_institutions <- institutions[ID_Art %in% alluv_com$ID_Art][,.SD[1], .(Institution, ID_Art)][,.N,Institution][,share:=N/sum(N)][order(-share)][,share_format:=paste0(format(round(share*100,2), 2),"%")]
 
 ################ Beginning of the template ######################
   cat(sprintf("  \n## Community _%s_ \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
@@ -285,12 +312,12 @@ main_journals <- main_journals %>%
   cat(sprintf("  \n### Most cited references by the community _%s_ \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
   cat(paste0("In the next table, you have the fifteen most cited references by the articles of the community. \n\n"))
   
-  print(kbl(most_cited_ref[,c("Nom","Annee","Revue_Abbrege","Titre","nb_cit_com")],
-            col.names = c("First Author","Year","Book title or journal (abbrv.)","Title","Citations")) %>% 
+  print(kbl(most_cited_ref[,c("Nom","Annee","Revue_Abbrege","Titre","nb_cit_com","share_of_paper_citing")],
+            col.names = c("First Author","Year","Book title or journal (abbrv.)","Title","Number of Citations","Share of Papers Citing")) %>% 
         kable_styling(bootstrap_options = c("striped","condensed")))
   
   cat(sprintf("  \n### Terms with the highest TF-IDF value in community %s \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
-  cat(paste0("  \nWe have extracted all the terms (unigrams and bigrams, that is one word and two words) in the title of all the community articles. We display here the 20 terms which indentify the most this particular community, in comparison to the other communities."))
+  cat(paste0("  \nWe have extracted all the terms (unigrams and bigrams, that is one word and two words) in the title of all the community articles. We display here the 20 terms which indentify the most this particular community, in comparison to the other communities.\n\n"))
 plot(ggplot(tf_idf_alluvial$list_words[Com_ID == com], aes(reorder_within(word, tf_idf, color), tf_idf, fill = color)) +
     geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
     labs(
@@ -301,7 +328,21 @@ plot(ggplot(tf_idf_alluvial$list_words[Com_ID == com], aes(reorder_within(word, 
     scale_x_reordered() +
     coord_flip() +
     theme_minimal())
+
+  cat(sprintf("  \n### Country Occurences in Affiliations %s \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
+  cat(paste0("  \nWe computed the share of authors' affiliations to particular countries. While the information is extracted from Authors' affiliations, note that the occurence is computed on unique countries affiliations per paper (e.g., an affiliation to Germany is counted as one occurence in a paper no matter the number of authors affiliated to German institutions, or the number of individual affiliations to different German institutions.\n\n"))
   
+  print(kbl(main_countries[1:10][,c("Pays", "N", "share_format")],
+            col.names = c("Country", "Number of Occurences", "Share of Occurence")) %>% 
+        kable_styling(bootstrap_options = c("striped","condensed")))
+  
+  cat(sprintf("  \n### Institutions Occurences in Affiliations %s \n\n", unique(alluv_com[Com_ID == com]$`sub-name`)))
+  cat(paste0("  \nWe computed the share of authors' affiliations to particular institutions. While the information is extracted from Authors' affiliations, note that the occurence is computed on unique institutions affiliations per paper (e.g., an affiliation to Harvard is counted as one occurence in a paper no matter the number of authors affiliated to Harvard, or the number of individual affiliations to different Harvard departments"))
+  
+  print(kbl(main_institutions[1:10][,c("Institution", "N", "share_format")],
+            col.names = c("Institution", "Number of Occurences", "Share of Occurence")) %>% 
+        kable_styling(bootstrap_options = c("striped","condensed")))
+
   cat("  \n")
 }
 ```
