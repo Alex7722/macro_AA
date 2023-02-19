@@ -40,8 +40,8 @@ require(DescTools)
 require(stringr)
 require(docstring)
 
-pswd <- ***REMOVED***
-usr <- ***REMOVED***
+source("~/macro_AA/logins_DO_NOT_UPLOAD.R")
+
 ESH <- dbConnect(MySQL(),
   user = usr, password = pswd, dbname = "OST_Expanded_SciHum",
   host = "127.0.0.1"
