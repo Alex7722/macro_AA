@@ -5,6 +5,8 @@ Aurélien Goutsmedt and Alexandre Truc
 
 ## What is the Mapping Macroeconomics Project
 
+The finished project:https://www.digitalhistoryofscience.org/dhm/
+
 This project has received a grant from the *History of Economics Sociey*
 [New Initiatives
 Fund](https://historyofeconomics.org/about-the-society/new-initiatives/).
